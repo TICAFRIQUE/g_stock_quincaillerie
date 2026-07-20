@@ -83,7 +83,7 @@ jobs:
             --exclude='storage/framework/views/' \
             --exclude='storage/app/public/' \
             --exclude='public/storage' \
-            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT || 22 }} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT || 22 }} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o PubkeyAcceptedAlgorithms=+ssh-rsa" \
             ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.SERVER_PATH }}/
 
       # ── 5. Commandes post-déploiement ────────────────────────────────
@@ -93,6 +93,7 @@ jobs:
               -p ${{ secrets.SSH_PORT || 22 }} \
               -o IdentitiesOnly=yes \
               -o StrictHostKeyChecking=no \
+              -o PubkeyAcceptedAlgorithms=+ssh-rsa \
               ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             set -e
             cd ${{ secrets.SERVER_PATH }}
