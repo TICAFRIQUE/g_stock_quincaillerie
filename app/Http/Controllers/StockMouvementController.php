@@ -22,13 +22,16 @@ class StockMouvementController extends Controller
         $fin = $request->filled('date_fin') ? Carbon::parse($request->string('date_fin')) : now()->endOfMonth();
         $type = MouvementStockType::tryFrom($request->string('type')->toString());
 
-        $mouvements = MouvementStock::query()
+        $requeteMouvements = MouvementStock::query()
             ->with(['produit', 'magasin', 'auteur'])
+            ->when($request->user()->magasin_id, fn ($q, $magasinId) => $q->where('magasin_id', $magasinId))
             ->whereBetween('created_at', [$debut->copy()->startOfDay(), $fin->copy()->endOfDay()])
             ->when($type, fn ($q) => $q->where('type', $type->value))
-            ->orderByDesc('created_at')
-            ->paginate(30)
-            ->withQueryString();
+            ->orderByDesc('created_at');
+
+        $mouvements = $request->boolean('tout')
+            ? $requeteMouvements->get()
+            : $requeteMouvements->paginate(30)->withQueryString();
 
         return view('stock.mouvements-index', [
             'mouvements' => $mouvements,

@@ -31,7 +31,7 @@
                             @endforeach
                         </ul>
                         <div class="d-flex gap-2">
-                            <a href="{{ route('ventes-en-attente.show', $venteEnAttente) }}" class="btn btn-sm btn-primary">
+                            <a href="{{ route('ventes-en-attente.reprendre.form', $venteEnAttente) }}" class="btn btn-sm btn-primary">
                                 <i class="bi bi-arrow-right-circle me-1"></i>Reprendre
                             </a>
                             <x-delete-button :action="route('ventes-en-attente.annuler', $venteEnAttente)" :label="'ce panier en attente'" />

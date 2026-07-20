@@ -37,6 +37,7 @@ class VenteService
         array $paiements,
         ?string $remiseTotaleType = null,
         ?int $remiseTotaleValeur = null,
+        ?int $montantRecu = null,
     ): Vente {
         if (empty($lignes)) {
             throw new InvalidArgumentException('Une vente doit comporter au moins une ligne.');
@@ -47,12 +48,12 @@ class VenteService
             throw new SessionNonOuverteException();
         }
 
-        return DB::transaction(function () use ($session, $caissier, $lignes, $paiements, $remiseTotaleType, $remiseTotaleValeur) {
+        return DB::transaction(function () use ($session, $caissier, $lignes, $paiements, $remiseTotaleType, $remiseTotaleValeur, $montantRecu) {
             $caisse = Caisse::whereKey($session->caisse_id)->lockForUpdate()->firstOrFail();
             $magasin = $caisse->magasin;
 
             $caisse->increment('sequence_ventes');
-            $numero = sprintf('M%d-C%d-%06d', $magasin->id, $caisse->id, $caisse->sequence_ventes);
+            $numero = sprintf('M%d-C%02d-%06d', $magasin->id, $caisse->id, $caisse->sequence_ventes);
 
             [$lignesResolues, $sousTotal] = $this->resoudreLignes($lignes, $magasin);
 
@@ -66,6 +67,13 @@ class VenteService
                 );
             }
 
+            // Le client peut donner plus que le net à payer (monnaie à rendre) :
+            // ce n'est qu'une information affichée sur le ticket, jamais utilisé
+            // pour les paiements enregistrés ci-dessous (toujours plafonnés au
+            // net à payer par le contrôleur, voir CLAUDE.md — comptage espèces).
+            $montantRecu = max($montantRecu ?? $totalNet, $totalNet);
+            $monnaieRendue = $montantRecu - $totalNet;
+
             $vente = Vente::create([
                 'numero' => $numero,
                 'magasin_id' => $magasin->id,
@@ -76,6 +84,8 @@ class VenteService
                 'remise_totale_valeur' => $remiseTotaleValeur,
                 'remise_totale_montant' => $remiseTotaleMontant,
                 'total_net' => $totalNet,
+                'montant_recu' => $montantRecu,
+                'monnaie_rendue' => $monnaieRendue,
             ]);
 
             foreach ($lignesResolues as $l) {

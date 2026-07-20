@@ -10,7 +10,14 @@
                     <span class="badge text-bg-success">Libre</span>
                 @endif
             </div>
-            <p class="text-secondary small mb-3">{{ $caisse->magasin->nom }}</p>
+            <p class="text-secondary small mb-3">
+                {{ $caisse->magasin->nom }}
+                @if ($caisse->sessions_aujourdhui_count > 1)
+                    <span class="badge text-bg-info ms-1" title="Cette caisse a été ouverte plusieurs fois aujourd'hui">
+                        <i class="bi bi-arrow-repeat me-1"></i>{{ $caisse->sessions_aujourdhui_count }} sessions aujourd'hui
+                    </span>
+                @endif
+            </p>
 
             @if ($sessionOuverte)
                 <p class="small mb-3">
@@ -24,9 +31,16 @@
                 @endif
             @else
                 @can('caisse.ouvrir')
-                    <a href="{{ route('sessions.create', $caisse) }}" class="btn btn-primary mt-auto">
-                        <i class="bi bi-unlock me-1"></i>Ouvrir une session
-                    </a>
+                    @if ($sessionCaissierOuverte)
+                        <button type="button" class="btn btn-primary mt-auto disabled" disabled
+                                title="Fermez d'abord votre session en cours sur « {{ $sessionCaissierOuverte->caisse->nom }} » avant d'en ouvrir une autre.">
+                            <i class="bi bi-unlock me-1"></i>Ouvrir une session
+                        </button>
+                    @else
+                        <a href="{{ route('sessions.create', $caisse) }}" class="btn btn-primary mt-auto">
+                            <i class="bi bi-unlock me-1"></i>Ouvrir une session
+                        </a>
+                    @endif
                 @endcan
             @endif
         </div>

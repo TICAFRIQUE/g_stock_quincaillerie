@@ -3,12 +3,21 @@
 @section('title', 'Historique des mouvements de stock')
 
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-1">
         <h2 class="h4 mb-0">Historique des mouvements de stock</h2>
-        <a href="{{ route('stock.index') }}" class="btn btn-link ps-0">Retour au stock</a>
+        <div class="d-flex gap-2">
+            <x-bouton-imprimer tout />
+            <a href="{{ route('stock.index') }}" class="btn btn-link ps-0 d-print-none">Retour au stock</a>
+        </div>
     </div>
+    <p class="text-secondary small mb-3">
+        Période : du {{ \Illuminate\Support\Carbon::parse($dateDebut)->format('d/m/Y') }} au {{ \Illuminate\Support\Carbon::parse($dateFin)->format('d/m/Y') }}
+        @if ($type)
+            · Type : {{ $type->libelle() }}
+        @endif
+    </p>
 
-    <form method="GET" action="{{ route('stock.mouvements.index') }}" class="row g-2 mb-3 align-items-end">
+    <form method="GET" action="{{ route('stock.mouvements.index') }}" class="row g-2 mb-3 align-items-end d-print-none">
         <div class="col-auto">
             <label for="date_debut" class="form-label small mb-1">Du</label>
             <input type="date" name="date_debut" id="date_debut" class="form-control" value="{{ $dateDebut }}" onchange="this.form.submit()">
@@ -72,7 +81,9 @@
         </div>
     </div>
 
-    <div class="mt-3">
-        {{ $mouvements->links() }}
-    </div>
+    @if ($mouvements instanceof \Illuminate\Pagination\LengthAwarePaginator)
+        <div class="mt-3 d-print-none">
+            {{ $mouvements->links() }}
+        </div>
+    @endif
 @endsection

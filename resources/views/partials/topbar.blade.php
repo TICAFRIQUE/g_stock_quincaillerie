@@ -1,3 +1,18 @@
+<div class="d-flex align-items-center gap-2">
+@can('rapport.voir')
+    @include('partials._cloche-notifications', [
+        'type' => \App\Notifications\EcartCaisseDetecte::class,
+        'icon' => 'bi-exclamation-triangle',
+        'titre' => 'Écarts de caisse',
+    ])
+    @include('partials._cloche-notifications', [
+        'type' => \App\Notifications\SessionOuverteTropLongtemps::class,
+        'icon' => 'bi-hourglass-split',
+        'titre' => 'Sessions ouvertes',
+    ])
+    @include('partials._cloche-stock-seuil')
+@endcan
+
 <div class="dropdown">
     <button class="btn btn-light dropdown-toggle d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
         <span class="fw-medium">{{ auth()->user()->name }}</span>
@@ -15,4 +30,5 @@
             </form>
         </li>
     </ul>
+</div>
 </div>

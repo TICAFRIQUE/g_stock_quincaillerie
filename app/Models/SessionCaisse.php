@@ -13,7 +13,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 #[Fillable([
     'caisse_id', 'caissier_id', 'fond_de_caisse', 'date_ouverture',
     'date_cloture', 'date_fermeture', 'total_ventes_especes',
-    'montant_compte', 'ecart', 'cloture_by',
+    'montant_compte', 'ecart', 'cloture_by', 'alerte_ouverture_envoyee_at',
 ])]
 class SessionCaisse extends Model
 {
@@ -29,6 +29,7 @@ class SessionCaisse extends Model
             'total_ventes_especes' => 'integer',
             'montant_compte' => 'integer',
             'ecart' => 'integer',
+            'alerte_ouverture_envoyee_at' => 'datetime',
         ];
     }
 

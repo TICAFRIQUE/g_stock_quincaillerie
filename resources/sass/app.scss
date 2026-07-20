@@ -127,3 +127,31 @@ $input-bg: #ffffff;
 [x-cloak] {
     display: none !important;
 }
+
+// --- Reçu de caisse (impression POS) : seule la carte .recu-pos sort sur le
+// papier, à la largeur d'un ticket thermique 80mm — pas la sidebar/topbar.
+@media print {
+    .erp-sidebar,
+    .erp-sidebar-backdrop,
+    .erp-topbar,
+    .d-print-none {
+        display: none !important;
+    }
+
+    .erp-main,
+    main {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .recu-pos {
+        max-width: 80mm !important;
+        margin: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    @page {
+        margin: 5mm;
+    }
+}

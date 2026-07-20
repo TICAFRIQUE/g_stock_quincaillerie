@@ -56,9 +56,16 @@
                 <div class="card-body">
                     <h3 class="h6"><i class="bi bi-clipboard-check me-2"></i>Inventaires</h3>
                     <p class="text-secondary small">Historique des comptages et écarts.</p>
-                    @can('inventaire.voir')
-                        <a href="{{ route('inventaires.index') }}" class="btn btn-sm btn-outline-primary">Voir</a>
-                    @endcan
+                    <a href="{{ route('rapports.inventaires') }}" class="btn btn-sm btn-outline-primary">Voir</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h3 class="h6"><i class="bi bi-journal-text me-2"></i>Journal d'activité</h3>
+                    <p class="text-secondary small">Actions sensibles, connexions/déconnexions.</p>
+                    <a href="{{ route('journal.index') }}" class="btn btn-sm btn-outline-primary">Voir</a>
                 </div>
             </div>
         </div>

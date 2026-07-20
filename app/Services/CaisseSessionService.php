@@ -3,14 +3,17 @@
 namespace App\Services;
 
 use App\Exceptions\CaisseNonLibreException;
+use App\Exceptions\CaissierDejaEnSessionException;
 use App\Exceptions\VentesEnAttentePresentesException;
 use App\Models\Caisse;
 use App\Models\Paiement;
 use App\Models\SessionCaisse;
 use App\Models\User;
 use App\Models\VenteEnAttente;
+use App\Notifications\EcartCaisseDetecte;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use RuntimeException;
 
 /**
@@ -31,6 +34,17 @@ class CaisseSessionService
 
             if ($dejaOuverte) {
                 throw new CaisseNonLibreException($caisse);
+            }
+
+            // Un caissier ne peut pas mener deux sessions de front, même sur
+            // des caisses différentes — il doit fermer la précédente d'abord.
+            $sessionCaissierOuverte = SessionCaisse::where('caissier_id', $caissier->id)
+                ->whereNull('date_fermeture')
+                ->with('caisse')
+                ->first();
+
+            if ($sessionCaissierOuverte) {
+                throw new CaissierDejaEnSessionException($sessionCaissierOuverte);
             }
 
             try {
@@ -56,7 +70,7 @@ class CaisseSessionService
 
         $this->assertPasDeVenteEnAttente($session);
 
-        return DB::transaction(function () use ($session, $montantCompte, $auteur) {
+        $session = DB::transaction(function () use ($session, $montantCompte, $auteur) {
             $totalEspeces = Paiement::query()
                 ->whereHas('vente', fn ($q) => $q->where('session_caisse_id', $session->id))
                 ->whereHas('moyenPaiement', fn ($q) => $q->where('est_espece', true))
@@ -74,6 +88,26 @@ class CaisseSessionService
 
             return $session->refresh();
         });
+
+        if ($session->ecart !== 0) {
+            $this->notifierEcart($session);
+        }
+
+        return $session;
+    }
+
+    /**
+     * Alerte les gérants du magasin concerné et les superadmins — envoyée
+     * après la transaction pour ne jamais notifier une clôture qui aurait
+     * finalement échoué.
+     */
+    private function notifierEcart(SessionCaisse $session): void
+    {
+        $session->loadMissing(['caisse.magasin', 'caissier']);
+
+        $destinataires = User::gerantsEtSuperadmins($session->caisse->magasin_id);
+
+        Notification::send($destinataires, new EcartCaisseDetecte($session));
     }
 
     public function fermer(SessionCaisse $session): SessionCaisse

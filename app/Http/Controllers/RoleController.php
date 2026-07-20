@@ -30,7 +30,14 @@ class RoleController extends Controller
         ]);
 
         $role = Role::create(['name' => $donnees['name'], 'guard_name' => 'web']);
-        $role->syncPermissions($this->filtrerPermissionsAutorisees($donnees['permissions'] ?? []));
+        $permissions = $this->filtrerPermissionsAutorisees($donnees['permissions'] ?? []);
+        $role->syncPermissions($permissions);
+
+        activity()
+            ->causedBy($request->user())
+            ->performedOn($role)
+            ->withProperties(['permissions' => $permissions])
+            ->log("Rôle « {$role->name} » créé");
 
         return redirect()->route('roles.index')->with('succes', 'Rôle créé.');
     }
@@ -63,22 +70,37 @@ class RoleController extends Controller
             ->intersect(config('permissions.protected'))
             ->all();
 
+        $permissionsAvant = $role->permissions->pluck('name')->all();
+
         $role->update(['name' => $donnees['name']]);
-        $role->syncPermissions([
+        $permissionsApres = [
             ...$this->filtrerPermissionsAutorisees($donnees['permissions'] ?? []),
             ...$protegeesConservees,
-        ]);
+        ];
+        $role->syncPermissions($permissionsApres);
+
+        activity()
+            ->causedBy($request->user())
+            ->performedOn($role)
+            ->withProperties(['avant' => $permissionsAvant, 'apres' => $permissionsApres])
+            ->log("Rôle « {$role->name} » modifié");
 
         return redirect()->route('roles.index')->with('succes', 'Rôle mis à jour.');
     }
 
-    public function destroy(Role $role): RedirectResponse
+    public function destroy(Request $request, Role $role): RedirectResponse
     {
         abort_if($role->name === 'Superadmin', 403);
 
         if ($role->users()->exists()) {
             return redirect()->route('roles.index')->with('erreur', 'Ce rôle est attribué à des utilisateurs, il ne peut pas être supprimé.');
         }
+
+        activity()
+            ->causedBy($request->user())
+            ->performedOn($role)
+            ->withProperties(['nom' => $role->name, 'permissions' => $role->permissions->pluck('name')->all()])
+            ->log("Rôle « {$role->name} » supprimé");
 
         $role->delete();
 

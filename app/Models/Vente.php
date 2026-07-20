@@ -13,6 +13,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 #[Fillable([
     'numero', 'magasin_id', 'session_caisse_id', 'caissier_id', 'sous_total',
     'remise_totale_type', 'remise_totale_valeur', 'remise_totale_montant', 'total_net',
+    'montant_recu', 'monnaie_rendue',
 ])]
 class Vente extends Model
 {
@@ -27,6 +28,8 @@ class Vente extends Model
             'remise_totale_valeur' => 'integer',
             'remise_totale_montant' => 'integer',
             'total_net' => 'integer',
+            'montant_recu' => 'integer',
+            'monnaie_rendue' => 'integer',
         ];
     }
 

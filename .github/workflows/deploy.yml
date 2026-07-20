@@ -1,0 +1,107 @@
+name: Déploiement
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, bcmath, pdo_sqlite, gd, exif, zip, curl, intl
+          coverage: none
+
+      - name: Installer les dépendances PHP
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Préparer l'environnement de test
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Exécuter les tests
+        run: php artisan test
+
+  deploy:
+    name: Build & Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    environment: PRODUCTION
+    if: github.ref == 'refs/heads/main'
+    steps:
+      # ── 1. Récupérer le code ─────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. PHP + Composer ────────────────────────────────────────────
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, xml, curl, zip, bcmath, intl, gd, exif
+          coverage: none
+
+      - name: Installer les dépendances Composer (prod only)
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+      # ── 3. Node + Vite (assets front, absent du template d'origine) ──
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Installer les dépendances JS
+        run: npm ci
+
+      - name: Construire les assets (Vite)
+        run: npm run build
+
+      # ── 4. Envoi des fichiers via rsync natif ───────────────────────
+      - name: Déployer via rsync
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.SSH_PORT || 22 }} ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+          rsync -azv --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.env' \
+            --exclude='node_modules' \
+            --exclude='tests/' \
+            --exclude='storage/logs/' \
+            --exclude='storage/framework/sessions/' \
+            --exclude='storage/framework/cache/' \
+            --exclude='storage/framework/views/' \
+            --exclude='storage/app/public/' \
+            --exclude='public/storage' \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT || 22 }} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
+            ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.SERVER_PATH }}/
+
+      # ── 5. Commandes post-déploiement ────────────────────────────────
+      - name: Post-deploy (migrate + cache + storage link)
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ secrets.SSH_PORT || 22 }} \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=no \
+              ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            set -e
+            cd ${{ secrets.SERVER_PATH }}
+            php artisan down || true
+            php artisan migrate --force
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+            php artisan storage:link || true
+            php artisan queue:restart
+            php artisan up
+          EOF

@@ -60,11 +60,13 @@ class DemoCatalogueSeeder extends Seeder
             $this->magasins[] = Magasin::firstOrCreate(['nom' => $definition['nom']], $definition);
         }
 
+        // Nom de caisse toujours simple ("Caisse 1", "Caisse 2") : le magasin
+        // est déjà rattaché via magasin_id et systématiquement réaffiché à
+        // côté par les vues — le baker dans le nom double l'affichage.
         foreach ($this->magasins as $magasin) {
             $nombreCaisses = $magasin->is($magasinPrincipal) ? 1 : 2;
             for ($i = 1; $i <= $nombreCaisses; $i++) {
-                $nom = $magasin->is($magasinPrincipal) && $i === 1 ? 'Caisse 1' : "Caisse {$i} — {$magasin->nom}";
-                $this->caisses[] = Caisse::firstOrCreate(['magasin_id' => $magasin->id, 'nom' => $nom]);
+                $this->caisses[] = Caisse::firstOrCreate(['magasin_id' => $magasin->id, 'nom' => "Caisse {$i}"]);
             }
         }
     }

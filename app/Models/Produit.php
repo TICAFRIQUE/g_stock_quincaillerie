@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\MediaLibrary\HasMedia;
@@ -21,6 +22,13 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 class Produit extends Model implements HasMedia
 {
     use HasFactory, SoftDeletes, LogsActivity, InteractsWithMedia;
+
+    /**
+     * Clé de cache du catalogue de vente (voir catalogueVente()) — publique
+     * pour que UniteVente puisse invalider la même entrée sans dupliquer la
+     * clé (le catalogue en cache embarque les unités de vente).
+     */
+    public const CACHE_CATALOGUE_VENTE = 'produits:catalogue-vente';
 
     protected function casts(): array
     {
@@ -88,5 +96,60 @@ class Produit extends Model implements HasMedia
     public function ligneVentes(): HasMany
     {
         return $this->hasMany(LigneVente::class);
+    }
+
+    /**
+     * Référentiel produits pour l'écran de vente : donnée de référence peu
+     * volatile (change en admin, jamais à la vente), mise en cache et
+     * invalidée à chaque écriture (voir booted()). Ne contient jamais le
+     * stock — dérivé des mouvements, donc toujours recalculé en direct par
+     * l'appelant, jamais mis en cache avec le catalogue.
+     *
+     * Mis en cache sous forme de tableau brut (jamais d'objet
+     * Collection/Model) car le driver cache "database" interdit
+     * l'unserialize d'objets PHP (`config('cache.serializable_classes')` =
+     * false, durcissement contre l'injection d'objets) : un objet caché
+     * reviendrait `__PHP_Incomplete_Class`.
+     *
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    public static function catalogueVente(): \Illuminate\Support\Collection
+    {
+        $catalogue = Cache::rememberForever(self::CACHE_CATALOGUE_VENTE, function () {
+            return static::where('actif', true)
+                ->with(['uniteVentes' => fn ($q) => $q->where('actif', true)->orderBy('facteur')])
+                ->orderBy('nom')
+                ->get()
+                ->map(fn (self $p) => [
+                    'id' => $p->id,
+                    'sku' => $p->sku,
+                    'nom' => $p->nom,
+                    'libelle_distinctif' => $p->libelle_distinctif,
+                    'libelle_affichage' => $p->libelle_affichage,
+                    'prix_piece' => $p->prix_piece,
+                    'unites' => $p->uniteVentes->map(fn (UniteVente $u) => [
+                        'id' => $u->id,
+                        'libelle' => $u->libelle,
+                        'facteur' => $u->facteur,
+                        'prix' => $u->prix,
+                    ])->values()->all(),
+                ])
+                ->values()
+                ->all();
+        });
+
+        return collect($catalogue)->map(fn (array $p) => [
+            ...$p,
+            'unites' => collect($p['unites']),
+        ]);
+    }
+
+    protected static function booted(): void
+    {
+        $invalider = fn () => Cache::forget(self::CACHE_CATALOGUE_VENTE);
+
+        static::saved($invalider);
+        static::deleted($invalider);
+        static::restored($invalider);
     }
 }

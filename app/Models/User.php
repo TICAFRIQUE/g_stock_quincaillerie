@@ -58,4 +58,23 @@ class User extends Authenticatable
     {
         return $this->hasMany(Vente::class, 'caissier_id');
     }
+
+    /**
+     * Destinataires des alertes caisse (écart, session restée ouverte…) :
+     * les gérants du magasin concerné, plus tous les superadmins.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, User>
+     */
+    public static function gerantsEtSuperadmins(int $magasinId): \Illuminate\Database\Eloquent\Collection
+    {
+        return static::where('actif', true)
+            ->where(function ($q) use ($magasinId) {
+                $q->whereHas('roles', fn ($r) => $r->where('name', 'Superadmin'))
+                    ->orWhere(function ($q2) use ($magasinId) {
+                        $q2->whereHas('roles', fn ($r) => $r->where('name', 'Gérant'))
+                            ->where('magasin_id', $magasinId);
+                    });
+            })
+            ->get();
+    }
 }

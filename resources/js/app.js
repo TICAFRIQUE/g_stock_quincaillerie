@@ -68,14 +68,14 @@ window.dataTableFrLang = {
  * côté client pour griser en amont (voir CLAUDE.md), le serveur revalide tout
  * de toute façon dans VenteService avant d'écrire le moindre mouvement.
  */
-window.posApp = function (produits) {
+window.posApp = function (produits, panierInitial = [], libelleInitial = '') {
     return {
         produits,
-        panier: [],
+        panier: panierInitial,
         remiseTotaleType: '',
         remiseTotaleValeur: null,
         paiements: [{ moyen_paiement_id: '', montant: null }],
-        libelleAttente: '',
+        libelleAttente: libelleInitial,
 
         // La barre du haut ajoute une ligne « vierge » (aucune variante choisie,
         // aucun calcul) — l'utilisateur choisit ensuite pièce/lot directement
@@ -232,6 +232,12 @@ window.posApp = function (produits) {
             return this.paiements.reduce((somme, p) => somme + (Number(p.montant) || 0), 0);
         },
 
+        // Un montant saisi sans moyen de paiement choisi échouerait silencieusement
+        // à l'enregistrement (validation serveur), donc on bloque en amont.
+        get aUnPaiementSansMoyen() {
+            return this.paiements.some((p) => (Number(p.montant) || 0) > 0 && !p.moyen_paiement_id);
+        },
+
         ajouterPaiement() {
             this.paiements.push({ moyen_paiement_id: '', montant: null });
         },
@@ -243,6 +249,49 @@ window.posApp = function (produits) {
         completerPaiement(index) {
             const reste = this.totalNet - (this.totalPaiements - (Number(this.paiements[index].montant) || 0));
             this.paiements[index].montant = Math.max(reste, 0);
+        },
+
+        // Le client peut donner plus que le net à payer (monnaie à rendre) :
+        // ce qui est réellement enregistré comme encaissement ne doit jamais
+        // dépasser le net à payer, sinon le tiroir-caisse serait faussé à la
+        // clôture (voir CLAUDE.md, règle du comptage espèces). Les montants
+        // saisis servent au calcul de la monnaie à rendre, mais c'est cette
+        // liste "plafonnée" qui est réellement envoyée au serveur.
+        get monnaieARendre() {
+            return Math.max(this.totalPaiements - this.totalNet, 0);
+        },
+
+        get paiementsAppliques() {
+            let restant = this.totalNet;
+            const resultats = [];
+            for (const p of this.paiements) {
+                const montant = Number(p.montant) || 0;
+                if (montant <= 0 || restant <= 0) continue;
+                const applique = Math.min(montant, restant);
+                resultats.push({ moyen_paiement_id: p.moyen_paiement_id, montant: applique });
+                restant -= applique;
+            }
+            return resultats;
+        },
+
+        declencherFinalisation(event) {
+            const form = document.getElementById('formVente');
+            if (!form.checkValidity()) {
+                form.classList.add('was-validated');
+                form.reportValidity();
+                return;
+            }
+            window.bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmActionModal')).show(event.currentTarget);
+        },
+
+        declencherMiseEnAttente(event) {
+            const form = document.getElementById('formAttente');
+            if (!form.checkValidity()) {
+                form.classList.add('was-validated');
+                form.reportValidity();
+                return;
+            }
+            window.bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmActionModal')).show(event.currentTarget);
         },
     };
 };

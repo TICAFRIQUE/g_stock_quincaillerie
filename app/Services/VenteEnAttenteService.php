@@ -28,6 +28,7 @@ class VenteEnAttenteService
         User $caissier,
         array $lignes,
         ?string $libelle = null,
+        ?VenteEnAttente $existant = null,
     ): VenteEnAttente {
         if (empty($lignes)) {
             throw new InvalidArgumentException('Une vente en attente doit comporter au moins une ligne.');
@@ -38,15 +39,19 @@ class VenteEnAttenteService
             throw new SessionNonOuverteException();
         }
 
-        return DB::transaction(function () use ($session, $caissier, $lignes, $libelle) {
-            $venteEnAttente = VenteEnAttente::create([
+        return DB::transaction(function () use ($session, $caissier, $lignes, $libelle, $existant) {
+            $venteEnAttente = $existant ?? new VenteEnAttente([
                 'magasin_id' => $session->caisse->magasin_id,
                 'caisse_id' => $session->caisse_id,
                 'session_caisse_id' => $session->id,
                 'caissier_id' => $caissier->id,
-                'libelle' => $libelle,
             ]);
+            $venteEnAttente->libelle = $libelle;
+            $venteEnAttente->save();
 
+            // « Remettre en attente » un panier déjà repris est une mise à jour
+            // du même brouillon, pas un nouveau panier : on remplace ses lignes.
+            $venteEnAttente->lignes()->delete();
             foreach ($lignes as $ligne) {
                 $venteEnAttente->lignes()->create([
                     'produit_id' => $ligne['produit_id'],
@@ -60,23 +65,24 @@ class VenteEnAttenteService
     }
 
     /**
+     * Finalise le panier avec les lignes/remises/paiements tels qu'édités à
+     * l'écran de reprise (le panier a pu être modifié depuis la mise en
+     * attente) — mêmes règles qu'une vente créée directement.
+     *
+     * @param  array<int, array{produit_id:int, unite_vente_id?:?int, quantite:int, remise_type?:?string, remise_valeur?:?int}>  $lignes
      * @param  array<int, array{moyen_paiement_id:int, montant:int}>  $paiements
      */
     public function reprendre(
         VenteEnAttente $venteEnAttente,
+        array $lignes,
         array $paiements,
         ?string $remiseTotaleType = null,
         ?int $remiseTotaleValeur = null,
+        ?int $montantRecu = null,
     ): Vente {
-        $venteEnAttente->loadMissing(['lignes', 'sessionCaisse', 'caissier']);
+        $venteEnAttente->loadMissing(['sessionCaisse', 'caissier']);
 
-        $lignes = $venteEnAttente->lignes->map(fn ($l) => [
-            'produit_id' => $l->produit_id,
-            'unite_vente_id' => $l->unite_vente_id,
-            'quantite' => $l->quantite,
-        ])->all();
-
-        return DB::transaction(function () use ($venteEnAttente, $lignes, $paiements, $remiseTotaleType, $remiseTotaleValeur) {
+        return DB::transaction(function () use ($venteEnAttente, $lignes, $paiements, $remiseTotaleType, $remiseTotaleValeur, $montantRecu) {
             $vente = $this->venteService->vendre(
                 session: $venteEnAttente->sessionCaisse,
                 caissier: $venteEnAttente->caissier,
@@ -84,6 +90,7 @@ class VenteEnAttenteService
                 paiements: $paiements,
                 remiseTotaleType: $remiseTotaleType,
                 remiseTotaleValeur: $remiseTotaleValeur,
+                montantRecu: $montantRecu,
             );
 
             $venteEnAttente->delete();

@@ -7,8 +7,10 @@ use App\Http\Controllers\CommandeAchatController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FournisseurController;
 use App\Http\Controllers\InventaireController;
+use App\Http\Controllers\JournalActiviteController;
 use App\Http\Controllers\MagasinController;
 use App\Http\Controllers\MoyenPaiementController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProduitController;
 use App\Http\Controllers\RapportController;
 use App\Http\Controllers\RoleController;
@@ -32,6 +34,9 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+
+    Route::post('notifications/marquer-lues', [NotificationController::class, 'marquerLues'])->name('notifications.marquer-lues');
+    Route::get('notifications/{notification}/ouvrir', [NotificationController::class, 'ouvrir'])->name('notifications.ouvrir');
 
     Route::middleware('can:magasin.gerer')->group(function () {
         Route::resource('magasins', MagasinController::class)->except(['show']);
@@ -101,6 +106,7 @@ Route::middleware('auth')->group(function () {
         Route::get('caisses/{caisse}/ouvrir', [SessionCaisseController::class, 'create'])->name('sessions.create');
         Route::post('caisses/{caisse}/ouvrir', [SessionCaisseController::class, 'store'])->name('sessions.store');
         Route::get('sessions/{session}', [SessionCaisseController::class, 'show'])->name('sessions.show');
+        Route::get('sessions/{session}/rapport', [SessionCaisseController::class, 'rapport'])->name('sessions.rapport');
     });
 
     Route::middleware('can:caisse.cloturer')->group(function () {
@@ -121,7 +127,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:ventenattente.gerer')->group(function () {
         Route::get('sessions/{session}/ventes-en-attente', [VenteEnAttenteController::class, 'index'])->name('ventes-en-attente.index');
         Route::post('sessions/{session}/ventes-en-attente', [VenteEnAttenteController::class, 'store'])->name('ventes-en-attente.store');
-        Route::get('ventes-en-attente/{venteEnAttente}', [VenteEnAttenteController::class, 'show'])->name('ventes-en-attente.show');
+        Route::put('ventes-en-attente/{venteEnAttente}', [VenteEnAttenteController::class, 'update'])->name('ventes-en-attente.update');
+        Route::get('ventes-en-attente/{venteEnAttente}/reprendre', [VenteController::class, 'reprendre'])->name('ventes-en-attente.reprendre.form');
         Route::post('ventes-en-attente/{venteEnAttente}/reprendre', [VenteEnAttenteController::class, 'reprendre'])->name('ventes-en-attente.reprendre');
         Route::delete('ventes-en-attente/{venteEnAttente}', [VenteEnAttenteController::class, 'annuler'])->name('ventes-en-attente.annuler');
     });
@@ -145,5 +152,7 @@ Route::middleware('auth')->group(function () {
         Route::get('rapports/stock', [RapportController::class, 'stock'])->name('rapports.stock');
         Route::get('rapports/ecarts-caisse', [RapportController::class, 'ecartsCaisse'])->name('rapports.ecarts-caisse');
         Route::get('rapports/casse', [RapportController::class, 'casse'])->name('rapports.casse');
+        Route::get('rapports/inventaires', [RapportController::class, 'inventaires'])->name('rapports.inventaires');
+        Route::get('journal', [JournalActiviteController::class, 'index'])->name('journal.index');
     });
 });

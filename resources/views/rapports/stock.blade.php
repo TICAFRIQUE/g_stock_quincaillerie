@@ -5,7 +5,7 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="h4 mb-0">Valeur du stock</h2>
-        <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
+        <button type="button" class="btn btn-outline-secondary d-print-none" onclick="window.print()">
             <i class="bi bi-printer me-1"></i>Imprimer
         </button>
     </div>

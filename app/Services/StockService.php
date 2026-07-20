@@ -9,9 +9,11 @@ use App\Models\MouvementStock;
 use App\Models\Produit;
 use App\Models\Stock;
 use App\Models\User;
+use App\Notifications\StockSousSeuil;
 use App\Support\Arrondi;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use InvalidArgumentException;
 
 /**
@@ -56,7 +58,8 @@ class StockService
                 ]);
             }
 
-            $nouvelleQuantite = $stock->quantite + $quantite;
+            $ancienneQuantite = $stock->quantite;
+            $nouvelleQuantite = $ancienneQuantite + $quantite;
 
             if ($nouvelleQuantite < 0) {
                 throw new StockInsuffisantException($produit, $magasin, abs($quantite), $stock->quantite);
@@ -71,6 +74,23 @@ class StockService
             }
 
             $stock->quantite = $nouvelleQuantite;
+
+            // État de l'épisode d'alerte (pas juste le franchissement) :
+            // si on est sous le seuil et qu'aucune alerte n'est encore
+            // active, on la déclenche — que ce soit un nouveau franchissement
+            // OU un stock déjà sous le seuil (repris tel quel, jamais notifié
+            // jusqu'ici). Dès que le stock repasse au-dessus, on réarme pour
+            // la prochaine fois. Envoyée après commit pour ne jamais notifier
+            // un mouvement qui serait finalement annulé plus loin.
+            if ($nouvelleQuantite <= $produit->seuil_alerte) {
+                if ($stock->alerte_seuil_envoyee_at === null) {
+                    $stock->alerte_seuil_envoyee_at = now();
+                    DB::afterCommit(fn () => $this->notifierStockSousSeuil($produit, $magasin, $nouvelleQuantite));
+                }
+            } else {
+                $stock->alerte_seuil_envoyee_at = null;
+            }
+
             $stock->save();
 
             return MouvementStock::create([
@@ -100,5 +120,12 @@ class StockService
             ->where('produit_id', $produit->id)
             ->where('magasin_id', $magasin->id)
             ->value('cout_moyen_pondere') ?? 0;
+    }
+
+    private function notifierStockSousSeuil(Produit $produit, Magasin $magasin, int $quantite): void
+    {
+        $destinataires = User::gerantsEtSuperadmins($magasin->id);
+
+        Notification::send($destinataires, new StockSousSeuil($produit, $magasin, $quantite));
     }
 }
