@@ -19,7 +19,13 @@ jobs:
           coverage: none
 
       - name: Mettre à jour SQLite (compat pragma_table_xinfo 2 arguments)
-        run: sudo apt-get update -y && sudo apt-get install -y --only-upgrade sqlite3 libsqlite3-0
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --only-upgrade sqlite3 libsqlite3-0 libsqlite3-dev
+          sudo pecl uninstall pdo_sqlite 2>/dev/null || true
+          sudo pecl install pdo_sqlite
+          echo "Version SQLite utilisée par PHP :"
+          php -r "echo (new PDO('sqlite::memory:'))->query('select sqlite_version()')->fetchColumn(), PHP_EOL;"
 
       - name: Installer les dépendances PHP
         run: composer install --no-interaction --prefer-dist --no-progress
