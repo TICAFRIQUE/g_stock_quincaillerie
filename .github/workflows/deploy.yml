@@ -118,6 +118,7 @@ jobs:
               ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             set -e
             cd ${{ secrets.SERVER_PATH }}
+            mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache/data storage/framework/testing storage/app/public storage/logs
             php artisan down || true
             php artisan migrate --force
             php artisan config:cache
