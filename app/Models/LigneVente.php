@@ -37,13 +37,18 @@ class LigneVente extends Model
         return $this->belongsTo(Vente::class);
     }
 
+    /**
+     * withTrashed() : une ligne de vente est immuable et doit rester
+     * affichable (ticket, rapport de marge) même si le produit a été
+     * supprimé (soft delete) depuis.
+     */
     public function produit(): BelongsTo
     {
-        return $this->belongsTo(Produit::class);
+        return $this->belongsTo(Produit::class)->withTrashed();
     }
 
     public function uniteVente(): BelongsTo
     {
-        return $this->belongsTo(UniteVente::class);
+        return $this->belongsTo(UniteVente::class)->withTrashed();
     }
 }

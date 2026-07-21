@@ -82,12 +82,11 @@
                                             <td>
                                                 <select class="form-select form-select-sm" style="min-width: 150px;"
                                                         :class="{ 'is-invalid': estDoublon(index) || ligne.unite_vente_id === undefined }"
-                                                        :value="ligne.unite_vente_id === undefined ? '' : (ligne.unite_vente_id || 'piece')"
                                                         @change="changerVarianteDepuisSelect(ligne, $event.target.value)" required>
-                                                    <option value="">— Choisir —</option>
-                                                    <option value="piece" x-text="'Pièce — ' + produitDe(ligne).prix_piece + ' F'"></option>
+                                                    <option value="" :selected="ligne.unite_vente_id === undefined">— Choisir —</option>
+                                                    <option value="piece" :selected="ligne.unite_vente_id === null" x-text="'Pièce — ' + produitDe(ligne).prix_piece + ' F'"></option>
                                                     <template x-for="unite in produitDe(ligne).unites" :key="unite.id">
-                                                        <option :value="unite.id" x-text="unite.libelle + ' — ' + unite.prix + ' F'"></option>
+                                                        <option :value="unite.id" :selected="unite.id === ligne.unite_vente_id" x-text="unite.libelle + ' — ' + unite.prix + ' F'"></option>
                                                     </template>
                                                 </select>
                                                 <div class="text-danger small mt-1" x-show="estDoublon(index)" x-cloak>Déjà dans le panier avec la même variante.</div>

@@ -73,9 +73,13 @@ class Produit extends Model implements HasMedia
         $this->addMediaCollection('image')->singleFile();
     }
 
+    /**
+     * withTrashed() : évite un crash d'affichage si la catégorie a été
+     * supprimée (soft delete) alors que des produits la référencent encore.
+     */
     public function categorie(): BelongsTo
     {
-        return $this->belongsTo(Categorie::class);
+        return $this->belongsTo(Categorie::class)->withTrashed();
     }
 
     public function uniteVentes(): HasMany

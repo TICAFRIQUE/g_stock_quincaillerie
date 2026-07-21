@@ -10,12 +10,7 @@
         @endcan
     </div>
 
-    <form method="GET" action="{{ route('produits.index') }}" class="mb-3">
-        <div class="input-group" style="max-width: 400px;">
-            <input type="text" name="recherche" class="form-control" placeholder="SKU, nom ou code-barres…" value="{{ request('recherche') }}">
-            <button type="submit" class="btn btn-outline-secondary">Rechercher</button>
-        </div>
-    </form>
+    <x-recherche-form :action="route('produits.index')" placeholder="SKU, nom ou code-barres…" />
 
     <div class="card">
         <div class="table-responsive">

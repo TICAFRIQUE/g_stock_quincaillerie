@@ -31,14 +31,19 @@ class CommandeAchat extends Model
         return LogOptions::defaults()->logFillable()->logOnlyDirty();
     }
 
+    /**
+     * withTrashed() : une commande d'achat est un historique, elle doit
+     * rester affichable même si le fournisseur ou le magasin ont été
+     * supprimés (soft delete) depuis.
+     */
     public function fournisseur(): BelongsTo
     {
-        return $this->belongsTo(Fournisseur::class);
+        return $this->belongsTo(Fournisseur::class)->withTrashed();
     }
 
     public function magasin(): BelongsTo
     {
-        return $this->belongsTo(Magasin::class);
+        return $this->belongsTo(Magasin::class)->withTrashed();
     }
 
     public function auteur(): BelongsTo

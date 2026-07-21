@@ -113,6 +113,13 @@ $input-bg: #ffffff;
     margin-left: 0.15rem;
 }
 
+// Le $danger custom est assez clair pour que le calcul de contraste
+// automatique de Bootstrap choisisse parfois du texte noir — peu lisible.
+// Le blanc reste le seul choix correct sur ce rouge.
+.text-bg-danger {
+    color: #fff !important;
+}
+
 // --- Boutons d'action icône (tableaux) ---
 
 .btn-icon {

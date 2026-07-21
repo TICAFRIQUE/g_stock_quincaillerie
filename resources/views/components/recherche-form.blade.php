@@ -8,7 +8,7 @@
         {{ $slot }}
         @if (request()->hasAny(array_merge([$nom, 'tri', 'direction'], $autresParams)))
             <a href="{{ $action }}" class="btn btn-outline-danger" title="Réinitialiser la recherche">
-                <i class="bi bi-x-circle me-1"></i>Réinitialiser
+                <i class="bi bi-x-circle"></i>
             </a>
         @endif
     </div>

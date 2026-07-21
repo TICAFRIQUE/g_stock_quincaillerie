@@ -13,14 +13,18 @@ class VenteEnAttente extends Model
 {
     use HasFactory;
 
+    /**
+     * withTrashed() : évite un crash d'affichage si le magasin ou la caisse
+     * ont été supprimés (soft delete) pendant qu'une vente reste en attente.
+     */
     public function magasin(): BelongsTo
     {
-        return $this->belongsTo(Magasin::class);
+        return $this->belongsTo(Magasin::class)->withTrashed();
     }
 
     public function caisse(): BelongsTo
     {
-        return $this->belongsTo(Caisse::class);
+        return $this->belongsTo(Caisse::class)->withTrashed();
     }
 
     public function sessionCaisse(): BelongsTo

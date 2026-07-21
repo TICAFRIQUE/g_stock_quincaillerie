@@ -26,8 +26,12 @@ class LigneInventaire extends Model
         return $this->belongsTo(Inventaire::class);
     }
 
+    /**
+     * withTrashed() : ligne d'inventaire historique, doit rester affichable
+     * même si le produit a été supprimé (soft delete) depuis.
+     */
     public function produit(): BelongsTo
     {
-        return $this->belongsTo(Produit::class);
+        return $this->belongsTo(Produit::class)->withTrashed();
     }
 }

@@ -44,9 +44,14 @@ class User extends Authenticatable
         return LogOptions::defaults()->logOnly(['name', 'email', 'magasin_id', 'actif'])->logOnlyDirty();
     }
 
+    /**
+     * withTrashed() : évite un crash d'affichage (badge magasin du
+     * topbar, etc.) si le magasin de rattachement a été supprimé
+     * (soft delete) alors que l'utilisateur y reste encore attaché.
+     */
     public function magasin(): BelongsTo
     {
-        return $this->belongsTo(Magasin::class);
+        return $this->belongsTo(Magasin::class)->withTrashed();
     }
 
     public function sessionCaisses(): HasMany

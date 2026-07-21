@@ -24,13 +24,18 @@ class LigneVenteEnAttente extends Model
         return $this->belongsTo(VenteEnAttente::class);
     }
 
+    /**
+     * withTrashed() : évite un crash d'affichage si le produit a été
+     * supprimé (soft delete) pendant qu'il restait dans un panier en
+     * attente.
+     */
     public function produit(): BelongsTo
     {
-        return $this->belongsTo(Produit::class);
+        return $this->belongsTo(Produit::class)->withTrashed();
     }
 
     public function uniteVente(): BelongsTo
     {
-        return $this->belongsTo(UniteVente::class);
+        return $this->belongsTo(UniteVente::class)->withTrashed();
     }
 }

@@ -34,14 +34,19 @@ class MouvementStock extends Model
         return LogOptions::defaults()->logFillable();
     }
 
+    /**
+     * withTrashed() : un mouvement de stock est un registre immuable, il
+     * doit rester consultable même si le produit ou le magasin ont été
+     * supprimés (soft delete) depuis.
+     */
     public function produit(): BelongsTo
     {
-        return $this->belongsTo(Produit::class);
+        return $this->belongsTo(Produit::class)->withTrashed();
     }
 
     public function magasin(): BelongsTo
     {
-        return $this->belongsTo(Magasin::class);
+        return $this->belongsTo(Magasin::class)->withTrashed();
     }
 
     public function auteur(): BelongsTo

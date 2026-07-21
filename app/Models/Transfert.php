@@ -31,19 +31,24 @@ class Transfert extends Model
         return LogOptions::defaults()->logFillable();
     }
 
+    /**
+     * withTrashed() : un transfert est un registre immuable, il doit
+     * rester consultable même si le produit ou les magasins ont été
+     * supprimés (soft delete) depuis.
+     */
     public function produit(): BelongsTo
     {
-        return $this->belongsTo(Produit::class);
+        return $this->belongsTo(Produit::class)->withTrashed();
     }
 
     public function magasinSource(): BelongsTo
     {
-        return $this->belongsTo(Magasin::class, 'magasin_source_id');
+        return $this->belongsTo(Magasin::class, 'magasin_source_id')->withTrashed();
     }
 
     public function magasinDestination(): BelongsTo
     {
-        return $this->belongsTo(Magasin::class, 'magasin_destination_id');
+        return $this->belongsTo(Magasin::class, 'magasin_destination_id')->withTrashed();
     }
 
     public function auteur(): BelongsTo

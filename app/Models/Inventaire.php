@@ -28,9 +28,13 @@ class Inventaire extends Model
         return LogOptions::defaults()->logFillable()->logOnlyDirty();
     }
 
+    /**
+     * withTrashed() : un inventaire est un historique, il doit rester
+     * affichable même si le magasin a été supprimé (soft delete) depuis.
+     */
     public function magasin(): BelongsTo
     {
-        return $this->belongsTo(Magasin::class);
+        return $this->belongsTo(Magasin::class)->withTrashed();
     }
 
     public function auteur(): BelongsTo

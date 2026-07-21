@@ -38,9 +38,14 @@ class Vente extends Model
         return LogOptions::defaults()->logFillable();
     }
 
+    /**
+     * withTrashed() : une vente est un historique immuable, elle doit
+     * rester affichable (ticket, rapports) même si le magasin a été
+     * supprimé (soft delete) depuis.
+     */
     public function magasin(): BelongsTo
     {
-        return $this->belongsTo(Magasin::class);
+        return $this->belongsTo(Magasin::class)->withTrashed();
     }
 
     public function sessionCaisse(): BelongsTo

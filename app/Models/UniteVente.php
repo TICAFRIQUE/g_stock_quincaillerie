@@ -23,9 +23,13 @@ class UniteVente extends Model
         ];
     }
 
+    /**
+     * withTrashed() : évite un crash d'affichage si le produit parent a
+     * été supprimé (soft delete).
+     */
     public function produit(): BelongsTo
     {
-        return $this->belongsTo(Produit::class);
+        return $this->belongsTo(Produit::class)->withTrashed();
     }
 
     protected static function booted(): void

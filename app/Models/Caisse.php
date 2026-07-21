@@ -29,9 +29,13 @@ class Caisse extends Model
         return LogOptions::defaults()->logFillable()->logOnlyDirty();
     }
 
+    /**
+     * withTrashed() : évite un crash d'affichage si le magasin a été
+     * supprimé (soft delete) alors que la caisse le référence encore.
+     */
     public function magasin(): BelongsTo
     {
-        return $this->belongsTo(Magasin::class);
+        return $this->belongsTo(Magasin::class)->withTrashed();
     }
 
     public function sessionCaisses(): HasMany

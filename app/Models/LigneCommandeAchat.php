@@ -25,8 +25,12 @@ class LigneCommandeAchat extends Model
         return $this->belongsTo(CommandeAchat::class);
     }
 
+    /**
+     * withTrashed() : ligne de commande historique, doit rester affichable
+     * même si le produit a été supprimé (soft delete) depuis.
+     */
     public function produit(): BelongsTo
     {
-        return $this->belongsTo(Produit::class);
+        return $this->belongsTo(Produit::class)->withTrashed();
     }
 }

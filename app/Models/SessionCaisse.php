@@ -38,9 +38,14 @@ class SessionCaisse extends Model
         return LogOptions::defaults()->logFillable()->logOnlyDirty();
     }
 
+    /**
+     * withTrashed() : une session est un historique immuable, elle doit
+     * rester affichable même si la caisse a été supprimée (soft delete)
+     * depuis.
+     */
     public function caisse(): BelongsTo
     {
-        return $this->belongsTo(Caisse::class);
+        return $this->belongsTo(Caisse::class)->withTrashed();
     }
 
     public function caissier(): BelongsTo
