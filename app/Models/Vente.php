@@ -7,20 +7,27 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 #[Fillable([
     'numero', 'magasin_id', 'session_caisse_id', 'caissier_id', 'sous_total',
     'remise_totale_type', 'remise_totale_valeur', 'remise_totale_montant', 'total_net',
-    'montant_recu', 'monnaie_rendue',
+    'montant_recu', 'monnaie_rendue', 'motif_annulation', 'annulee_par',
 ])]
 class Vente extends Model
 {
-    use HasFactory, LogsActivity;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     const UPDATED_AT = null;
 
+    /**
+     * Une vente "supprimée" (deleted_at) représente une annulation, pas une
+     * perte de données : le contenu (lignes, montants) n'est jamais modifié,
+     * elle reste consultable (withTrashed) et exclue par défaut des
+     * agrégats (CA, rapports) — voir VenteController::annuler().
+     */
     protected function casts(): array
     {
         return [
@@ -30,6 +37,7 @@ class Vente extends Model
             'total_net' => 'integer',
             'montant_recu' => 'integer',
             'monnaie_rendue' => 'integer',
+            'deleted_at' => 'datetime',
         ];
     }
 
@@ -56,6 +64,11 @@ class Vente extends Model
     public function caissier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'caissier_id');
+    }
+
+    public function annulateur(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'annulee_par');
     }
 
     public function lignes(): HasMany

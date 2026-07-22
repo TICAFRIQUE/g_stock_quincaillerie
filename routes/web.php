@@ -121,7 +121,19 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:vente.creer')->group(function () {
         Route::get('sessions/{session}/vente', [VenteController::class, 'create'])->name('ventes.create');
         Route::post('sessions/{session}/vente', [VenteController::class, 'store'])->name('ventes.store');
-        Route::get('ventes/{vente}/ticket', [VenteController::class, 'ticket'])->name('ventes.ticket');
+        // withTrashed() : une vente annulée reste consultable (ticket avec
+        // mention "Annulée"), jamais un 404.
+        Route::get('ventes/{vente}/ticket', [VenteController::class, 'ticket'])->name('ventes.ticket')->withTrashed();
+    });
+
+    Route::middleware('can:vente.signaler')->group(function () {
+        Route::post('ventes/{vente}/signaler', [VenteController::class, 'signaler'])->name('ventes.signaler');
+    });
+
+    // Pas de withTrashed() ici : tenter d'annuler une vente déjà annulée doit
+    // échouer (404 sur la liaison de route), pas la re-traiter.
+    Route::middleware('can:vente.annuler')->group(function () {
+        Route::post('ventes/{vente}/annuler', [VenteController::class, 'annuler'])->name('ventes.annuler');
     });
 
     Route::middleware('can:ventenattente.gerer')->group(function () {

@@ -305,6 +305,12 @@ document.querySelectorAll('form').forEach((form) => {
     form.noValidate = true;
 });
 
+// Spinner générique + anti double-soumission — voir demarrerSpinner() plus bas.
+// Retient le bouton qui a ouvert une popup de confirmation, pour lui appliquer
+// le spinner (et pas au bouton "Confirmer" de la popup) une fois le formulaire
+// réellement soumis via requestSubmit().
+let dernierDeclencheurConfirmation = null;
+
 document.addEventListener('submit', (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement)) {
@@ -313,8 +319,18 @@ document.addEventListener('submit', (event) => {
     if (!form.checkValidity()) {
         event.preventDefault();
         event.stopPropagation();
+        form.classList.add('was-validated');
+        return;
     }
     form.classList.add('was-validated');
+
+    const bouton = event.submitter
+        ?? (dernierDeclencheurConfirmation?.getAttribute('data-form-id') === form.id ? dernierDeclencheurConfirmation : null);
+    dernierDeclencheurConfirmation = null;
+
+    if (bouton instanceof HTMLElement) {
+        demarrerSpinner(bouton);
+    }
 }, true);
 
 Alpine.start();
@@ -335,7 +351,11 @@ document.addEventListener('show.bs.modal', (event) => {
 
     const confirmButton = modal.querySelector('#confirmDeleteButton');
     confirmButton.onclick = () => {
-        document.getElementById(formId)?.submit();
+        dernierDeclencheurConfirmation = trigger ?? null;
+        // requestSubmit() (contrairement à submit()) déclenche l'événement
+        // 'submit', nécessaire pour que le spinner générique s'applique ici
+        // aussi.
+        document.getElementById(formId)?.requestSubmit();
     };
 });
 
@@ -359,9 +379,79 @@ document.addEventListener('show.bs.modal', (event) => {
     confirmButton.className = 'btn ' + buttonClass;
     confirmButton.textContent = buttonLabel;
     confirmButton.onclick = () => {
+        dernierDeclencheurConfirmation = trigger ?? null;
         // requestSubmit() (contrairement à submit()) déclenche l'événement
         // 'submit' et la validation native — nécessaire pour les formulaires
         // avec des champs required (ex. valider un achat depuis sa création).
         document.getElementById(formId)?.requestSubmit();
     };
 });
+
+// --- Spinner générique sur tout bouton qui soumet un formulaire ---
+//
+// Empêche un double-clic de renvoyer deux fois la même action (ex. finaliser
+// deux fois la même vente) et donne un retour visuel immédiat. Comme les
+// formulaires de l'app se soumettent classiquement (rechargement de page, pas
+// de fetch), le navigateur ne prévient pas toujours JS en cas d'échec réseau
+// pur (serveur injoignable) : un délai de sécurité réactive alors le bouton et
+// signale l'erreur, plutôt que de laisser le spinner tourner indéfiniment. En
+// cas d'erreur métier normale (validation, stock insuffisant…), Laravel
+// recharge la page avec le message habituel — le spinner disparaît de
+// lui-même puisque toute la page est remplacée.
+const DELAI_SECURITE_SPINNER_MS = 20000;
+
+function demarrerSpinner(bouton) {
+    if (bouton.dataset.spinnerActif) {
+        return;
+    }
+
+    bouton.dataset.spinnerActif = '1';
+    bouton.dataset.libelleOriginal = bouton.innerHTML;
+    bouton.disabled = true;
+
+    const texte = bouton.textContent.trim();
+    const spinner = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+    bouton.innerHTML = texte ? `${spinner} ${texte}` : spinner;
+
+    window.setTimeout(() => {
+        if (bouton.isConnected && bouton.dataset.spinnerActif) {
+            arreterSpinner(bouton);
+            afficherToastErreur("La requête met trop de temps à répondre. Vérifiez votre connexion et réessayez.");
+        }
+    }, DELAI_SECURITE_SPINNER_MS);
+}
+
+function arreterSpinner(bouton) {
+    bouton.disabled = false;
+    if (bouton.dataset.libelleOriginal !== undefined) {
+        bouton.innerHTML = bouton.dataset.libelleOriginal;
+    }
+    delete bouton.dataset.spinnerActif;
+    delete bouton.dataset.libelleOriginal;
+}
+
+function afficherToastErreur(message) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        container.style.zIndex = 1080;
+        document.body.appendChild(container);
+    }
+
+    const toastEl = document.createElement('div');
+    toastEl.className = 'toast align-items-center text-bg-danger border-0';
+    toastEl.setAttribute('role', 'alert');
+    toastEl.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    container.appendChild(toastEl);
+
+    const toast = window.bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 8000 });
+    toast.show();
+    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+}

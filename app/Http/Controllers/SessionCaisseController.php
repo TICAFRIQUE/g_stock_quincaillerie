@@ -73,7 +73,16 @@ class SessionCaisseController extends Controller
         $this->assurerMagasin($session->caisse->magasin_id);
 
         $session->load(['caisse.magasin', 'caissier']);
+        // vente_en_attentes_count : total de la caisse, sert au blocage de
+        // clôture (règle 8 — bloque tant qu'il en reste, peu importe qui les
+        // a créées). venteEnAttentesVisibles : ce que CE caissier peut
+        // effectivement voir/traiter (les siennes, sauf s'il a caisse.gerer)
+        // — c'est celui-là qu'affiche le KPI/badge, sinon le chiffre ne
+        // correspond pas à ce que le caissier trouve en cliquant dessus.
         $session->loadCount(['ventes', 'venteEnAttentes']);
+        $venteEnAttentesVisibles = $session->venteEnAttentes()
+            ->when(! $request->user()->can('caisse.gerer'), fn ($q) => $q->where('caissier_id', $request->user()->id))
+            ->count();
 
         $totalVentes = (int) $session->ventes()->sum('total_net');
         $paiementsParMoyen = $this->paiementsParMoyen($session);
@@ -99,6 +108,7 @@ class SessionCaisseController extends Controller
         return view('sessions.show', [
             'session' => $session,
             'totalVentes' => $totalVentes,
+            'venteEnAttentesVisibles' => $venteEnAttentesVisibles,
             'paiementsParMoyen' => $paiementsParMoyen,
             'ventes' => $ventes,
             'sessionsAujourdhui' => $sessionsAujourdhui,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Notifications\StockSousSeuil;
+use App\Notifications\VenteSignalee;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -24,6 +25,10 @@ class NotificationController extends Controller
 
         if ($notif->type === StockSousSeuil::class) {
             return redirect()->route('stock.index', ['magasin_id' => $notif->data['magasin_id'], 'sous_seuil' => 1]);
+        }
+
+        if ($notif->type === VenteSignalee::class) {
+            return redirect()->route('ventes.ticket', $notif->data['vente_id']);
         }
 
         return redirect()->route('sessions.show', $notif->data['session_id']);

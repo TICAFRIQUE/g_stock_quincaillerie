@@ -9,9 +9,12 @@ use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $roles = Role::withCount(['users', 'permissions'])->orderBy('name')->get();
+        $roles = Role::withCount(['users', 'permissions'])
+            ->when(! $request->user()->hasRole('Superadmin'), fn ($query) => $query->where('name', '!=', 'Superadmin'))
+            ->orderBy('name')
+            ->get();
 
         return view('roles.index', ['roles' => $roles]);
     }

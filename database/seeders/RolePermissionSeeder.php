@@ -27,6 +27,7 @@ class RolePermissionSeeder extends Seeder
             'stock.voir',
             'vente.voir',
             'vente.creer',
+            'vente.signaler',
             'ventenattente.gerer',
             'caisse.ouvrir',
             'caisse.cloturer',

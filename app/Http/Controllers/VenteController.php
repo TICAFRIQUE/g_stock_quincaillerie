@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\MouvementStockType;
 use App\Exceptions\SessionNonOuverteException;
 use App\Exceptions\StockInsuffisantException;
 use App\Http\Controllers\Concerns\AutoriseMagasin;
@@ -12,11 +13,15 @@ use App\Models\Paiement;
 use App\Models\Produit;
 use App\Models\SessionCaisse;
 use App\Models\Stock;
+use App\Models\User;
 use App\Models\Vente;
 use App\Models\VenteEnAttente;
+use App\Notifications\VenteSignalee;
+use App\Services\StockService;
 use App\Services\VenteService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use InvalidArgumentException;
 
@@ -37,7 +42,7 @@ class VenteController extends Controller
      */
     public function reprendre(VenteEnAttente $venteEnAttente): View
     {
-        $this->assurerProprietaire($venteEnAttente);
+        $this->assurerProprietaireOuGerant($venteEnAttente);
 
         $venteEnAttente->load(['lignes.produit', 'lignes.uniteVente', 'sessionCaisse']);
 
@@ -76,11 +81,19 @@ class VenteController extends Controller
             ])->values()
             : collect();
 
+        // Un caissier ne voit (et ne finalise) que ses propres ventes en
+        // attente : le badge doit refléter ce même périmètre, pas le total
+        // de la session (qui peut inclure des paniers d'un autre caissier
+        // ou du gérant sur la même caisse).
+        $venteEnAttentesCount = $session->venteEnAttentes()
+            ->when(! request()->user()->can('caisse.gerer'), fn ($q) => $q->where('caissier_id', request()->user()->id))
+            ->count();
+
         return view('ventes.create', [
             'session' => $session,
             'produits' => $produits,
             'moyensPaiement' => MoyenPaiement::actifs(),
-            'venteEnAttentesCount' => $session->venteEnAttentes()->count(),
+            'venteEnAttentesCount' => $venteEnAttentesCount,
             'venteEnAttente' => $venteEnAttente,
             'panierInitial' => $panierInitial,
         ]);
@@ -90,6 +103,7 @@ class VenteController extends Controller
     {
         $this->assurerMagasin($session->caisse->magasin_id);
         $this->nettoyerChampsOptionnels($request);
+        $this->bloquerRemiseSansPermission($request);
 
         $donnees = $request->validate([
             'lignes' => ['required', 'array', 'min:1'],
@@ -127,9 +141,91 @@ class VenteController extends Controller
     {
         $this->assurerMagasin($vente->magasin_id);
 
-        $vente->load(['lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement', 'magasin', 'caissier', 'sessionCaisse.caisse']);
+        $vente->load(['lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement', 'magasin', 'caissier', 'sessionCaisse.caisse', 'annulateur']);
 
-        return view('ventes.ticket', ['vente' => $vente]);
+        $signalements = $vente->activities()
+            ->where('description', 'like', '%» signalée :%')
+            ->with('causer')
+            ->latest()
+            ->get();
+
+        return view('ventes.ticket', ['vente' => $vente, 'signalements' => $signalements]);
+    }
+
+    /**
+     * Ne fait que tracer un signalement (ex. doublon de saisie) dans le
+     * journal d'activité et prévenir les gérants — ne touche ni au stock ni
+     * aux montants. Charge au titulaire de la permission vente.annuler de
+     * décider s'il y a lieu d'annuler (voir annuler() ci-dessous).
+     */
+    public function signaler(Request $request, Vente $vente): RedirectResponse
+    {
+        $this->assurerMagasin($vente->magasin_id);
+
+        $donnees = $request->validate([
+            'motif' => ['required', 'string', 'max:500'],
+        ]);
+
+        activity()
+            ->causedBy($request->user())
+            ->performedOn($vente)
+            ->withProperties(['motif' => $donnees['motif']])
+            ->log("Vente « {$vente->numero} » signalée : {$donnees['motif']}");
+
+        User::gerantsEtSuperadmins($vente->magasin_id)->each(
+            fn (User $destinataire) => $destinataire->notify(new VenteSignalee($vente, $donnees['motif']))
+        );
+
+        return redirect()->route('ventes.ticket', $vente)
+            ->with('succes', 'Vente signalée. Le gérant peut ajuster la caisse ou le stock manuellement si besoin.');
+    }
+
+    /**
+     * Annule une vente (erreur de saisie — pas un retour client, voir
+     * discussion CLAUDE.md). La vente n'est ni supprimée ni modifiée dans
+     * son contenu : elle est marquée annulée (soft delete + motif + auteur),
+     * reste consultable dans l'historique, et un mouvement de stock inverse
+     * (immuable) restitue exactement ce qui avait été décrémenté par la
+     * vente. Exclue automatiquement des CA/rapports par le scope par défaut
+     * du modèle Vente (soft deleted).
+     */
+    public function annuler(Request $request, Vente $vente, StockService $stockService): RedirectResponse
+    {
+        $this->assurerMagasin($vente->magasin_id);
+
+        $donnees = $request->validate([
+            'motif' => ['required', 'string', 'max:500'],
+        ]);
+
+        $vente->load('lignes.produit', 'magasin');
+
+        DB::transaction(function () use ($vente, $donnees, $request, $stockService) {
+            foreach ($vente->lignes as $ligne) {
+                $stockService->enregistrerMouvement(
+                    produit: $ligne->produit,
+                    magasin: $vente->magasin,
+                    quantite: $ligne->quantite_pieces,
+                    type: MouvementStockType::Annulation,
+                    auteur: $request->user(),
+                    reference: $vente,
+                    motif: $donnees['motif'],
+                );
+            }
+
+            $vente->motif_annulation = $donnees['motif'];
+            $vente->annulee_par = $request->user()->id;
+            $vente->save();
+            $vente->delete();
+        });
+
+        activity()
+            ->causedBy($request->user())
+            ->performedOn($vente)
+            ->withProperties(['motif' => $donnees['motif']])
+            ->log("Vente « {$vente->numero} » annulée : {$donnees['motif']}");
+
+        return redirect()->route('ventes.ticket', $vente)
+            ->with('succes', 'Vente annulée. Le stock a été remis à jour.');
     }
 
     /**

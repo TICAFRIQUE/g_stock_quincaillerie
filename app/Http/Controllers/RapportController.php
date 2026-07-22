@@ -70,6 +70,7 @@ class RapportController extends Controller
             ->join('produits', 'produits.id', '=', 'ligne_ventes.produit_id')
             ->when($magasinId, fn ($q) => $q->where('ventes.magasin_id', $magasinId))
             ->whereBetween('ventes.created_at', [$debut, $fin])
+            ->whereNull('ventes.deleted_at')
             ->selectRaw('produits.nom as nom, produits.sku as sku,
                 SUM(ligne_ventes.quantite_pieces) as pieces,
                 SUM(ligne_ventes.total_ligne) as ventes_total,

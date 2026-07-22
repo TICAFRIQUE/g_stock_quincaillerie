@@ -52,13 +52,16 @@
                         <h3 class="h6">Panier</h3>
 
                         <div class="table-responsive" style="max-height: 65vh; overflow-y: auto;">
+                            @php $colonnesPanier = auth()->user()->can('vente.remise') ? 6 : 5; @endphp
                             <table class="table table-sm align-middle mb-0">
                                 <thead>
                                     <tr>
                                         <th>Désignation</th>
                                         <th>Qté</th>
                                         <th>Pièce / Lot</th>
-                                        <th>Remise</th>
+                                        @can('vente.remise')
+                                            <th>Remise</th>
+                                        @endcan
                                         <th class="text-end">Total</th>
                                         <th></th>
                                     </tr>
@@ -66,7 +69,7 @@
                                 <tbody>
                                     <template x-if="panier.length === 0">
                                         <tr>
-                                            <td colspan="6" class="text-secondary fst-italic small text-center py-3">Le panier est vide. Sélectionnez un produit ci-dessus.</td>
+                                            <td colspan="{{ $colonnesPanier }}" class="text-secondary fst-italic small text-center py-3">Le panier est vide. Sélectionnez un produit ci-dessus.</td>
                                         </tr>
                                     </template>
                                     <template x-for="(ligne, index) in panier" :key="index">
@@ -91,18 +94,20 @@
                                                 </select>
                                                 <div class="text-danger small mt-1" x-show="estDoublon(index)" x-cloak>Déjà dans le panier avec la même variante.</div>
                                             </td>
-                                            <td>
-                                                <div class="d-flex flex-column gap-1" style="min-width: 130px;">
-                                                    <select x-model="ligne.remise_type" class="form-select form-select-sm">
-                                                        <option value="">Sans remise</option>
-                                                        <option value="montant">Remise (F)</option>
-                                                        <option value="pourcentage">Remise (%)</option>
-                                                    </select>
-                                                    <input type="number" x-model.number="ligne.remise_valeur"
-                                                           @input="if (ligne.remise_type === 'pourcentage' && ligne.remise_valeur > 100) ligne.remise_valeur = 100"
-                                                           x-show="ligne.remise_type" min="0" :max="ligne.remise_type === 'pourcentage' ? 100 : null" class="form-control form-control-sm" placeholder="Valeur">
-                                                </div>
-                                            </td>
+                                            @can('vente.remise')
+                                                <td>
+                                                    <div class="d-flex flex-column gap-1" style="min-width: 130px;">
+                                                        <select x-model="ligne.remise_type" class="form-select form-select-sm">
+                                                            <option value="">Sans remise</option>
+                                                            <option value="montant">Remise (F)</option>
+                                                            <option value="pourcentage">Remise (%)</option>
+                                                        </select>
+                                                        <input type="number" x-model.number="ligne.remise_valeur"
+                                                               @input="if (ligne.remise_type === 'pourcentage' && ligne.remise_valeur > 100) ligne.remise_valeur = 100"
+                                                               x-show="ligne.remise_type" min="0" :max="ligne.remise_type === 'pourcentage' ? 100 : null" class="form-control form-control-sm" placeholder="Valeur">
+                                                    </div>
+                                                </td>
+                                            @endcan
                                             <td class="text-end fw-medium" x-text="totalLigne(ligne) + ' F'"></td>
                                             <td>
                                                 <div class="d-flex gap-1">
@@ -129,33 +134,37 @@
                         <div class="card-body">
                             <h3 class="h6">Comptabilité</h3>
 
-                            <div class="mb-2">
-                                <label class="form-label small">Remise sur le total</label>
-                                <div class="row g-1">
-                                    <div class="col-6">
-                                        <select x-model="remiseTotaleType" class="form-select form-select-sm">
-                                            <option value="">Sans remise</option>
-                                            <option value="montant">Remise (F)</option>
-                                            <option value="pourcentage">Remise (%)</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-6">
-                                        <input type="number" x-model.number="remiseTotaleValeur"
-                                               @input="if (remiseTotaleType === 'pourcentage' && remiseTotaleValeur > 100) remiseTotaleValeur = 100"
-                                               x-show="remiseTotaleType" min="0" :max="remiseTotaleType === 'pourcentage' ? 100 : null" class="form-control form-control-sm" placeholder="Valeur">
+                            @can('vente.remise')
+                                <div class="mb-2">
+                                    <label class="form-label small">Remise sur le total</label>
+                                    <div class="row g-1">
+                                        <div class="col-6">
+                                            <select x-model="remiseTotaleType" class="form-select form-select-sm">
+                                                <option value="">Sans remise</option>
+                                                <option value="montant">Remise (F)</option>
+                                                <option value="pourcentage">Remise (%)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" x-model.number="remiseTotaleValeur"
+                                                   @input="if (remiseTotaleType === 'pourcentage' && remiseTotaleValeur > 100) remiseTotaleValeur = 100"
+                                                   x-show="remiseTotaleType" min="0" :max="remiseTotaleType === 'pourcentage' ? 100 : null" class="form-control form-control-sm" placeholder="Valeur">
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            @endcan
 
                             <table class="table table-sm mt-3 mb-0">
                                 <tr>
                                     <td>Sous-total</td>
                                     <td class="text-end" x-text="sousTotal + ' F'"></td>
                                 </tr>
-                                <tr>
-                                    <td>Remise totale</td>
-                                    <td class="text-end" x-text="'− ' + remiseTotaleMontant + ' F'"></td>
-                                </tr>
+                                @can('vente.remise')
+                                    <tr>
+                                        <td>Remise totale</td>
+                                        <td class="text-end" x-text="'− ' + remiseTotaleMontant + ' F'"></td>
+                                    </tr>
+                                @endcan
                                 <tr class="fw-bold">
                                     <td>Net à payer</td>
                                     <td class="text-end" x-text="totalNet + ' F'"></td>

@@ -34,7 +34,7 @@ class LigneVente extends Model
 
     public function vente(): BelongsTo
     {
-        return $this->belongsTo(Vente::class);
+        return $this->belongsTo(Vente::class)->withTrashed();
     }
 
     /**

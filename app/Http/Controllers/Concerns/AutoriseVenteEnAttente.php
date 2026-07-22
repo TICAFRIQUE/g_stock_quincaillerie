@@ -6,21 +6,13 @@ use App\Models\VenteEnAttente;
 
 /**
  * CLAUDE.md : une vente en attente est rattachée au caissier qui l'a créée —
- * il est seul à pouvoir la reprendre/la modifier. Le gérant (permission
- * caisse.gerer) peut voir et annuler celles de son magasin, mais pas les
- * finaliser à la place du caissier propriétaire.
+ * un caissier ne voit et ne traite (reprendre/modifier/annuler) que les
+ * siennes. Le gérant ou le superadmin (permission caisse.gerer, dont le
+ * superadmin dispose toujours via le bypass Gate::before) peuvent voir et
+ * traiter celles de n'importe quel caissier de leur périmètre.
  */
 trait AutoriseVenteEnAttente
 {
-    protected function assurerProprietaire(VenteEnAttente $venteEnAttente): void
-    {
-        abort_if(
-            $venteEnAttente->caissier_id !== request()->user()->id,
-            403,
-            'Cette vente en attente appartient à un autre caissier — seul son propriétaire peut la reprendre.'
-        );
-    }
-
     protected function assurerProprietaireOuGerant(VenteEnAttente $venteEnAttente): void
     {
         abort_if(

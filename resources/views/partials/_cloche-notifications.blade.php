@@ -46,6 +46,15 @@
                         {{ $notification->data['caissier'] }} — {{ $notification->data['caisse'] }} ({{ $notification->data['magasin'] }})
                     </div>
                     <div class="small text-secondary">Ouverte le {{ \Illuminate\Support\Carbon::parse($notification->data['date_ouverture'])->format('d/m/Y H:i') }}</div>
+                @elseif ($type === \App\Notifications\VenteSignalee::class)
+                    <div class="small fw-medium text-warning-emphasis">
+                        <i class="bi bi-flag-fill me-1"></i>
+                        Vente {{ $notification->data['numero'] }} signalée
+                    </div>
+                    <div class="small text-secondary">
+                        {{ $notification->data['caissier'] }} ({{ $notification->data['magasin'] }})
+                    </div>
+                    <div class="small text-secondary fst-italic">{{ $notification->data['motif'] }}</div>
                 @endif
             </a>
         @empty

@@ -51,6 +51,7 @@ class DashboardController extends Controller
             ->join('ventes', 'ventes.id', '=', 'paiements.vente_id')
             ->join('moyen_paiements', 'moyen_paiements.id', '=', 'paiements.moyen_paiement_id')
             ->where('ventes.session_caisse_id', $session->id)
+            ->whereNull('ventes.deleted_at')
             ->selectRaw('moyen_paiements.nom as nom, SUM(paiements.montant) as total')
             ->groupBy('moyen_paiements.id', 'moyen_paiements.nom')
             ->get();
@@ -61,7 +62,10 @@ class DashboardController extends Controller
             'totalVentes' => $totalVentes,
             'panierMoyen' => $nombreVentes > 0 ? (int) round($totalVentes / $nombreVentes) : 0,
             'parMoyen' => $parMoyen,
-            'venteEnAttenteCount' => $session->venteEnAttentes()->count(),
+            // Le tableau de bord du caissier ne montre que ses propres
+            // ventes en attente, jamais celles d'un autre caissier sur la
+            // même caisse.
+            'venteEnAttenteCount' => $session->venteEnAttentes()->where('caissier_id', $utilisateur->id)->count(),
         ];
     }
 
@@ -105,6 +109,7 @@ class DashboardController extends Controller
             ->join('produits', 'produits.id', '=', 'ligne_ventes.produit_id')
             ->when($magasinId, fn ($q) => $q->where('ventes.magasin_id', $magasinId))
             ->where('ventes.created_at', '>=', $depuis)
+            ->whereNull('ventes.deleted_at')
             ->selectRaw('produits.nom as nom, produits.libelle_distinctif as libelle_distinctif, produits.sku as sku, SUM(ligne_ventes.quantite_pieces) as pieces_vendues, SUM(ligne_ventes.total_ligne) as total')
             ->groupBy('produits.id', 'produits.nom', 'produits.libelle_distinctif', 'produits.sku')
             ->orderByDesc('total')
@@ -195,6 +200,7 @@ class DashboardController extends Controller
             ->join('moyen_paiements', 'moyen_paiements.id', '=', 'paiements.moyen_paiement_id')
             ->when($magasinId, fn ($q) => $q->where('ventes.magasin_id', $magasinId))
             ->where('ventes.created_at', '>=', $depuis)
+            ->whereNull('ventes.deleted_at')
             ->selectRaw('moyen_paiements.nom as nom, SUM(paiements.montant) as total')
             ->groupBy('moyen_paiements.id', 'moyen_paiements.nom')
             ->get();

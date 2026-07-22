@@ -35,8 +35,8 @@
                 @can('ventenattente.gerer')
                     <a href="{{ route('ventes-en-attente.index', $session) }}" class="btn btn-outline-warning position-relative">
                         <i class="bi bi-hourglass-split me-1"></i>Ventes en attente
-                        @if ($session->vente_en_attentes_count > 0)
-                            <span class="badge rounded-pill text-bg-warning ms-1">{{ $session->vente_en_attentes_count }}</span>
+                        @if ($venteEnAttentesVisibles > 0)
+                            <span class="badge rounded-pill text-bg-warning ms-1">{{ $venteEnAttentesVisibles }}</span>
                         @endif
                     </a>
                 @endcan
@@ -78,7 +78,7 @@
         </div>
         <div class="col-6 col-md-3">
             <x-kpi-card label="Ventes en attente" icon="bi-hourglass-split" color="warning"
-                :value="$session->vente_en_attentes_count" />
+                :value="$venteEnAttentesVisibles" />
         </div>
         <div class="col-6 col-md-3">
             <x-kpi-card label="Total net en caisse" icon="bi-graph-up-arrow" color="success"

@@ -17,7 +17,7 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start">
                             <h3 class="h6">Panier #{{ $venteEnAttente->id }}</h3>
-                            <span class="text-secondary small">{{ $venteEnAttente->created_at->format('H:i') }}</span>
+                            <span class="text-secondary small">{{ $venteEnAttente->created_at->format('d/m/Y H:i') }}</span>
                         </div>
                         @if ($venteEnAttente->libelle)
                             <p class="small text-secondary fst-italic">{{ $venteEnAttente->libelle }}</p>

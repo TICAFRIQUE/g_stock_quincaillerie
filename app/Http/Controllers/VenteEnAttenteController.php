@@ -71,7 +71,7 @@ class VenteEnAttenteController extends Controller
      */
     public function update(Request $request, VenteEnAttente $venteEnAttente, VenteEnAttenteService $venteEnAttenteService): RedirectResponse
     {
-        $this->assurerProprietaire($venteEnAttente);
+        $this->assurerProprietaireOuGerant($venteEnAttente);
         $this->nettoyerLignes($request);
 
         $donnees = $request->validate([
@@ -99,12 +99,13 @@ class VenteEnAttenteController extends Controller
 
     public function reprendre(Request $request, VenteEnAttente $venteEnAttente, VenteEnAttenteService $venteEnAttenteService): RedirectResponse
     {
-        $this->assurerProprietaire($venteEnAttente);
+        $this->assurerProprietaireOuGerant($venteEnAttente);
         $this->nettoyerLignes($request);
         $request->merge([
             'remise_totale_type' => $request->input('remise_totale_type') ?: null,
             'remise_totale_valeur' => $request->input('remise_totale_valeur') ?: null,
         ]);
+        $this->bloquerRemiseSansPermission($request);
 
         $donnees = $request->validate([
             'lignes' => ['required', 'array', 'min:1'],

@@ -9,6 +9,7 @@ enum MouvementStockType: string
     case Casse = 'casse';
     case Transfert = 'transfert';
     case Ajustement = 'ajustement';
+    case Annulation = 'annulation';
 
     public function libelle(): string
     {
@@ -18,6 +19,7 @@ enum MouvementStockType: string
             self::Casse => 'Casse',
             self::Transfert => 'Transfert',
             self::Ajustement => 'Ajustement',
+            self::Annulation => 'Annulation de vente',
         };
     }
 
@@ -29,6 +31,7 @@ enum MouvementStockType: string
             self::Casse => 'text-bg-danger',
             self::Transfert => 'text-bg-info',
             self::Ajustement => 'text-bg-secondary',
+            self::Annulation => 'text-bg-warning',
         };
     }
 }

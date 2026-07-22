@@ -10,6 +10,11 @@
         'icon' => 'bi-hourglass-split',
         'titre' => 'Sessions ouvertes',
     ])
+    @include('partials._cloche-notifications', [
+        'type' => \App\Notifications\VenteSignalee::class,
+        'icon' => 'bi-flag',
+        'titre' => 'Ventes signalées',
+    ])
     @include('partials._cloche-stock-seuil')
 @endcan
 
