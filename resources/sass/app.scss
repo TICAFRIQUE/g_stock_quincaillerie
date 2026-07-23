@@ -135,6 +135,33 @@ $input-bg: #ffffff;
     display: none !important;
 }
 
+// --- Select2 : le thème select2-bootstrap-5 utilise le bleu Bootstrap par
+// défaut (#0d6efd) — remplacé par le violet du projet partout où il
+// apparaît (focus, dropdown ouvert, option sélectionnée). !important
+// nécessaire : cette feuille de style tierce est importée via le bundle JS,
+// après celle-ci dans la sortie Vite.
+.select2-container--bootstrap-5 {
+    &.select2-container--focus .select2-selection,
+    &.select2-container--open .select2-selection {
+        border-color: $primary !important;
+        box-shadow: 0 0 0 0.25rem rgba($primary, 0.25) !important;
+    }
+
+    .select2-dropdown {
+        border-color: $primary !important;
+
+        .select2-search__field:focus {
+            border-color: $primary !important;
+            box-shadow: 0 0 0 0.25rem rgba($primary, 0.25) !important;
+        }
+
+        .select2-results__options .select2-results__option--selected,
+        .select2-results__options .select2-results__option[aria-selected='true']:not(.select2-results__option--highlighted) {
+            background-color: $primary !important;
+        }
+    }
+}
+
 // --- Page de connexion : bloc vitrine (présentation) + bloc formulaire ---
 
 .login-layout {

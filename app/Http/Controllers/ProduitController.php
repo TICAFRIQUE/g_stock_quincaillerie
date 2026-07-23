@@ -8,6 +8,7 @@ use App\Models\Produit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ProduitController extends Controller
@@ -155,10 +156,18 @@ class ProduitController extends Controller
 
     private function valider(Request $request, ?Produit $produit = null): array
     {
+        // Deux produits peuvent porter le même nom (CLAUDE.md — le SKU
+        // identifie le produit) ; dans ce cas le libellé distinctif devient
+        // obligatoire pour ne pas les confondre à la caisse.
+        $nomEnDouble = Produit::where('actif', true)
+            ->when($produit, fn ($q) => $q->where('id', '!=', $produit->id))
+            ->where('nom', $request->input('nom'))
+            ->exists();
+
         $donnees = $request->validate([
             'sku' => ['nullable', 'string', 'max:255', 'unique:produits,sku,'.($produit?->id)],
             'nom' => ['required', 'string', 'max:255'],
-            'libelle_distinctif' => ['nullable', 'string', 'max:255'],
+            'libelle_distinctif' => [Rule::requiredIf($nomEnDouble), 'nullable', 'string', 'max:255'],
             'code_barre' => ['nullable', 'string', 'max:255', 'unique:produits,code_barre,'.($produit?->id)],
             'categorie_id' => ['required', 'exists:categories,id'],
             'prix_piece' => ['required', 'integer', 'min:0'],

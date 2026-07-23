@@ -31,44 +31,51 @@
     </div>
 
     <div class="col-md-6 mb-3">
-        <label for="libelle_distinctif" class="form-label">Libellé distinctif</label>
+        <label for="libelle_distinctif" class="form-label">
+            Libellé distinctif<span class="required-marker" x-show="nomEnDouble" x-cloak>*</span>
+        </label>
         <input type="text" name="libelle_distinctif" id="libelle_distinctif" class="form-control @error('libelle_distinctif') is-invalid @enderror"
-               x-model="libelleDistinctif" placeholder="Qualité, motif, provenance…">
+               x-model="libelleDistinctif" :required="nomEnDouble" placeholder="Qualité, motif, provenance…">
         @error('libelle_distinctif') <div class="invalid-feedback">{{ $message }}</div> @enderror
         <div class="form-text">Permet de distinguer deux produits qui portent le même nom.</div>
         <div class="form-text text-warning" x-show="nomEnDouble && libelleDistinctif.trim() === ''" x-cloak>
-            <i class="bi bi-exclamation-triangle-fill me-1"></i>Un autre produit s'appelle déjà « <span x-text="nom"></span> ». Renseignez un libellé distinctif pour les différencier à la caisse.
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>Un autre produit s'appelle déjà « <span x-text="nom"></span> ». Le libellé distinctif est obligatoire pour les différencier à la caisse.
         </div>
     </div>
 </div>
 
 <div class="row">
-    <div class="col-md-4 mb-3">
+    <div class="col-md-6 mb-3">
         <label for="categorie_id" class="form-label">Catégorie<span class="required-marker">*</span></label>
         <select name="categorie_id" id="categorie_id" class="form-select @error('categorie_id') is-invalid @enderror" required>
             <option value="">— Choisir —</option>
             @foreach ($categories->whereNull('parent_id') as $parente)
+                @php $enfants = $categories->where('parent_id', $parente->id); @endphp
                 <option value="{{ $parente->id }}" @selected(old('categorie_id', $produit->categorie_id ?? '') == $parente->id)>
                     {{ $parente->nom }}
                 </option>
-                @foreach ($categories->where('parent_id', $parente->id) as $enfant)
-                    <option value="{{ $enfant->id }}" @selected(old('categorie_id', $produit->categorie_id ?? '') == $enfant->id)>
-                        — {{ $enfant->nom }}
-                    </option>
-                @endforeach
+                @if ($enfants->isNotEmpty())
+                    <optgroup label="Sous-catégories de {{ $parente->nom }}">
+                        @foreach ($enfants as $enfant)
+                            <option value="{{ $enfant->id }}" @selected(old('categorie_id', $produit->categorie_id ?? '') == $enfant->id)>
+                                {{ $enfant->nom }}
+                            </option>
+                        @endforeach
+                    </optgroup>
+                @endif
             @endforeach
         </select>
         @error('categorie_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
     </div>
 
-    <div class="col-md-4 mb-3">
+    <div class="col-md-3 mb-3">
         <label for="prix_piece" class="form-label">Prix pièce (F CFA)<span class="required-marker">*</span></label>
         <input type="number" name="prix_piece" id="prix_piece" class="form-control @error('prix_piece') is-invalid @enderror"
                value="{{ old('prix_piece', $produit->prix_piece ?? '') }}" min="0" required>
         @error('prix_piece') <div class="invalid-feedback">{{ $message }}</div> @enderror
     </div>
 
-    <div class="col-md-4 mb-3">
+    <div class="col-md-3 mb-3">
         <label for="seuil_alerte" class="form-label">Seuil d'alerte (pièces)<span class="required-marker">*</span></label>
         <input type="number" name="seuil_alerte" id="seuil_alerte" class="form-control @error('seuil_alerte') is-invalid @enderror"
                value="{{ old('seuil_alerte', $produit->seuil_alerte ?? 0) }}" min="0" required>
@@ -124,3 +131,11 @@
 </div>
 
 <x-actif-toggle :checked="$produit->actif ?? true" />
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.initSelect2('#categorie_id', { placeholder: '— Choisir —' });
+        });
+    </script>
+@endpush
