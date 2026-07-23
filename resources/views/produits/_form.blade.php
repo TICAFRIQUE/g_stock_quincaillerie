@@ -50,19 +50,15 @@
         <select name="categorie_id" id="categorie_id" class="form-select @error('categorie_id') is-invalid @enderror" required>
             <option value="">— Choisir —</option>
             @foreach ($categories->whereNull('parent_id') as $parente)
-                @php $enfants = $categories->where('parent_id', $parente->id); @endphp
                 <option value="{{ $parente->id }}" @selected(old('categorie_id', $produit->categorie_id ?? '') == $parente->id)>
                     {{ $parente->nom }}
                 </option>
-                @if ($enfants->isNotEmpty())
-                    <optgroup label="Sous-catégories de {{ $parente->nom }}">
-                        @foreach ($enfants as $enfant)
-                            <option value="{{ $enfant->id }}" @selected(old('categorie_id', $produit->categorie_id ?? '') == $enfant->id)>
-                                {{ $enfant->nom }}
-                            </option>
-                        @endforeach
-                    </optgroup>
-                @endif
+                @foreach ($categories->where('parent_id', $parente->id) as $enfant)
+                    <option value="{{ $enfant->id }}" data-sous-categorie="1"
+                            @selected(old('categorie_id', $produit->categorie_id ?? '') == $enfant->id)>
+                        {{ $enfant->nom }}
+                    </option>
+                @endforeach
             @endforeach
         </select>
         @error('categorie_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
@@ -135,7 +131,25 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            window.initSelect2('#categorie_id', { placeholder: '— Choisir —' });
+            window.initSelect2('#categorie_id', {
+                placeholder: '— Choisir —',
+                // Sous-catégorie : même liste que sa catégorie parente,
+                // juste décalée vers la droite — pas d'en-tête de groupe
+                // séparé, pour rester lisible d'un coup d'œil. La catégorie
+                // parente ressort en gras/gris pour bien la distinguer de
+                // ses sous-catégories.
+                templateResult: (option) => {
+                    if (!option.id) {
+                        return option.text;
+                    }
+                    const estSousCategorie = option.element?.dataset.sousCategorie === '1';
+                    const $span = jQuery('<span></span>').text(option.text);
+
+                    return estSousCategorie
+                        ? $span.css('padding-left', '1.5rem')
+                        : $span.css({ fontWeight: 'bold', color: '#6c757d' });
+                },
+            });
         });
     </script>
 @endpush
