@@ -49,7 +49,7 @@ class UtilisateurController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $donnees = $this->valider($request);
-        $motDePasse = Str::password(12);
+        $motDePasse = $this->genererMotDePasseProvisoire();
 
         $utilisateur = User::create([
             'name' => $donnees['name'],
@@ -102,7 +102,7 @@ class UtilisateurController extends Controller
     {
         abort_if($utilisateur->hasRole('Superadmin'), 403);
 
-        $motDePasse = Str::password(12);
+        $motDePasse = $this->genererMotDePasseProvisoire();
         $utilisateur->update(['password' => $motDePasse]);
 
         Mail::to($utilisateur->email)->queue(new IdentifiantsUtilisateurMail($utilisateur, $motDePasse, nouveauCompte: false));
@@ -140,5 +140,15 @@ class UtilisateurController extends Controller
         $donnees['actif'] = $request->boolean('actif', true);
 
         return $donnees;
+    }
+
+    /**
+     * Alphanumérique en majuscules uniquement (pas de symboles, pas de
+     * minuscules) : mot de passe provisoire plus simple à lire/retaper pour
+     * un utilisateur non technique qui le reçoit par e-mail.
+     */
+    private function genererMotDePasseProvisoire(): string
+    {
+        return Str::upper(Str::random(8));
     }
 }
