@@ -42,7 +42,7 @@ return [
         'utilisateur.gerer',
         'role.gerer',
         'parametre.gerer',
-        'magasin.gerer',
+        'administration.gerer',
     ],
 
     /*
@@ -50,17 +50,32 @@ return [
     | Noyau de permissions protégé
     |--------------------------------------------------------------------------
     |
-    | Ces permissions ne sont jamais proposées à l'attribution sur les rôles
-    | créés à la volée par l'admin (voir couche de gestion des rôles, future).
-    | Décision volontairement code-owned : la protection elle-même ne doit pas
-    | être modifiable via une simple UPDATE en base.
+    | Jamais proposées à l'attribution sur les rôles créés à la volée, quel que
+    | soit qui édite le rôle (même Superadmin) — voir RoleController. Décision
+    | volontairement code-owned : la protection elle-même ne doit pas être
+    | modifiable via une simple UPDATE en base.
     |
     */
     'protected' => [
+        'parametre.gerer',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Réservé à Superadmin
+    |--------------------------------------------------------------------------
+    |
+    | Attribuables à un rôle créé à la volée, mais uniquement visibles/
+    | cochables quand c'est Superadmin qui crée/modifie le rôle — un Gérant
+    | (qui a accès à cet écran via role.gerer) ne les voit pas. Risque de
+    | délégation en cascade sinon : un rôle avec role.gerer pourrait créer
+    | d'autres rôles avec n'importe quelle permission, utilisateur.gerer
+    | pourrait créer de nouveaux comptes admin.
+    |
+    */
+    'superadmin_only' => [
         'role.gerer',
         'utilisateur.gerer',
-        'parametre.gerer',
-        'magasin.gerer',
     ],
 
 ];

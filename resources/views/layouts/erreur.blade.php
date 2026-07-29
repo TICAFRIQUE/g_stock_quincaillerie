@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@yield('titre', 'Erreur') — G-Stock Vaisselle</title>
+    <title>@yield('titre', 'Erreur') — {{ $parametre->nom }}</title>
+    <link rel="icon" type="image/jpeg" href="{{ $parametre->logoUrl() }}">
     @vite(['resources/sass/app.scss', 'resources/js/app.js'])
 </head>
 <body class="d-flex align-items-center" style="min-height: 100vh; background-color: var(--erp-sidebar-bg);">
@@ -11,8 +12,11 @@
         <div class="row justify-content-center">
             <div class="col-12 col-sm-8 col-md-6 col-lg-5">
                 <div class="text-center mb-4">
-                    <span class="fs-1">🍽️</span>
-                    <h1 class="h4 text-white mt-2">G-Stock Vaisselle</h1>
+                    <span class="brand-logo-chip brand-logo-chip--lg">
+                        <img src="{{ $parametre->logoUrl() }}" alt="Logo {{ $parametre->nom }}">
+                    </span>
+                    <h1 class="h4 text-white mt-2 mb-1">{{ $parametre->nom }}</h1>
+                    <span class="brand-accent-bar mx-auto"></span>
                 </div>
 
                 <div class="card shadow-sm text-center">

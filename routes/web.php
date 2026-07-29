@@ -11,6 +11,7 @@ use App\Http\Controllers\JournalActiviteController;
 use App\Http\Controllers\MagasinController;
 use App\Http\Controllers\MoyenPaiementController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ParametreController;
 use App\Http\Controllers\ProduitController;
 use App\Http\Controllers\RapportController;
 use App\Http\Controllers\RoleController;
@@ -38,7 +39,7 @@ Route::middleware('auth')->group(function () {
     Route::post('notifications/marquer-lues', [NotificationController::class, 'marquerLues'])->name('notifications.marquer-lues');
     Route::get('notifications/{notification}/ouvrir', [NotificationController::class, 'ouvrir'])->name('notifications.ouvrir');
 
-    Route::middleware('can:magasin.gerer')->group(function () {
+    Route::middleware('can:administration.gerer')->group(function () {
         Route::resource('magasins', MagasinController::class)->except(['show']);
     });
 
@@ -58,10 +59,16 @@ Route::middleware('auth')->group(function () {
         Route::delete('produits/{produit}/unite-ventes/{uniteVente}', [UniteVenteController::class, 'destroy'])->name('produits.unite-ventes.destroy');
     });
 
-    Route::middleware('can:parametre.gerer')->group(function () {
+    Route::middleware('can:administration.gerer')->group(function () {
         Route::resource('moyens-paiement', MoyenPaiementController::class)
             ->except(['show'])
             ->parameters(['moyens-paiement' => 'moyenPaiement']);
+    });
+
+    Route::middleware('can:parametre.gerer')->group(function () {
+        Route::get('parametres', [ParametreController::class, 'edit'])->name('parametres.edit');
+        Route::put('parametres', [ParametreController::class, 'update'])->name('parametres.update');
+        Route::post('parametres/backup', [ParametreController::class, 'backup'])->name('parametres.backup');
     });
 
     Route::middleware('can:fournisseur.gerer')->group(function () {
@@ -70,9 +77,15 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('can:achat.voir')->group(function () {
         Route::resource('commande-achats', CommandeAchatController::class)
-            ->only(['index', 'create', 'store', 'show', 'destroy'])
+            ->only(['index', 'create', 'store', 'destroy'])
             ->parameters(['commande-achats' => 'commandeAchat']);
+        // withTrashed() : une commande annulée reste consultable (détail avec
+        // bandeau d'annulation), voir CommandeAchatController::show().
+        Route::get('commande-achats/{commandeAchat}', [CommandeAchatController::class, 'show'])->name('commande-achats.show')->withTrashed();
         Route::post('commande-achats/{commandeAchat}/valider', [CommandeAchatController::class, 'valider'])->name('commande-achats.valider');
+        // Pas de withTrashed() ici : tenter d'annuler une commande déjà
+        // annulée doit échouer (404 sur la liaison de route), pas la re-traiter.
+        Route::post('commande-achats/{commandeAchat}/annuler', [CommandeAchatController::class, 'annuler'])->name('commande-achats.annuler');
     });
 
     Route::middleware('can:stock.voir')->group(function () {
@@ -95,7 +108,11 @@ Route::middleware('auth')->group(function () {
         Route::post('inventaires/{inventaire}/valider', [InventaireController::class, 'valider'])->name('inventaires.valider');
     });
 
-    Route::middleware('can:caisse.gerer')->group(function () {
+    // La gestion (CRUD) des caisses passe par administration.gerer, distinct
+    // de la permission caisse.gerer qui donne au gérant une vue d'ensemble
+    // sur les sessions/ventes de son équipe (voir SessionCaisseController,
+    // VenteController, VenteEnAttenteController, AutoriseVenteEnAttente).
+    Route::middleware('can:administration.gerer')->group(function () {
         Route::resource('caisses', CaisseController::class)
             ->except(['show'])
             ->parameters(['caisses' => 'caisse']);

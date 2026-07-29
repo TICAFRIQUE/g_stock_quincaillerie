@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Models\Parametre;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,10 +23,12 @@ class IdentifiantsUtilisateurMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
+        $nom = Parametre::actuel()->nom;
+
         return new Envelope(
             subject: $this->nouveauCompte
-                ? 'Votre compte G-Stock Vaisselle'
-                : 'Votre mot de passe G-Stock Vaisselle a été réinitialisé',
+                ? "Votre compte {$nom}"
+                : "Votre mot de passe {$nom} a été réinitialisé",
         );
     }
 
@@ -33,6 +36,7 @@ class IdentifiantsUtilisateurMail extends Mailable implements ShouldQueue
     {
         return new Content(
             view: 'emails.identifiants-utilisateur',
+            with: ['parametre' => Parametre::actuel()],
         );
     }
 }

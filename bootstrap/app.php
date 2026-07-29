@@ -12,7 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Cookie signal de fin de téléchargement (voir ParametreController::backup()
+        // et resources/js/app.js) : doit rester lisible/comparable tel quel côté
+        // client (document.cookie === '1'), donc exclu du chiffrement automatique.
+        $middleware->encryptCookies(except: ['telechargement_pret']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

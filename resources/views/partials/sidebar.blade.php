@@ -22,31 +22,33 @@
                 <i class="bi bi-clipboard-check me-2"></i>Inventaire
             </a>
         @endcan
+         @can('fournisseur.gerer')
+            <a href="{{ route('fournisseurs.index') }}" class="nav-link {{ request()->routeIs('fournisseurs.*') ? 'active' : '' }}">
+                <i class="bi bi-building me-2"></i>Fournisseurs
+            </a>
+        @endcan
 
         @can('achat.voir')
             <a href="{{ route('commande-achats.index') }}" class="nav-link {{ request()->routeIs('commande-achats.*') ? 'active' : '' }}">
                 <i class="bi bi-truck me-2"></i>Achats
             </a>
         @endcan
-        @can('fournisseur.gerer')
-            <a href="{{ route('fournisseurs.index') }}" class="nav-link {{ request()->routeIs('fournisseurs.*') ? 'active' : '' }}">
-                <i class="bi bi-building me-2"></i>Fournisseurs
-            </a>
-        @endcan
+       
     @endcanany
 
     @canany(['produit.voir', 'categorie.gerer'])
         <span class="text-uppercase small px-2 mt-3 mb-1" style="color: var(--erp-sidebar-color); opacity: .6;">Catalogue</span>
+         @can('categorie.gerer')
+            <a href="{{ route('categories.index') }}" class="nav-link {{ request()->routeIs('categories.*') ? 'active' : '' }}">
+                <i class="bi bi-tags me-2"></i>Catégories
+            </a>
+        @endcan
         @can('produit.voir')
             <a href="{{ route('produits.index') }}" class="nav-link {{ request()->routeIs('produits.*') ? 'active' : '' }}">
                 <i class="bi bi-cup-hot me-2"></i>Produits
             </a>
         @endcan
-        @can('categorie.gerer')
-            <a href="{{ route('categories.index') }}" class="nav-link {{ request()->routeIs('categories.*') ? 'active' : '' }}">
-                <i class="bi bi-tags me-2"></i>Catégories
-            </a>
-        @endcan
+      
     @endcanany
 
     @can('rapport.voir')
@@ -56,24 +58,24 @@
         </a>
     @endcan
 
-    @canany(['magasin.gerer', 'caisse.gerer', 'parametre.gerer', 'utilisateur.gerer', 'role.gerer'])
+    @canany(['administration.gerer', 'parametre.gerer', 'utilisateur.gerer', 'role.gerer'])
         <span class="text-uppercase small px-2 mt-3 mb-1" style="color: var(--erp-sidebar-color); opacity: .6;">Administration</span>
 
-        @can('magasin.gerer')
+        @can('administration.gerer')
             <a href="{{ route('magasins.index') }}" class="nav-link {{ request()->routeIs('magasins.*') ? 'active' : '' }}">
                 <i class="bi bi-shop me-2"></i>Magasins
             </a>
-        @endcan
-
-        @can('caisse.gerer')
             <a href="{{ route('caisses.index') }}" class="nav-link {{ request()->routeIs('caisses.*') ? 'active' : '' }}">
                 <i class="bi bi-cash-stack me-2"></i>Caisses
+            </a>
+            <a href="{{ route('moyens-paiement.index') }}" class="nav-link {{ request()->routeIs('moyens-paiement.*') ? 'active' : '' }}">
+                <i class="bi bi-credit-card me-2"></i>Moyens de paiement
             </a>
         @endcan
 
         @can('parametre.gerer')
-            <a href="{{ route('moyens-paiement.index') }}" class="nav-link {{ request()->routeIs('moyens-paiement.*') ? 'active' : '' }}">
-                <i class="bi bi-credit-card me-2"></i>Moyens de paiement
+            <a href="{{ route('parametres.edit') }}" class="nav-link {{ request()->routeIs('parametres.*') ? 'active' : '' }}">
+                <i class="bi bi-gear me-2"></i>Paramètres
             </a>
         @endcan
 

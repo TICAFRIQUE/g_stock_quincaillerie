@@ -3,16 +3,16 @@
 <head>
     <meta charset="utf-8">
 </head>
-<body style="font-family: Arial, sans-serif; color: #212529; background: #f5f4f8; padding: 24px;">
+<body style="font-family: Arial, sans-serif; color: #212529; background: #f4f6f4; padding: 24px;">
     <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 8px; padding: 24px;">
-        <h2 style="color: #4a2a7a; margin-top: 0;">G-Stock Vaisselle</h2>
+        <h2 style="color: #163126; margin-top: 0;">{{ $parametre->nom }}</h2>
 
         <p>Bonjour {{ $utilisateur->name }},</p>
 
         @if ($nouveauCompte)
-            <p>Un compte vient d'être créé pour vous sur G-Stock Vaisselle. Voici vos identifiants de connexion :</p>
+            <p>Un compte vient d'être créé pour vous sur {{ $parametre->nom }}. Voici vos identifiants de connexion :</p>
         @else
-            <p>Votre mot de passe G-Stock Vaisselle a été réinitialisé. Voici vos nouveaux identifiants :</p>
+            <p>Votre mot de passe a été réinitialisé. Voici vos nouveaux identifiants :</p>
         @endif
 
         <table style="width: 100%; margin: 16px 0; border-collapse: collapse;">

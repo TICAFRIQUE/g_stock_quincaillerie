@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@yield('title', 'Tableau de bord') — G-Stock Vaisselle</title>
+    <title>@yield('title', 'Tableau de bord') — {{ $parametre->nom }}</title>
+    <link rel="icon" type="image/jpeg" href="{{ $parametre->logoUrl() }}">
     @vite(['resources/sass/app.scss', 'resources/js/app.js'])
 </head>
 <body>
@@ -12,8 +13,16 @@
 
         <aside class="erp-sidebar flex-shrink-0 p-3" :class="{ 'erp-sidebar-open': sidebarOpen }">
             <div class="d-flex align-items-center gap-2 mb-4 px-2">
-                <span class="fs-4">🍽️</span>
-                <span class="fs-5 fw-semibold text-white">G-Stock Vaisselle</span>
+                <span class="brand-logo-chip">
+                    <img src="{{ $parametre->logoUrl() }}" alt="Logo {{ $parametre->nom }}">
+                </span>
+                <div>
+                    <span class="fs-6 fw-semibold text-white d-block lh-sm">{{ $parametre->nom }}</span>
+                    @if ($parametre->slogan)
+                        <span class="small d-block lh-sm" style="color: var(--erp-sidebar-color);">{{ $parametre->slogan }}</span>
+                    @endif
+                    <span class="brand-accent-bar mt-1"></span>
+                </div>
             </div>
             @include('partials.sidebar')
         </aside>

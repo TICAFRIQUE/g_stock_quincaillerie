@@ -3,12 +3,14 @@
 namespace App\Providers;
 
 use App\Listeners\LogAuthentication;
+use App\Models\Parametre;
 use App\Models\User;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -35,5 +37,12 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(Login::class, [LogAuthentication::class, 'handleLogin']);
         Event::listen(Logout::class, [LogAuthentication::class, 'handleLogout']);
+
+        // Logo, nom, slogan… configurables (voir ParametreController) : partagés
+        // avec les layouts qui affichent la marque, plutôt que de repasser
+        // Parametre::actuel() depuis chaque contrôleur.
+        View::composer(['layouts.app', 'layouts.erreur', 'auth.login'], function ($view) {
+            $view->with('parametre', Parametre::actuel());
+        });
     }
 }

@@ -3,15 +3,22 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Connexion — G-Stock Vaisselle</title>
+    <title>Connexion — {{ $parametre->nom }}</title>
+    <link rel="icon" type="image/jpeg" href="{{ $parametre->logoUrl() }}">
     @vite(['resources/sass/app.scss', 'resources/js/app.js'])
 </head>
 <body>
     <div class="login-layout">
         <div class="login-layout__vitrine">
             <div class="login-layout__vitrine-contenu">
-                <span class="fs-1">🍽️</span>
-                <h1 class="h2 text-white mt-3 mb-3">G-Stock Vaisselle</h1>
+                <span class="brand-logo-chip brand-logo-chip--lg">
+                    <img src="{{ $parametre->logoUrl() }}" alt="Logo {{ $parametre->nom }}">
+                </span>
+                <h1 class="h2 text-white mt-3 mb-2">{{ $parametre->nom }}</h1>
+                @if ($parametre->slogan)
+                    <p class="text-white-50 mb-2">{{ $parametre->slogan }}</p>
+                @endif
+                <span class="brand-accent-bar mb-3"></span>
                 <p class="lead text-white-50">
                     Bienvenue dans votre application de gestion de caisse et de stock —
                     suivez vos ventes, vos magasins et vos équipes en toute simplicité,

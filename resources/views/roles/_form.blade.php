@@ -7,8 +7,12 @@
 
 <h3 class="h6">Permissions</h3>
 <p class="text-secondary small">
-    Le noyau système (gestion des rôles, utilisateurs, paramètres, magasins) n'est pas
-    proposé ici : il reste réservé aux rôles Superadmin et Gérant existants.
+    @if (auth()->user()->hasRole('Superadmin'))
+        La gestion des paramètres généraux n'est pas proposée ici : elle reste réservée au rôle Superadmin.
+    @else
+        La gestion des rôles, des utilisateurs et des paramètres généraux n'est pas proposée ici :
+        elle reste réservée au rôle Superadmin.
+    @endif
 </p>
 
 @php $selectionnees = old('permissions', $permissionsActuelles ?? []); @endphp

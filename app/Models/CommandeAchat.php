@@ -7,16 +7,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 #[Fillable([
     'numero', 'fournisseur_id', 'magasin_id', 'statut', 'date_commande',
-    'created_by', 'valide_by', 'valide_at',
+    'created_by', 'valide_by', 'valide_at', 'motif_annulation', 'annulee_par',
 ])]
 class CommandeAchat extends Model
 {
-    use HasFactory, LogsActivity;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected function casts(): array
     {
@@ -54,6 +55,11 @@ class CommandeAchat extends Model
     public function validateur(): BelongsTo
     {
         return $this->belongsTo(User::class, 'valide_by');
+    }
+
+    public function annulateur(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'annulee_par');
     }
 
     public function lignes(): HasMany

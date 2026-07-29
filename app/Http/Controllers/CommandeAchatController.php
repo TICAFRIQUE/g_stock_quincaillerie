@@ -69,9 +69,18 @@ class CommandeAchatController extends Controller
         $lignes = $request->validate([
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'distinct', 'exists:produits,id'],
+            'lignes.*.unite_achat' => ['required', 'in:piece,groupe'],
+            'lignes.*.qte_par_groupe' => ['required_if:lignes.*.unite_achat,groupe', 'nullable', 'integer', 'min:2'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.prix_achat' => ['required', 'integer', 'min:0'],
         ])['lignes'];
+
+        foreach ($lignes as &$ligne) {
+            if ($ligne['unite_achat'] !== 'groupe') {
+                $ligne['qte_par_groupe'] = null;
+            }
+        }
+        unset($ligne);
 
         $validerImmediatement = $donnees['action'] === 'valider';
         abort_if($validerImmediatement && ! $request->user()->can('achat.valider'), 403);
@@ -113,12 +122,12 @@ class CommandeAchatController extends Controller
 
     public function show(CommandeAchat $commandeAchat): View
     {
-        $commandeAchat->load(['fournisseur', 'magasin', 'lignes.produit', 'auteur', 'validateur']);
+        $commandeAchat->load(['fournisseur', 'magasin', 'lignes.produit', 'auteur', 'validateur', 'annulateur']);
 
         return view('commande-achats.show', [
             'commande' => $commandeAchat,
             'peutValider' => request()->user()->can('achat.valider'),
-            'peutSupprimer' => request()->user()->can('achat.annuler'),
+            'peutAnnuler' => request()->user()->can('achat.annuler'),
         ]);
     }
 
@@ -140,12 +149,35 @@ class CommandeAchatController extends Controller
         abort_unless($request->user()->can('achat.annuler'), 403);
 
         if ($commandeAchat->statut !== 'brouillon') {
-            return redirect()->route('commande-achats.index')->with('erreur', 'Seule une commande en brouillon peut être annulée : une commande validée a déjà mis à jour le stock et ne peut plus être supprimée.');
+            return redirect()->route('commande-achats.index')->with('erreur', 'Seule une commande en brouillon peut être supprimée : une commande validée a déjà mis à jour le stock, utilisez « Annuler l\'achat » à la place.');
         }
 
         $commandeAchat->delete();
 
-        return redirect()->route('commande-achats.index')->with('succes', 'Commande annulée.');
+        return redirect()->route('commande-achats.index')->with('succes', 'Commande supprimée.');
+    }
+
+    /**
+     * Annule une commande validée (erreur de saisie, réception refusée…) —
+     * pas une suppression : voir AchatService::annuler(). Le stock est
+     * remis à jour automatiquement, échoue proprement si une partie a déjà
+     * été consommée ailleurs.
+     */
+    public function annuler(Request $request, CommandeAchat $commandeAchat, AchatService $achatService): RedirectResponse
+    {
+        abort_unless($request->user()->can('achat.annuler'), 403);
+
+        $donnees = $request->validate([
+            'motif' => ['required', 'string', 'max:500'],
+        ]);
+
+        try {
+            $achatService->annuler($commandeAchat, $request->user(), $donnees['motif']);
+        } catch (RuntimeException $e) {
+            return redirect()->route('commande-achats.show', $commandeAchat)->with('erreur', $e->getMessage());
+        }
+
+        return redirect()->route('commande-achats.index')->with('succes', "Commande annulée : le stock a été mis à jour.");
     }
 
     private function genererNumero(): string

@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolePermissionSeeder::class,
             MoyenPaiementSeeder::class,
+            ParametreSeeder::class,
         ]);
 
         if (app()->environment('local')) {

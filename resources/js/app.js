@@ -330,8 +330,29 @@ document.addEventListener('submit', (event) => {
 
     if (bouton instanceof HTMLElement) {
         demarrerSpinner(bouton);
+        if (form.dataset.telechargement !== undefined) {
+            surveillerTelechargement(bouton);
+        }
     }
 }, true);
+
+// Formulaires de téléchargement de fichier (ex. sauvegarde) : la réponse est
+// un fichier, pas une page — aucun rechargement ne vient jamais réinitialiser
+// le spinner générique tout seul. Le contrôleur pose un cookie une fois le
+// fichier prêt à être envoyé (ex. ParametreController::backup()) ; on le
+// sonde pour arrêter le spinner dès que le téléchargement démarre vraiment,
+// plutôt que d'attendre le délai de sécurité de 20 s (qui afficherait à tort
+// une erreur de lenteur alors que le fichier a bien été livré).
+function surveillerTelechargement(bouton) {
+    const intervalle = window.setInterval(() => {
+        if (!document.cookie.includes('telechargement_pret=1')) {
+            return;
+        }
+        window.clearInterval(intervalle);
+        document.cookie = 'telechargement_pret=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+        arreterSpinner(bouton);
+    }, 300);
+}
 
 Alpine.start();
 

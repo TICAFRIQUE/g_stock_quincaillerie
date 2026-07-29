@@ -160,7 +160,22 @@
                 @endif
             </table>
 
-            <div class="text-center text-secondary small mt-3">Merci de votre visite !</div>
+            <div class="text-center text-secondary small mt-3">
+                Merci de votre visite !
+                @php($parametre = \App\Models\Parametre::actuel())
+                @if ($parametre->numero || $parametre->adresse || $parametre->slogan)
+                    <hr>
+                @endif
+                @if ($parametre->slogan)
+                    <div>{{ $parametre->slogan }}</div>
+                @endif
+                @if ($parametre->numero)
+                    <div>{{ $parametre->numero }}</div>
+                @endif
+                @if ($parametre->adresse)
+                    <div>{{ $parametre->adresse }}</div>
+                @endif
+            </div>
         </div>
     </div>
 @endsection
