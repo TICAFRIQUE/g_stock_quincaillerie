@@ -38,8 +38,8 @@
                 <div class="card-body">
                     <h3 class="h6">Unités de vente</h3>
                     <p class="text-secondary small">
-                        La pièce (prix : {{ number_format($produit->prix_piece, 0, ',', ' ') }} F) est toujours vendable.
-                        Ajoutez ici des lots (ex. « Lot de 5 ») avec leur propre prix total.
+                        L'unité de base « {{ $produit->unite_base_libelle }} » (prix : {{ number_format($produit->prix_piece, 0, ',', ' ') }} F) est toujours vendable.
+                        Ajoutez ici des variantes (ex. « 5L », « Carton de 24 ») avec leur propre libellé et prix total.
                     </p>
 
                     @if ($produit->uniteVentes->isNotEmpty())
@@ -48,7 +48,7 @@
                                 <thead>
                                     <tr>
                                         <th>Libellé</th>
-                                        <th>Pièces par lot</th>
+                                        <th>Facteur</th>
                                         <th>Prix</th>
                                         <th></th>
                                     </tr>
@@ -57,7 +57,7 @@
                                     @foreach ($produit->uniteVentes as $uniteVente)
                                         <tr x-show="editingId !== {{ $uniteVente->id }}">
                                             <td>{{ $uniteVente->libelle }}</td>
-                                            <td>{{ $uniteVente->facteur }} pièces</td>
+                                            <td>{{ $uniteVente->facteur }} × {{ $produit->unite_base_libelle }}</td>
                                             <td>{{ number_format($uniteVente->prix, 0, ',', ' ') }} F</td>
                                             <td class="text-end">
                                                 @if ($peutModifier)
@@ -76,11 +76,19 @@
                                                     <form method="POST" action="{{ route('produits.unite-ventes.update', [$produit, $uniteVente]) }}" class="row g-2 align-items-end">
                                                         @csrf
                                                         @method('PUT')
-                                                        <div class="col-5">
-                                                            <label class="form-label small">Pièces par lot<span class="required-marker">*</span></label>
+                                                        <div class="col-4">
+                                                            <label class="form-label small">Unité<span class="required-marker">*</span></label>
+                                                            <select name="unite_id" class="form-select form-select-sm" required>
+                                                                @foreach ($unites as $uniteOption)
+                                                                    <option value="{{ $uniteOption->id }}" @selected($uniteVente->unite_id === $uniteOption->id)>{{ $uniteOption->nom }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-3">
+                                                            <label class="form-label small">Facteur<span class="required-marker">*</span></label>
                                                             <input type="number" name="facteur" class="form-control form-control-sm" value="{{ $uniteVente->facteur }}" min="2" required>
                                                         </div>
-                                                        <div class="col-5">
+                                                        <div class="col-3">
                                                             <label class="form-label small">Prix (F)<span class="required-marker">*</span></label>
                                                             <input type="number" name="prix" class="form-control form-control-sm" value="{{ $uniteVente->prix }}" min="0" required>
                                                         </div>
@@ -109,11 +117,20 @@
                         <hr>
                         <form method="POST" action="{{ route('produits.unite-ventes.store', $produit) }}" class="row g-2 align-items-end">
                             @csrf
-                            <div class="col-5">
-                                <label class="form-label small">Pièces par lot<span class="required-marker">*</span></label>
+                            <div class="col-4">
+                                <label class="form-label small">Unité<span class="required-marker">*</span></label>
+                                <select name="unite_id" class="form-select form-select-sm" required>
+                                    <option value="">— Choisir —</option>
+                                    @foreach ($unites as $uniteOption)
+                                        <option value="{{ $uniteOption->id }}">{{ $uniteOption->nom }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-3">
+                                <label class="form-label small">Facteur<span class="required-marker">*</span></label>
                                 <input type="number" name="facteur" class="form-control form-control-sm" min="2" placeholder="Ex. 5" required>
                             </div>
-                            <div class="col-5">
+                            <div class="col-3">
                                 <label class="form-label small">Prix (F)<span class="required-marker">*</span></label>
                                 <input type="number" name="prix" class="form-control form-control-sm" min="0" required>
                             </div>
@@ -124,7 +141,8 @@
                                 </button>
                             </div>
                         </form>
-                        <div class="form-text">Le nom (« Lot de 5 »…) est généré automatiquement.</div>
+                        <div class="form-text">Facteur = nombre d'unités de base contenues (ex. 5 pour un bidon de 5L si l'unité de base est le litre).</div>
+                        @error('unite_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         @error('facteur') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         @error('prix') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                     @endif

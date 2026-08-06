@@ -10,7 +10,8 @@
             <div class="card">
                 <div class="card-body">
                     <form id="formCommandeAchat" method="POST" action="{{ route('commande-achats.store') }}" x-data="{
-                            lignes: {{ Js::from(old('lignes', [['produit_id' => '', 'unite_achat' => 'piece', 'qte_par_groupe' => '', 'quantite' => '', 'prix_achat' => '']])) }},
+                            lignes: {{ Js::from(old('lignes', [['produit_id' => '', 'unite_vente_id' => '', 'quantite' => '', 'prix_achat' => '']])) }},
+                            unitesParProduit: {{ Js::from($unitesParProduit) }},
                             erreurs: {{ Js::from($errors->getMessages()) }},
                             actionSoumission: {{ Js::from(old('action', 'brouillon')) }},
                             estDoublon(index) {
@@ -20,10 +21,18 @@
                             get aUnDoublon() {
                                 return this.lignes.some((l, i) => this.estDoublon(i));
                             },
+                            unitesDisponibles(produitId) {
+                                const infos = this.unitesParProduit[produitId];
+                                if (!infos) return [];
+                                return [{ id: '', libelle: infos.basePiece, facteur: 1 }, ...infos.variantes];
+                            },
+                            uniteChoisie(ligne) {
+                                const options = this.unitesDisponibles(ligne.produit_id);
+                                return options.find((o) => String(o.id) === String(ligne.unite_vente_id || '')) || options[0] || { libelle: 'pièce', facteur: 1 };
+                            },
                             quantitePieces(ligne) {
                                 const quantite = Number(ligne.quantite) || 0;
-                                const facteur = ligne.unite_achat === 'groupe' ? (Number(ligne.qte_par_groupe) || 0) : 1;
-                                return quantite * facteur;
+                                return quantite * this.uniteChoisie(ligne).facteur;
                             },
                             declencherValidation(event) {
                                 const form = document.getElementById('formCommandeAchat');
@@ -81,7 +90,7 @@
 
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <h3 class="h6 mb-0">Lignes de la commande</h3>
-                            <button type="button" class="btn btn-sm btn-outline-primary" @click="lignes.push({ produit_id: '', unite_achat: 'piece', qte_par_groupe: '', quantite: '', prix_achat: '' })">
+                            <button type="button" class="btn btn-sm btn-outline-primary" @click="lignes.push({ produit_id: '', unite_vente_id: '', quantite: '', prix_achat: '' })">
                                 <i class="bi bi-plus-lg"></i> Ajouter une ligne
                             </button>
                         </div>
@@ -89,9 +98,9 @@
                         <template x-for="(ligne, index) in lignes" :key="index">
                             <div class="border rounded p-2 mb-2">
                                 <div class="row g-2 align-items-end mb-2">
-                                    <div class="col-12 col-md-5">
+                                    <div class="col-12 col-md-6">
                                         <label class="form-label small">Produit<span class="required-marker">*</span></label>
-                                        <select :name="'lignes['+index+'][produit_id]'" x-model="ligne.produit_id"
+                                        <select :name="'lignes['+index+'][produit_id]'" x-model="ligne.produit_id" @change="ligne.unite_vente_id = ''"
                                                 class="form-select form-select-sm produit-ligne-select" :class="{ 'is-invalid': estDoublon(index) }"
                                                 x-init="window.initSelect2($el, { width: '100%' })" required>
                                             <option value="">— Choisir —</option>
@@ -102,18 +111,14 @@
                                         <div class="text-danger small mt-1" x-show="estDoublon(index)" x-cloak>Ce produit est déjà présent dans une autre ligne.</div>
                                         <div class="text-danger small mt-1" x-show="erreurs['lignes.'+index+'.produit_id']" x-text="(erreurs['lignes.'+index+'.produit_id'] || [])[0]"></div>
                                     </div>
-                                    <div class="col-6 col-md-3">
+                                    <div class="col-6 col-md-5">
                                         <label class="form-label small">Unité d'achat<span class="required-marker">*</span></label>
-                                        <select :name="'lignes['+index+'][unite_achat]'" x-model="ligne.unite_achat" class="form-select form-select-sm" required>
-                                            <option value="piece">Pièce</option>
-                                            <option value="groupe">Groupe (carton, lot…)</option>
+                                        <select :name="'lignes['+index+'][unite_vente_id]'" x-model="ligne.unite_vente_id" class="form-select form-select-sm">
+                                            <template x-for="option in unitesDisponibles(ligne.produit_id)" :key="option.id">
+                                                <option :value="option.id" x-text="option.libelle"></option>
+                                            </template>
                                         </select>
-                                    </div>
-                                    <div class="col-6 col-md-3" x-show="ligne.unite_achat === 'groupe'" x-cloak>
-                                        <label class="form-label small">Qté par groupe<span class="required-marker">*</span></label>
-                                        <input type="number" :name="'lignes['+index+'][qte_par_groupe]'" x-model="ligne.qte_par_groupe"
-                                               class="form-control form-control-sm" min="2" :required="ligne.unite_achat === 'groupe'">
-                                        <div class="text-danger small mt-1" x-show="erreurs['lignes.'+index+'.qte_par_groupe']" x-text="(erreurs['lignes.'+index+'.qte_par_groupe'] || [])[0]"></div>
+                                        <div class="text-danger small mt-1" x-show="erreurs['lignes.'+index+'.unite_vente_id']" x-text="(erreurs['lignes.'+index+'.unite_vente_id'] || [])[0]"></div>
                                     </div>
                                     <div class="col-md-1 text-md-end">
                                         <button type="button" class="btn btn-sm btn-icon btn-outline-danger" title="Retirer" @click="lignes.length > 1 && lignes.splice(index, 1)">
@@ -124,11 +129,11 @@
                                 </div>
                                 <div class="row g-2 align-items-end">
                                     <div class="col-4">
-                                        <label class="form-label small" x-text="(ligne.unite_achat === 'groupe' ? 'Nombre de groupes' : 'Quantité (pièces)') + ' *'"></label>
+                                        <label class="form-label small" x-text="'Quantité (' + uniteChoisie(ligne).libelle + ') *'"></label>
                                         <input type="number" :name="'lignes['+index+'][quantite]'" x-model="ligne.quantite" class="form-control form-control-sm" min="1" required>
                                     </div>
                                     <div class="col-4">
-                                        <label class="form-label small" x-text="(ligne.unite_achat === 'groupe' ? 'Prix d\'achat du groupe (F)' : 'Prix d\'achat (F)') + ' *'"></label>
+                                        <label class="form-label small" x-text="'Prix d\'achat (' + uniteChoisie(ligne).libelle + ', F) *'"></label>
                                         <input type="number" :name="'lignes['+index+'][prix_achat]'" x-model="ligne.prix_achat" class="form-control form-control-sm" min="0" required>
                                     </div>
                                     <div class="col-4">
@@ -139,7 +144,7 @@
                             </div>
                         </template>
 
-                        <button type="button" class="btn btn-sm btn-outline-primary mb-2" @click="lignes.push({ produit_id: '', unite_achat: 'piece', qte_par_groupe: '', quantite: '', prix_achat: '' })">
+                        <button type="button" class="btn btn-sm btn-outline-primary mb-2" @click="lignes.push({ produit_id: '', unite_vente_id: '', quantite: '', prix_achat: '' })">
                             <i class="bi bi-plus-lg"></i> Ajouter une ligne
                         </button>
 

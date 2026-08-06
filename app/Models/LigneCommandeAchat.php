@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * quantite_pieces n'est volontairement pas fillable : c'est un champ dérivé,
  * calculé côté serveur (voir booted()), jamais saisi directement.
  */
-#[Fillable(['commande_achat_id', 'produit_id', 'unite_achat', 'qte_par_groupe', 'quantite', 'prix_achat'])]
+#[Fillable(['commande_achat_id', 'produit_id', 'unite_vente_id', 'quantite', 'prix_achat'])]
 class LigneCommandeAchat extends Model
 {
     use HasFactory;
@@ -20,7 +20,6 @@ class LigneCommandeAchat extends Model
     protected function casts(): array
     {
         return [
-            'qte_par_groupe' => 'integer',
             'quantite' => 'integer',
             'quantite_pieces' => 'integer',
             'prix_achat' => 'integer',
@@ -49,12 +48,22 @@ class LigneCommandeAchat extends Model
     }
 
     /**
-     * Nombre de pièces contenues dans une unité d'achat (1 pour "pièce",
-     * qte_par_groupe pour "groupe").
+     * withTrashed() : ligne de commande historique, doit rester affichable
+     * même si l'unité de vente a été désactivée/supprimée depuis — même
+     * référentiel que la vente/le devis (voir UniteVente).
+     */
+    public function uniteVente(): BelongsTo
+    {
+        return $this->belongsTo(UniteVente::class)->withTrashed();
+    }
+
+    /**
+     * Nombre de pièces contenues dans l'unité d'achat choisie (1 si achetée
+     * à la pièce/unité de base, le facteur de l'UniteVente sinon).
      */
     public function facteurPieces(): int
     {
-        return $this->unite_achat === 'groupe' ? max(1, (int) $this->qte_par_groupe) : 1;
+        return $this->uniteVente?->facteur ?? 1;
     }
 
     /**

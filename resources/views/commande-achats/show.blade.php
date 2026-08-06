@@ -110,17 +110,13 @@
                             <td><code>{{ $ligne->produit->sku }}</code></td>
                             <td>{{ $ligne->produit->libelle_affichage }}</td>
                             <td>
-                                @if ($ligne->unite_achat === 'groupe')
-                                    {{ $ligne->quantite }} groupe{{ $ligne->quantite > 1 ? 's' : '' }} de {{ $ligne->qte_par_groupe }}
-                                @else
-                                    {{ $ligne->quantite }} pièce{{ $ligne->quantite > 1 ? 's' : '' }}
-                                @endif
+                                {{ $ligne->quantite }} × {{ $ligne->uniteVente->libelle ?? $ligne->produit->unite_base_libelle }}
                             </td>
-                            <td>{{ $ligne->quantite_pieces }} pièces</td>
+                            <td>{{ $ligne->quantite_pieces }} {{ $ligne->produit->unite_base_libelle }}</td>
                             <td>
                                 {{ number_format($ligne->prix_achat, 0, ',', ' ') }} F
-                                @if ($ligne->unite_achat === 'groupe')
-                                    <div class="text-secondary small">soit {{ number_format($ligne->prixAchatParPiece(), 0, ',', ' ') }} F / pièce</div>
+                                @if ($ligne->uniteVente)
+                                    <div class="text-secondary small">soit {{ number_format($ligne->prixAchatParPiece(), 0, ',', ' ') }} F / {{ $ligne->produit->unite_base_libelle }}</div>
                                 @endif
                             </td>
                             <td>{{ number_format($ligne->quantite * $ligne->prix_achat, 0, ',', ' ') }} F</td>

@@ -3,12 +3,24 @@
         <i class="bi bi-speedometer2 me-2"></i>Tableau de bord
     </a>
 
-    @can('caisse.ouvrir')
+    @canany(['caisse.ouvrir', 'client.voir', 'devis.voir'])
         <span class="text-uppercase small px-2 mt-3 mb-1" style="color: var(--erp-sidebar-color); opacity: .6;">Ventes</span>
-        <a href="{{ route('sessions.index') }}" class="nav-link {{ request()->routeIs('sessions.*', 'ventes.*', 'ventes-en-attente.*') ? 'active' : '' }}">
-            <i class="bi bi-cash-stack me-2"></i>Caisses
-        </a>
-    @endcan
+        @can('caisse.ouvrir')
+            <a href="{{ route('sessions.index') }}" class="nav-link {{ request()->routeIs('sessions.*', 'ventes.*', 'ventes-en-attente.*', 'reglements.*') ? 'active' : '' }}">
+                <i class="bi bi-cash-stack me-2"></i>Caisses
+            </a>
+        @endcan
+        @can('devis.voir')
+            <a href="{{ route('devis.index') }}" class="nav-link {{ request()->routeIs('devis.*') ? 'active' : '' }}">
+                <i class="bi bi-file-earmark-text me-2"></i>Devis
+            </a>
+        @endcan
+        @can('client.voir')
+            <a href="{{ route('clients.index') }}" class="nav-link {{ request()->routeIs('clients.*') ? 'active' : '' }}">
+                <i class="bi bi-people-fill me-2"></i>Clients
+            </a>
+        @endcan
+    @endcanany
 
     @canany(['stock.voir', 'inventaire.voir', 'achat.voir', 'fournisseur.gerer'])
         <span class="text-uppercase small px-2 mt-3 mb-1" style="color: var(--erp-sidebar-color); opacity: .6;">Stock</span>
@@ -70,6 +82,9 @@
             </a>
             <a href="{{ route('moyens-paiement.index') }}" class="nav-link {{ request()->routeIs('moyens-paiement.*') ? 'active' : '' }}">
                 <i class="bi bi-credit-card me-2"></i>Moyens de paiement
+            </a>
+            <a href="{{ route('unites.index') }}" class="nav-link {{ request()->routeIs('unites.*') ? 'active' : '' }}">
+                <i class="bi bi-rulers me-2"></i>Unités
             </a>
         @endcan
 

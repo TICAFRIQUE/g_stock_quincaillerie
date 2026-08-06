@@ -1,17 +1,17 @@
-// Palette ERP (voir CLAUDE.md) : primaire vert bouteille et accent rouge
-// corail repris du logo (public/images/logo.jpeg), surfaces claires,
-// gris neutres.
-$primary: #163126;
-$secondary: #6c757d;
+// Palette ERP quincaillerie (voir CLAUDE.md) : primaire orange chantier,
+// secondaires mélangés (acier/béton, bleu industriel, jaune sécurité),
+// surfaces claires chaudes, gris/bruns neutres.
+$primary: #e8590c; // orange chantier
+$secondary: #57534e; // gris acier/béton
 $success: #2e7d32;
-$info: #14b8a6; // turquoise (accent secondaire, badges informatifs)
-$warning: #f5a623;
-$danger: #d94a3f; // rouge du logo
-$light: #f4f6f4;
-$dark: #0f221b;
+$info: #2470a8; // bleu industriel (accent secondaire, badges informatifs)
+$warning: #f5b800; // jaune sécurité
+$danger: #c62828;
+$light: #f6f3ef;
+$dark: #241e19;
 
-$body-bg: #f4f6f4;
-$body-color: #1c2c22;
+$body-bg: #f6f3ef;
+$body-color: #241e19;
 $font-family-sans-serif: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
 $border-radius: 0.5rem;
@@ -19,7 +19,7 @@ $border-radius-sm: 0.375rem;
 $border-radius-lg: 0.75rem;
 
 // Champs de formulaire plus visibles par défaut (pas seulement au focus).
-$input-border-color: #8d9a8f;
+$input-border-color: #a69c93;
 $input-border-width: 1px;
 $input-bg: #ffffff;
 
@@ -29,11 +29,13 @@ $input-bg: #ffffff;
 // --- ERP layout ---
 
 :root {
-    --erp-sidebar-bg: #0f221b;
-    --erp-sidebar-bg-active: #163126;
-    --erp-sidebar-color: #cfe0d4;
+    --erp-sidebar-bg: #{$dark};
+    // Orange brûlé plus sombre que $primary : un lien actif en $primary plein
+    // sur fond sidebar sombre resterait trop clair pour un texte blanc lisible.
+    --erp-sidebar-bg-active: #b34700;
+    --erp-sidebar-color: #e8ddd3;
     --erp-sidebar-color-active: #ffffff;
-    --erp-turquoise: #{$info};
+    --erp-accent: #{$info};
 }
 
 .erp-sidebar {
@@ -83,7 +85,8 @@ $input-bg: #ffffff;
 
 // --- Logo (fond blanc dans le fichier source) : présenté dans un chip blanc
 // pour rester lisible sur les fonds sombres (sidebar, vitrine de connexion),
-// avec une barre d'accent rouge qui reprend la 2e couleur du logo.
+// avec une barre d'accent bleu industriel qui contraste avec l'orange
+// primaire (palette volontairement mélangée, pas monochrome).
 .brand-logo-chip {
     display: inline-flex;
     align-items: center;
@@ -109,7 +112,7 @@ $input-bg: #ffffff;
     width: 2.5rem;
     height: 3px;
     border-radius: 999px;
-    background-color: $danger;
+    background-color: $info;
 }
 
 .erp-topbar {

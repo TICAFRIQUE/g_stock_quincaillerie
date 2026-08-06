@@ -44,35 +44,61 @@
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-6 mb-3">
-        <label for="categorie_id" class="form-label">Catégorie<span class="required-marker">*</span></label>
-        <select name="categorie_id" id="categorie_id" class="form-select @error('categorie_id') is-invalid @enderror" required>
+<div class="row" x-data="{
+        categories: {{ \Illuminate\Support\Js::from($categories->map(fn ($c) => ['id' => $c->id, 'nom' => $c->nom, 'parent_id' => $c->parent_id])->values()) }},
+        parentId: {{ \Illuminate\Support\Js::from(old('categorie_parent_id', $categorieParentInitiale ?? '')) }},
+        categorieId: {{ \Illuminate\Support\Js::from(old('categorie_id', $produit->categorie_id ?? '')) }},
+        get parentes() { return this.categories.filter((c) => !c.parent_id); },
+        get enfants() { return this.categories.filter((c) => String(c.parent_id) === String(this.parentId)); },
+        get aDesEnfants() { return this.enfants.length > 0; },
+    }">
+    <input type="hidden" name="categorie_id" :value="categorieId">
+
+    <div class="col-md-3 mb-3">
+        <label for="categorie_parent_id" class="form-label">Catégorie<span class="required-marker">*</span></label>
+        <select name="categorie_parent_id" id="categorie_parent_id" class="form-select @error('categorie_id') is-invalid @enderror"
+                x-model="parentId" @change="categorieId = aDesEnfants ? '' : parentId" required>
             <option value="">— Choisir —</option>
-            @foreach ($categories->whereNull('parent_id') as $parente)
-                <option value="{{ $parente->id }}" @selected(old('categorie_id', $produit->categorie_id ?? '') == $parente->id)>
-                    {{ $parente->nom }}
-                </option>
-                @foreach ($categories->where('parent_id', $parente->id) as $enfant)
-                    <option value="{{ $enfant->id }}" data-sous-categorie="1"
-                            @selected(old('categorie_id', $produit->categorie_id ?? '') == $enfant->id)>
-                        {{ $enfant->nom }}
-                    </option>
-                @endforeach
-            @endforeach
+            <template x-for="parente in parentes" :key="parente.id">
+                <option :value="parente.id" x-text="parente.nom"></option>
+            </template>
         </select>
-        @error('categorie_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+        @error('categorie_id') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+    </div>
+
+    <div class="col-md-3 mb-3" x-show="aDesEnfants" x-cloak>
+        <label for="categorie_sous_id" class="form-label">Sous-catégorie<span class="required-marker">*</span></label>
+        <select id="categorie_sous_id" class="form-select" x-model="categorieId" :required="aDesEnfants">
+            <option value="">— Choisir —</option>
+            <template x-for="enfant in enfants" :key="enfant.id">
+                <option :value="enfant.id" x-text="enfant.nom"></option>
+            </template>
+        </select>
     </div>
 
     <div class="col-md-3 mb-3">
-        <label for="prix_piece" class="form-label">Prix pièce (F CFA)<span class="required-marker">*</span></label>
+        <label for="unite_base_id" class="form-label">Unité de base<span class="required-marker">*</span></label>
+        <select name="unite_base_id" id="unite_base_id" class="form-select @error('unite_base_id') is-invalid @enderror" required>
+            <option value="">— Choisir —</option>
+            @foreach ($unites as $uniteOption)
+                <option value="{{ $uniteOption->id }}" @selected(old('unite_base_id', $produit->unite_base_id ?? '') == $uniteOption->id)>
+                    {{ $uniteOption->nom }}
+                </option>
+            @endforeach
+        </select>
+        @error('unite_base_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+        <div class="form-text">La plus petite unité vendable de ce produit (Pièce, Litre, Mètre…). <a href="{{ route('unites.create') }}" target="_blank" rel="noopener">Ajouter une unité</a>.</div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <label for="prix_piece" class="form-label">Prix de l'unité de base (F CFA)<span class="required-marker">*</span></label>
         <input type="number" name="prix_piece" id="prix_piece" class="form-control @error('prix_piece') is-invalid @enderror"
                value="{{ old('prix_piece', $produit->prix_piece ?? '') }}" min="0" required>
         @error('prix_piece') <div class="invalid-feedback">{{ $message }}</div> @enderror
     </div>
 
     <div class="col-md-3 mb-3">
-        <label for="seuil_alerte" class="form-label">Seuil d'alerte (pièces)<span class="required-marker">*</span></label>
+        <label for="seuil_alerte" class="form-label">Seuil d'alerte (unités de base)<span class="required-marker">*</span></label>
         <input type="number" name="seuil_alerte" id="seuil_alerte" class="form-control @error('seuil_alerte') is-invalid @enderror"
                value="{{ old('seuil_alerte', $produit->seuil_alerte ?? 0) }}" min="0" required>
         @error('seuil_alerte') <div class="invalid-feedback">{{ $message }}</div> @enderror
@@ -83,10 +109,10 @@
     <div class="mb-3 p-3 bg-light rounded" x-data="{ lots: {{ \Illuminate\Support\Js::from(old('unites_vente', [])) }} }">
         <div class="d-flex align-items-center justify-content-between">
             <div>
-                <span class="form-label mb-0">Unités de vente (lots)</span>
-                <div class="form-text mt-0">Optionnel — la pièce reste toujours vendable. Ajoutez des lots (ex. « Lot de 5 ») avec leur propre prix.</div>
+                <span class="form-label mb-0">Unités de vente</span>
+                <div class="form-text mt-0">Optionnel — l'unité de base reste toujours vendable. Ajoutez des variantes (ex. Bidon 5L, Carton de 24) avec leur unité, leur facteur et leur prix.</div>
             </div>
-            <button type="button" class="btn btn-sm btn-outline-primary text-nowrap" @click="lots.push({ facteur: '', prix: '' })">
+            <button type="button" class="btn btn-sm btn-outline-primary text-nowrap" @click="lots.push({ unite_id: '', facteur: '', prix: '' })">
                 <i class="bi bi-plus-lg"></i> Ajouter une unité de vente
             </button>
         </div>
@@ -95,12 +121,20 @@
             <div class="mt-3">
                 <template x-for="(lot, index) in lots" :key="index">
                     <div class="row g-2 align-items-end mb-2">
-                        <div class="col-5">
-                            <label class="form-label small">Pièces par lot<span class="required-marker">*</span></label>
-                            <input type="number" :name="'unites_vente['+index+'][facteur]'" x-model="lot.facteur" class="form-control form-control-sm" min="2" placeholder="Ex. 5" required>
-                            <div class="form-text">Le nom (« Lot de 5 »…) est généré automatiquement.</div>
+                        <div class="col-4">
+                            <label class="form-label small">Unité<span class="required-marker">*</span></label>
+                            <select :name="'unites_vente['+index+'][unite_id]'" x-model="lot.unite_id" class="form-select form-select-sm" required>
+                                <option value="">— Choisir —</option>
+                                @foreach ($unites as $uniteOption)
+                                    <option value="{{ $uniteOption->id }}">{{ $uniteOption->nom }}</option>
+                                @endforeach
+                            </select>
                         </div>
-                        <div class="col-5">
+                        <div class="col-3">
+                            <label class="form-label small">Facteur<span class="required-marker">*</span></label>
+                            <input type="number" :name="'unites_vente['+index+'][facteur]'" x-model="lot.facteur" class="form-control form-control-sm" min="2" placeholder="Ex. 5" required>
+                        </div>
+                        <div class="col-3">
                             <label class="form-label small">Prix (F)<span class="required-marker">*</span></label>
                             <input type="number" :name="'unites_vente['+index+'][prix]'" x-model="lot.prix" class="form-control form-control-sm" min="0" required>
                         </div>
@@ -112,9 +146,11 @@
                         </div>
                     </div>
                 </template>
+                <div class="form-text">Facteur = nombre d'unités de base contenues (ex. 5 pour un bidon de 5L si l'unité de base est le litre).</div>
             </div>
         </template>
 
+        @error('unites_vente.*.unite_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
         @error('unites_vente.*.facteur') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
         @error('unites_vente.*.prix') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
     </div>
@@ -131,25 +167,13 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            window.initSelect2('#categorie_id', {
-                placeholder: '— Choisir —',
-                // Sous-catégorie : même liste que sa catégorie parente,
-                // juste décalée vers la droite — pas d'en-tête de groupe
-                // séparé, pour rester lisible d'un coup d'œil. La catégorie
-                // parente ressort en gras/gris pour bien la distinguer de
-                // ses sous-catégories.
-                templateResult: (option) => {
-                    if (!option.id) {
-                        return option.text;
-                    }
-                    const estSousCategorie = option.element?.dataset.sousCategorie === '1';
-                    const $span = jQuery('<span></span>').text(option.text);
-
-                    return estSousCategorie
-                        ? $span.css('padding-left', '1.5rem')
-                        : $span.css({ fontWeight: 'bold', color: '#6c757d' });
-                },
-            });
+            window.initSelect2('#unite_base_id', { placeholder: '— Choisir —' });
+            // Catégorie parente : liste statique, select2 classique (sans
+            // mise en forme particulière). La sous-catégorie qui apparaît à
+            // côté reste un <select> natif : ses options changent selon la
+            // catégorie choisie, ce qu'Alpine gère nativement sans avoir à
+            // resynchroniser un plugin jQuery à chaque changement.
+            window.initSelect2('#categorie_parent_id', { placeholder: '— Choisir —' });
         });
     </script>
 @endpush

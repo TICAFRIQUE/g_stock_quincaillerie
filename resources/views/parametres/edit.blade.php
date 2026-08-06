@@ -46,11 +46,20 @@
                             @error('numero') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
 
-                        <div class="mb-4">
+                        <div class="mb-3">
                             <label for="adresse" class="form-label">Adresse</label>
                             <input type="text" name="adresse" id="adresse" class="form-control @error('adresse') is-invalid @enderror"
                                    value="{{ old('adresse', $parametre->adresse) }}">
                             @error('adresse') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="duree_validite_devis_jours" class="form-label">Durée de validité d'un devis (jours)<span class="required-marker">*</span></label>
+                            <input type="number" name="duree_validite_devis_jours" id="duree_validite_devis_jours" min="1" max="365"
+                                   class="form-control @error('duree_validite_devis_jours') is-invalid @enderror"
+                                   value="{{ old('duree_validite_devis_jours', $parametre->duree_validite_devis_jours) }}" required>
+                            <div class="form-text">Passé ce délai, un devis non transformé passe automatiquement au statut « Expiré ».</div>
+                            @error('duree_validite_devis_jours') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
 
                         <button type="submit" class="btn btn-primary">Enregistrer</button>

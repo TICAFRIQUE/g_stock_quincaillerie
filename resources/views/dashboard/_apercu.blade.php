@@ -196,8 +196,8 @@
                         datasets: [{
                             label: 'Ventes (F)',
                             data: JSON.parse(evolutionEl.dataset.valeurs),
-                            borderColor: '#163126',
-                            backgroundColor: 'rgba(22, 49, 38, 0.15)',
+                            borderColor: '#e8590c',
+                            backgroundColor: 'rgba(232, 89, 12, 0.15)',
                             tension: 0.3,
                             fill: true,
                         }],
@@ -214,7 +214,7 @@
                         labels: JSON.parse(moyensEl.dataset.labels),
                         datasets: [{
                             data: JSON.parse(moyensEl.dataset.valeurs),
-                            backgroundColor: ['#163126', '#14b8a6', '#f5a623', '#d94a3f', '#2e7d32'],
+                            backgroundColor: ['#e8590c', '#2470a8', '#f5b800', '#c62828', '#2e7d32'],
                         }],
                     },
                 });

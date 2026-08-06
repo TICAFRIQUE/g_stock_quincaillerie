@@ -56,4 +56,9 @@ class Magasin extends Model
     {
         return $this->hasMany(CommandeAchat::class);
     }
+
+    public function devis(): HasMany
+    {
+        return $this->hasMany(Devis::class);
+    }
 }

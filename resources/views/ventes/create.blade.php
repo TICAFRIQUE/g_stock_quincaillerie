@@ -3,7 +3,12 @@
 @section('title', 'Vente')
 
 @section('content')
-    <div x-data="posApp({{ \Illuminate\Support\Js::from($produits) }}, {{ \Illuminate\Support\Js::from($panierInitial) }}, {{ \Illuminate\Support\Js::from($venteEnAttente->libelle ?? '') }})">
+    <div x-data="posApp(
+        {{ \Illuminate\Support\Js::from($produits) }},
+        {{ \Illuminate\Support\Js::from($panierInitial) }},
+        {{ \Illuminate\Support\Js::from($venteEnAttente->libelle ?? '') }},
+        {{ \Illuminate\Support\Js::from($devisTransformation->client_id ?? '') }}
+    )">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
             <div>
                 <h2 class="h4 mb-0">Vente — {{ $session->caisse->nom }}</h2>
@@ -14,19 +19,26 @@
                             <i class="bi bi-hourglass-split me-1"></i>Reprise du panier en attente #{{ $venteEnAttente->id }}
                         </span>
                     @endif
+                    @if ($devisTransformation)
+                        <span class="badge text-bg-info ms-2">
+                            <i class="bi bi-file-earmark-text me-1"></i>Transformation du devis {{ $devisTransformation->numero }}
+                        </span>
+                    @endif
                 </p>
             </div>
             <div class="d-flex flex-wrap gap-2">
-                @can('ventenattente.gerer')
-                    <a href="{{ route('ventes-en-attente.index', $session) }}" class="btn btn-outline-warning position-relative">
-                        <i class="bi bi-hourglass-split me-1"></i>Ventes en attente
-                        @if ($venteEnAttentesCount > 0)
-                            <span class="badge rounded-pill text-bg-warning ms-1">{{ $venteEnAttentesCount }}</span>
-                        @endif
-                    </a>
-                @endcan
-                <a href="{{ route('sessions.show', $session) }}" class="btn btn-link">
-                    <i class="bi bi-arrow-left me-1"></i>Retour à la session
+                @unless ($devisTransformation)
+                    @can('ventenattente.gerer')
+                        <a href="{{ route('ventes-en-attente.index', $session) }}" class="btn btn-outline-warning position-relative">
+                            <i class="bi bi-hourglass-split me-1"></i>Ventes en attente
+                            @if ($venteEnAttentesCount > 0)
+                                <span class="badge rounded-pill text-bg-warning ms-1">{{ $venteEnAttentesCount }}</span>
+                            @endif
+                        </a>
+                    @endcan
+                @endunless
+                <a href="{{ $devisTransformation ? route('devis.show', $devisTransformation) : route('sessions.show', $session) }}" class="btn btn-link">
+                    <i class="bi bi-arrow-left me-1"></i>{{ $devisTransformation ? 'Retour au devis' : 'Retour à la session' }}
                 </a>
             </div>
         </div>
@@ -58,7 +70,7 @@
                                     <tr>
                                         <th>Désignation</th>
                                         <th>Qté</th>
-                                        <th>Pièce / Lot</th>
+                                        <th>Unité</th>
                                         @can('vente.remise')
                                             <th>Remise</th>
                                         @endcan
@@ -87,7 +99,7 @@
                                                         :class="{ 'is-invalid': estDoublon(index) || ligne.unite_vente_id === undefined }"
                                                         @change="changerVarianteDepuisSelect(ligne, $event.target.value)" required>
                                                     <option value="" :selected="ligne.unite_vente_id === undefined">— Choisir —</option>
-                                                    <option value="piece" :selected="ligne.unite_vente_id === null" x-text="'Pièce — ' + produitDe(ligne).prix_piece + ' F'"></option>
+                                                    <option value="piece" :selected="ligne.unite_vente_id === null" x-text="produitDe(ligne).unite_base_libelle + ' — ' + produitDe(ligne).prix_piece + ' F'"></option>
                                                     <template x-for="unite in produitDe(ligne).unites" :key="unite.id">
                                                         <option :value="unite.id" :selected="unite.id === ligne.unite_vente_id" x-text="unite.libelle + ' — ' + unite.prix + ' F'"></option>
                                                     </template>
@@ -173,6 +185,47 @@
                         </div>
                     </div>
 
+                    @if ($devisTransformation)
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h3 class="h6">Client</h3>
+                                <p class="mb-0">
+                                    <a href="{{ route('clients.show', $devisTransformation->client) }}">{{ $devisTransformation->client->nom }}</a>
+                                </p>
+                                <div class="form-text small">
+                                    Client du devis {{ $devisTransformation->numero }} — non modifiable ici.
+                                    @can('vente.credit')
+                                        Un solde restant dû sera porté à son compte.
+                                    @endcan
+                                </div>
+                            </div>
+                        </div>
+                    @elseif (auth()->user()->can('vente.credit'))
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h3 class="h6">Client (vente à crédit)</h3>
+                                <div class="d-flex gap-1">
+                                    <select id="client-picker" class="form-select form-select-sm" x-model="clientId">
+                                        <option value="">— Vente comptant (aucun client) —</option>
+                                        @foreach ($clients as $c)
+                                            <option value="{{ $c->id }}">{{ $c->nom }}{{ $c->telephone ? ' — '.$c->telephone : '' }}</option>
+                                        @endforeach
+                                    </select>
+                                    @can('client.gerer')
+                                        <button type="button" class="btn btn-sm btn-outline-primary btn-icon flex-shrink-0" title="Nouveau client"
+                                                onclick="window.ouvrirClientRapide('client-picker')">
+                                            <i class="bi bi-person-plus"></i>
+                                            <span class="visually-hidden">Nouveau client</span>
+                                        </button>
+                                    @endcan
+                                </div>
+                                <div class="form-text small" x-show="clientId" x-cloak>
+                                    Le solde restant dû sera porté au compte de ce client.
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <div class="card mb-3">
                         <div class="card-body">
                             <h3 class="h6">Paiement</h3>
@@ -206,9 +259,12 @@
                                 <i class="bi bi-plus-lg"></i> Ajouter un moyen de paiement
                             </button>
 
-                            <div class="mt-2 small" :class="totalPaiements >= totalNet ? 'text-success' : 'text-danger'">
+                            <div class="mt-2 small" :class="totalPaiements >= totalNet ? 'text-success' : (clientId ? 'text-warning' : 'text-danger')">
                                 Total réglé : <span x-text="totalPaiements"></span> F
                                 <span x-show="totalPaiements < totalNet"> (net à payer : <span x-text="totalNet"></span> F)</span>
+                            </div>
+                            <div class="mt-1 small fw-medium text-warning" x-show="clientId && totalPaiements < totalNet" x-cloak>
+                                <i class="bi bi-credit-card me-1"></i>Solde à crédit : <span x-text="totalNet - totalPaiements"></span> F sur le compte du client.
                             </div>
                             <div class="mt-1 small fw-medium text-primary" x-show="monnaieARendre > 0" x-cloak>
                                 <i class="bi bi-cash-coin me-1"></i>Monnaie à rendre : <span x-text="monnaieARendre"></span> F
@@ -220,15 +276,15 @@
                     </div>
 
                     <div class="text-danger small mb-2" x-show="aUneLigneNonChoisie" x-cloak>
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i>Choisissez une variante (pièce ou lot) pour chaque ligne du panier.
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>Choisissez une unité pour chaque ligne du panier.
                     </div>
                     <div class="text-danger small mb-2" x-show="aUnDoublon" x-cloak>
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i>Un même produit ne peut pas apparaître deux fois avec la même variante (pièce ou lot) : corrigez avant d'enregistrer.
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>Un même produit ne peut pas apparaître deux fois avec la même unité : corrigez avant d'enregistrer.
                     </div>
 
                     <div class="d-flex gap-2">
                         <form id="formVente" method="POST"
-                              action="{{ $venteEnAttente ? route('ventes-en-attente.reprendre', $venteEnAttente) : route('ventes.store', $session) }}"
+                              action="{{ $devisTransformation ? route('devis.transformer', [$session, $devisTransformation]) : ($venteEnAttente ? route('ventes-en-attente.reprendre', $venteEnAttente) : route('ventes.store', $session)) }}"
                               class="flex-grow-1">
                             @csrf
                             <template x-for="(ligne, index) in panier" :key="'v'+index">
@@ -249,17 +305,30 @@
                                 </span>
                             </template>
                             <input type="hidden" name="montant_recu" :value="totalPaiements">
+                            <input type="hidden" name="client_id" :value="clientId">
+                            @php
+                                // Le crédit reste soumis à vente.credit même en mode devis, où
+                                // clientId est toujours renseigné (imposé par le devis) : on ne
+                                // peut donc pas se fier à "!clientId" pour bloquer, comme en mode
+                                // normal — on substitue un booléen de permission littéral figé au
+                                // rendu (non réactif, mais la permission ne change pas en cours de
+                                // page).
+                                $gardeCredit = $devisTransformation ? \Illuminate\Support\Js::from(auth()->user()->can('vente.credit')) : 'clientId';
+                            @endphp
                             <button type="button" class="btn btn-primary w-100"
-                                    :disabled="panier.length === 0 || totalPaiements < totalNet || aUnDoublon || aUneLigneNonChoisie || aUnPaiementSansMoyen"
+                                    :disabled="panier.length === 0 || (totalPaiements < totalNet && !({{ $gardeCredit }})) || aUnDoublon || aUneLigneNonChoisie || aUnPaiementSansMoyen"
                                     @click="declencherFinalisation($event)"
                                     data-form-id="formVente"
-                                    data-message="Finaliser cette vente ? Le stock sera mis à jour et le paiement enregistré. Cette action est irréversible."
+                                    :data-message="clientId && totalPaiements < totalNet
+                                        ? 'Finaliser cette vente à crédit ? Le stock sera mis à jour et le solde restant sera porté au compte du client. Cette action est irréversible.'
+                                        : 'Finaliser cette vente ? Le stock sera mis à jour et le paiement enregistré. Cette action est irréversible.'"
                                     data-button-label="Finaliser la vente" data-button-class="btn-primary">
-                                <i class="bi bi-check-circle me-1"></i>Finaliser la vente
+                                <i class="bi bi-check-circle me-1"></i>{{ $devisTransformation ? 'Transformer en vente' : 'Finaliser la vente' }}
                             </button>
                         </form>
                     </div>
 
+                    @unless ($devisTransformation)
                     @can('ventenattente.gerer')
                         <div class="mt-2">
                             <form id="formAttente" method="POST"
@@ -285,16 +354,24 @@
                             </form>
                         </div>
                     @endcan
+                    @endunless
                 </div>
             </div>
         </div>
     </div>
+
+    @can('client.gerer')
+        @include('partials.client-rapide-modal')
+    @endcan
 @endsection
 
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             window.initSelect2('#produit-picker', { placeholder: '— Rechercher un produit à ajouter —' });
+            if (document.getElementById('client-picker')) {
+                window.initSelect2('#client-picker', { placeholder: '— Vente comptant (aucun client) —', allowClear: true });
+            }
         });
     </script>
 @endpush

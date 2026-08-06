@@ -7,6 +7,7 @@ use App\Exceptions\CaissierDejaEnSessionException;
 use App\Exceptions\VentesEnAttentePresentesException;
 use App\Models\Caisse;
 use App\Models\Paiement;
+use App\Models\ReglementPaiement;
 use App\Models\SessionCaisse;
 use App\Models\User;
 use App\Models\VenteEnAttente;
@@ -71,15 +72,24 @@ class CaisseSessionService
         $this->assertPasDeVenteEnAttente($session);
 
         $session = DB::transaction(function () use ($session, $montantCompte, $auteur) {
-            $totalEspeces = Paiement::query()
+            $totalVentesEspeces = Paiement::query()
                 ->whereHas('vente', fn ($q) => $q->where('session_caisse_id', $session->id))
                 ->whereHas('moyenPaiement', fn ($q) => $q->where('est_espece', true))
                 ->sum('montant');
 
-            $theorique = $session->fond_de_caisse + $totalEspeces;
+            // Un règlement client encaissé dans cette session alimente le
+            // même tiroir qu'une vente (règle 10 : ventes ET règlements
+            // clients confondus).
+            $totalReglementsEspeces = ReglementPaiement::query()
+                ->whereHas('reglementClient', fn ($q) => $q->where('session_caisse_id', $session->id))
+                ->whereHas('moyenPaiement', fn ($q) => $q->where('est_espece', true))
+                ->sum('montant');
+
+            $theorique = $session->fond_de_caisse + $totalVentesEspeces + $totalReglementsEspeces;
 
             $session->update([
-                'total_ventes_especes' => $totalEspeces,
+                'total_ventes_especes' => $totalVentesEspeces,
+                'total_reglements_especes' => $totalReglementsEspeces,
                 'montant_compte' => $montantCompte,
                 'ecart' => $montantCompte - $theorique,
                 'date_cloture' => now(),

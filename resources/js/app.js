@@ -68,7 +68,7 @@ window.dataTableFrLang = {
  * côté client pour griser en amont (voir CLAUDE.md), le serveur revalide tout
  * de toute façon dans VenteService avant d'écrire le moindre mouvement.
  */
-window.posApp = function (produits, panierInitial = [], libelleInitial = '') {
+window.posApp = function (produits, panierInitial = [], libelleInitial = '', clientIdInitial = '') {
     return {
         produits,
         panier: panierInitial,
@@ -76,6 +76,11 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '') {
         remiseTotaleValeur: null,
         paiements: [{ moyen_paiement_id: '', montant: null }],
         libelleAttente: libelleInitial,
+        // Client sélectionné pour une vente à crédit (voir CLAUDE.md — vente à
+        // crédit). Vide = vente comptant, payée intégralement comme avant.
+        // Pré-rempli et figé lors de la transformation d'un devis (le client
+        // vient toujours du devis, jamais d'un choix libre à cet écran).
+        clientId: clientIdInitial,
 
         // La barre du haut ajoute une ligne « vierge » (aucune variante choisie,
         // aucun calcul) — l'utilisateur choisit ensuite pièce/lot directement
@@ -296,6 +301,146 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '') {
     };
 };
 
+/**
+ * Constructeur de lignes pour l'écran Devis : même logique de panier que
+ * posApp (ajout/duplication/doublon/remise de ligne), mais sans réservation
+ * de stock (un devis ne mouvemente rien, voir CLAUDE.md) ni section
+ * paiement — juste des montants indicatifs.
+ */
+window.devisApp = function (produits, panierInitial = []) {
+    return {
+        produits,
+        panier: panierInitial,
+
+        ajouterDepuisSelect(event) {
+            const option = event.target.selectedOptions[0];
+            if (!option || !option.value) return;
+
+            const produit = this.produits.find((p) => p.id === Number(option.dataset.produitId));
+            if (produit) {
+                this.ajouterLigneVierge(produit);
+            }
+
+            window.jQuery(event.target).val('').trigger('change');
+        },
+
+        ajouterLigneVierge(produit) {
+            const existante = this.panier.find((l) => l.produit_id === produit.id && l.unite_vente_id === undefined);
+            if (existante) {
+                existante.quantite += 1;
+                return;
+            }
+
+            this.panier.push({
+                produit_id: produit.id,
+                unite_vente_id: undefined,
+                produitLibelle: produit.libelle_affichage,
+                uniteLibelle: null,
+                facteur: null,
+                quantite: 1,
+                prixUnitaire: null,
+                remise_type: '',
+                remise_valeur: null,
+            });
+        },
+
+        dupliquerLigne(index) {
+            const original = this.panier[index];
+            this.panier.splice(index + 1, 0, {
+                produit_id: original.produit_id,
+                unite_vente_id: undefined,
+                produitLibelle: original.produitLibelle,
+                uniteLibelle: null,
+                facteur: null,
+                quantite: 1,
+                prixUnitaire: null,
+                remise_type: '',
+                remise_valeur: null,
+            });
+        },
+
+        estDoublon(index) {
+            const ligne = this.panier[index];
+            if (ligne.unite_vente_id === undefined) return false;
+            return this.panier.some(
+                (l, i) => i !== index && l.produit_id === ligne.produit_id && l.unite_vente_id === ligne.unite_vente_id
+            );
+        },
+
+        get aUnDoublon() {
+            return this.panier.some((l, i) => this.estDoublon(i));
+        },
+
+        get aUneLigneNonChoisie() {
+            return this.panier.some((l) => l.unite_vente_id === undefined);
+        },
+
+        produitDe(ligne) {
+            return this.produits.find((p) => p.id === ligne.produit_id);
+        },
+
+        // Pas de vérification de stock ici (à la différence de posApp) : un
+        // devis est indicatif et ne réserve rien, voir CLAUDE.md.
+        changerVarianteDepuisSelect(ligne, valeur) {
+            const produit = this.produitDe(ligne);
+            if (!produit) return;
+
+            if (valeur === '') {
+                ligne.unite_vente_id = undefined;
+                ligne.uniteLibelle = null;
+                ligne.facteur = null;
+                ligne.prixUnitaire = null;
+                return;
+            }
+
+            const unite = valeur === 'piece' ? null : produit.unites.find((u) => u.id === Number(valeur));
+            ligne.unite_vente_id = unite ? unite.id : null;
+            ligne.uniteLibelle = unite ? unite.libelle : null;
+            ligne.facteur = unite ? unite.facteur : 1;
+            ligne.prixUnitaire = unite ? unite.prix : produit.prix_piece;
+        },
+
+        changerQuantite(ligne, delta) {
+            const nouvelle = ligne.quantite + delta;
+            if (nouvelle < 1) {
+                this.panier.splice(this.panier.indexOf(ligne), 1);
+                return;
+            }
+            ligne.quantite = nouvelle;
+        },
+
+        retirerLigne(index) {
+            this.panier.splice(index, 1);
+        },
+
+        calculerRemise(type, valeur, base) {
+            if (!type || !valeur) return 0;
+            const montant = type === 'pourcentage' ? Math.round((base * valeur) / 100) : Number(valeur);
+            return Math.min(montant, base);
+        },
+
+        totalLigne(ligne) {
+            if (ligne.prixUnitaire === null) return 0;
+            const sousTotal = ligne.prixUnitaire * ligne.quantite;
+            return sousTotal - this.calculerRemise(ligne.remise_type, ligne.remise_valeur, sousTotal);
+        },
+
+        get sousTotal() {
+            return this.panier.reduce((somme, l) => somme + this.totalLigne(l), 0);
+        },
+
+        declencherEnregistrement(event, formId) {
+            const form = document.getElementById(formId);
+            if (!form.checkValidity()) {
+                form.classList.add('was-validated');
+                form.reportValidity();
+                return;
+            }
+            window.bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmActionModal')).show(event.currentTarget);
+        },
+    };
+};
+
 // Validation Bootstrap générique : chaque formulaire de l'app s'appuie sur les
 // contraintes HTML natives (required, min, type=email, unique côté serveur…) et
 // affiche le style Bootstrap (bordure rouge + .invalid-feedback) au lieu des bulles
@@ -476,3 +621,82 @@ function afficherToastErreur(message) {
     toast.show();
     toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
 }
+
+// --- Création rapide d'un client depuis l'écran de vente ou de devis ---
+//
+// Ouvre #clientRapideModal (voir partials/client-rapide-modal.blade.php),
+// crée le client en AJAX (POST /clients/rapide) puis l'ajoute et le
+// sélectionne directement dans le <select> (select2) visé — la vente ou le
+// devis en cours n'est jamais rechargé ni perdu.
+window.clientRapideCible = null;
+
+window.ouvrirClientRapide = function (selectId) {
+    window.clientRapideCible = selectId;
+
+    const nomInput = document.getElementById('clientRapideNom');
+    nomInput.value = '';
+    nomInput.classList.remove('is-invalid');
+    document.getElementById('clientRapideTelephone').value = '';
+    document.getElementById('clientRapideNomErreur').textContent = '';
+
+    window.bootstrap.Modal.getOrCreateInstance(document.getElementById('clientRapideModal')).show();
+};
+
+window.soumettreClientRapide = function () {
+    const nomInput = document.getElementById('clientRapideNom');
+    const erreurEl = document.getElementById('clientRapideNomErreur');
+    const bouton = document.getElementById('clientRapideBouton');
+    const nom = nomInput.value.trim();
+    const telephone = document.getElementById('clientRapideTelephone').value.trim();
+
+    nomInput.classList.remove('is-invalid');
+    erreurEl.textContent = '';
+
+    if (!nom) {
+        nomInput.classList.add('is-invalid');
+        erreurEl.textContent = 'Le nom est obligatoire.';
+        nomInput.focus();
+        return;
+    }
+
+    bouton.disabled = true;
+
+    fetch('/clients/rapide', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+        },
+        body: JSON.stringify({ nom, telephone: telephone || null }),
+    })
+        .then(async (response) => {
+            const data = await response.json();
+
+            if (!response.ok) {
+                nomInput.classList.add('is-invalid');
+                erreurEl.textContent = data.errors?.nom?.[0] ?? data.message ?? 'Impossible de créer le client.';
+                return;
+            }
+
+            const selectId = window.clientRapideCible;
+            const $select = selectId ? jQuery('#' + selectId) : null;
+            if ($select && $select.length) {
+                const texte = data.telephone ? `${data.nom} — ${data.telephone}` : data.nom;
+                // Ajoute puis sélectionne via l'API select2 (pas seulement le
+                // <select> natif), sinon l'affichage select2 ne se met pas à
+                // jour. trigger('change') ne notifie que les écouteurs jQuery
+                // (pas addEventListener utilisé par Alpine x-model) : on
+                // redispatche donc aussi un vrai événement natif, comme le
+                // fait déjà initSelect2() pour les sélections via l'UI.
+                $select.append(new Option(texte, data.id, true, true)).trigger('change');
+                $select[0].dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            window.bootstrap.Modal.getOrCreateInstance(document.getElementById('clientRapideModal')).hide();
+        })
+        .catch(() => afficherToastErreur('Impossible de créer le client. Vérifiez votre connexion.'))
+        .finally(() => {
+            bouton.disabled = false;
+        });
+};

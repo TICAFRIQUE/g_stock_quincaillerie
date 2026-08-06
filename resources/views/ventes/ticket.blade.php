@@ -10,8 +10,17 @@
                 <i class="bi bi-arrow-left me-1"></i>Retour à la session
             </a>
             <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
-                <i class="bi bi-printer me-1"></i>Imprimer le reçu
+                <i class="bi bi-printer me-1"></i>Imprimer le ticket
             </button>
+            <a href="{{ route('ventes.facture', $vente) }}" class="btn btn-outline-secondary" target="_blank" rel="noopener">
+                <i class="bi bi-receipt me-1"></i>Facture
+            </a>
+            <a href="{{ route('ventes.pdf', $vente) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+            </a>
+            <a href="{{ route('ventes.excel', $vente) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+            </a>
             <a href="{{ route('ventes.create', $vente->sessionCaisse) }}" class="btn btn-primary">
                 <i class="bi bi-cart-plus me-1"></i>Nouvelle vente
             </a>
@@ -101,6 +110,11 @@
                 <div class="small text-secondary">{{ $vente->sessionCaisse->caisse->nom }}</div>
                 <div class="small text-secondary">{{ $vente->created_at->format('d/m/Y H:i') }}</div>
                 <div class="fw-medium mt-1"><code>{{ $vente->numero }}</code></div>
+                @if ($vente->client)
+                    <div class="small text-secondary mt-1">
+                        Client : <a href="{{ route('clients.show', $vente->client) }}">{{ $vente->client->nom }}</a>
+                    </div>
+                @endif
             </div>
 
             <table class="table table-sm">
@@ -109,7 +123,7 @@
                         <tr>
                             <td>
                                 {{ $ligne->produit->libelle_affichage }}
-                                @if ($ligne->uniteVente) <span class="text-secondary small">({{ $ligne->uniteVente->libelle }})</span> @endif
+                                <span class="text-secondary small">({{ $ligne->uniteVente?->libelle ?? $ligne->produit->unite_base_libelle }})</span>
                                 <br>
                                 <span class="text-secondary small">{{ $ligne->quantite }} × {{ number_format($ligne->prix_unitaire_applique, 0, ',', ' ') }} F</span>
                                 @if ($ligne->remise_ligne_montant > 0)
@@ -156,6 +170,12 @@
                     <tr class="fw-medium">
                         <td>Monnaie rendue</td>
                         <td class="text-end">{{ number_format($vente->monnaie_rendue, 0, ',', ' ') }} F</td>
+                    </tr>
+                @endif
+                @if ($vente->soldeDu() > 0)
+                    <tr class="fw-bold text-danger">
+                        <td>Solde à crédit</td>
+                        <td class="text-end">{{ number_format($vente->soldeDu(), 0, ',', ' ') }} F</td>
                     </tr>
                 @endif
             </table>

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Facture {{ $vente->numero }}</title>
+    <style>
+        /* Feuille de style volontairement autonome (pas de Bootstrap) : ce
+           document sert aussi de source au PDF (dompdf), dont le support CSS
+           est limité — tables et boîtes simples uniquement, pas de flex/grid. */
+        body {
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+            font-size: 13px;
+            color: #241e19;
+            margin: 0;
+            padding: 28px;
+        }
+        table { border-collapse: collapse; }
+        .text-end { text-align: right; }
+        .actions { margin-bottom: 20px; }
+        .actions a, .actions button {
+            display: inline-block;
+            margin-right: 8px;
+            padding: 6px 14px;
+            font-size: 13px;
+            text-decoration: none;
+            border: 1px solid #e8590c;
+            border-radius: 4px;
+            color: #e8590c;
+            background: #fff;
+            cursor: pointer;
+        }
+        .entete { width: 100%; margin-bottom: 24px; }
+        .entete td { vertical-align: top; }
+        .logo { max-height: 70px; max-width: 220px; }
+        .entreprise-nom { font-size: 16px; font-weight: bold; }
+        .facture-titre { font-size: 22px; font-weight: bold; text-align: right; color: #e8590c; letter-spacing: 1px; }
+        .facture-meta { text-align: right; font-size: 12px; color: #555; line-height: 1.6; }
+        .bloc-client { margin: 16px 0 24px; padding: 12px 14px; background: #f6f3ef; border: 1px solid #ddd3c8; }
+        .bloc-client .label { font-size: 11px; text-transform: uppercase; color: #888; margin-bottom: 4px; }
+        table.lignes { width: 100%; margin-top: 8px; }
+        table.lignes th, table.lignes td { border: 1px solid #ccc; padding: 6px 8px; font-size: 12px; }
+        table.lignes th { background: #f0ece6; text-align: left; }
+        table.totaux { width: 45%; margin-left: 55%; margin-top: 12px; }
+        table.totaux td { padding: 5px 8px; }
+        table.totaux .net td { font-weight: bold; font-size: 15px; border-top: 2px solid #241e19; }
+        table.totaux .credit td { color: #b02a37; font-weight: bold; }
+        .badge-annulee { display: inline-block; padding: 4px 10px; border: 1px solid #b02a37; color: #b02a37; font-weight: bold; margin-bottom: 12px; }
+        .mention { margin-top: 30px; font-size: 11px; color: #888; text-align: center; }
+        @media print {
+            .actions { display: none; }
+            body { padding: 0; }
+        }
+    </style>
+</head>
+<body>
+    @unless ($pourPdf ?? false)
+        <div class="actions">
+            <button type="button" onclick="window.print()">Imprimer</button>
+            <a href="{{ route('ventes.pdf', $vente) }}">Télécharger en PDF</a>
+            <a href="{{ route('ventes.excel', $vente) }}">Télécharger en Excel</a>
+            <a href="{{ route('ventes.ticket', $vente) }}">Voir le ticket de caisse</a>
+        </div>
+    @endunless
+
+    @if ($vente->trashed())
+        <div class="badge-annulee">VENTE ANNULÉE</div>
+    @endif
+
+    <table class="entete">
+        <tr>
+            <td style="width: 55%;">
+                @if ($logoDataUri)
+                    <img src="{{ $logoDataUri }}" class="logo" alt="Logo">
+                    <br>
+                @endif
+                <span class="entreprise-nom">{{ $parametre->nom }}</span><br>
+                @if ($parametre->adresse) {{ $parametre->adresse }}<br> @endif
+                @if ($parametre->numero) Tél : {{ $parametre->numero }} @endif
+            </td>
+            <td style="width: 45%;">
+                <div class="facture-titre">FACTURE</div>
+                <div class="facture-meta">
+                    N° {{ $vente->numero }}<br>
+                    Date : {{ $vente->created_at->format('d/m/Y à H:i') }}<br>
+                    Magasin : {{ $vente->magasin->nom }}<br>
+                    Caisse : {{ $vente->sessionCaisse->caisse->nom }}<br>
+                    Caissier : {{ $vente->caissier->name }}
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="bloc-client">
+        <div class="label">Client</div>
+        <strong>{{ $vente->client->nom ?? 'Client comptant' }}</strong><br>
+        @if ($vente->client?->telephone) Tél : {{ $vente->client->telephone }}<br> @endif
+        @if ($vente->client?->adresse) {{ $vente->client->adresse }} @endif
+    </div>
+
+    <table class="lignes">
+        <thead>
+            <tr>
+                <th>Désignation</th>
+                <th>Unité</th>
+                <th class="text-end">Qté</th>
+                <th class="text-end">Prix unitaire</th>
+                <th class="text-end">Remise</th>
+                <th class="text-end">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach ($vente->lignes as $ligne)
+                <tr>
+                    <td>{{ $ligne->produit->libelle_affichage }}</td>
+                    <td>{{ $ligne->uniteVente->libelle ?? $ligne->produit->unite_base_libelle }}</td>
+                    <td class="text-end">{{ $ligne->quantite }}</td>
+                    <td class="text-end">{{ number_format($ligne->prix_unitaire_applique, 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ $ligne->remise_ligne_montant > 0 ? '− '.number_format($ligne->remise_ligne_montant, 0, ',', ' ').' F' : '—' }}</td>
+                    <td class="text-end">{{ number_format($ligne->total_ligne, 0, ',', ' ') }} F</td>
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
+
+    <table class="totaux">
+        <tr>
+            <td>Sous-total</td>
+            <td class="text-end">{{ number_format($vente->sous_total, 0, ',', ' ') }} F</td>
+        </tr>
+        @if ($vente->remise_totale_montant > 0)
+            <tr>
+                <td>Remise</td>
+                <td class="text-end">− {{ number_format($vente->remise_totale_montant, 0, ',', ' ') }} F</td>
+            </tr>
+        @endif
+        <tr class="net">
+            <td>Net à payer</td>
+            <td class="text-end">{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
+        </tr>
+        @foreach ($vente->paiements as $paiement)
+            <tr>
+                <td>{{ $paiement->moyenPaiement->nom }}</td>
+                <td class="text-end">{{ number_format($paiement->montant, 0, ',', ' ') }} F</td>
+            </tr>
+        @endforeach
+        @if ($vente->monnaie_rendue > 0)
+            <tr>
+                <td>Monnaie rendue</td>
+                <td class="text-end">{{ number_format($vente->monnaie_rendue, 0, ',', ' ') }} F</td>
+            </tr>
+        @endif
+        @if ($vente->soldeDu() > 0)
+            <tr class="credit">
+                <td>Solde à crédit</td>
+                <td class="text-end">{{ number_format($vente->soldeDu(), 0, ',', ' ') }} F</td>
+            </tr>
+        @endif
+    </table>
+
+    <div class="mention">
+        Merci de votre confiance.
+        @if ($parametre->slogan) {{ $parametre->slogan }} @endif
+    </div>
+</body>
+</html>

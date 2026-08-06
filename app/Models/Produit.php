@@ -17,7 +17,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 #[Fillable([
     'sku', 'nom', 'libelle_distinctif', 'code_barre', 'categorie_id',
-    'prix_piece', 'seuil_alerte', 'actif',
+    'prix_piece', 'unite_base_id', 'seuil_alerte', 'actif',
 ])]
 class Produit extends Model implements HasMedia
 {
@@ -68,6 +68,21 @@ class Produit extends Model implements HasMedia
         );
     }
 
+    /**
+     * Compatibilité : historiquement une colonne texte libre, désormais
+     * dérivée du référentiel Unite (voir migration 2026_08_06_130001).
+     * Garder ce nom d'accesseur évite de retoucher tous les écrans qui
+     * l'affichent déjà (vente, devis, ticket…).
+     */
+    protected function uniteBaseLibelle(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->uniteBase
+                ? ($this->uniteBase->abbreviation ?: $this->uniteBase->nom)
+                : 'pièce',
+        );
+    }
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('image')->singleFile();
@@ -80,6 +95,11 @@ class Produit extends Model implements HasMedia
     public function categorie(): BelongsTo
     {
         return $this->belongsTo(Categorie::class)->withTrashed();
+    }
+
+    public function uniteBase(): BelongsTo
+    {
+        return $this->belongsTo(Unite::class, 'unite_base_id');
     }
 
     public function uniteVentes(): HasMany
@@ -121,7 +141,11 @@ class Produit extends Model implements HasMedia
     {
         $catalogue = Cache::rememberForever(self::CACHE_CATALOGUE_VENTE, function () {
             return static::where('actif', true)
-                ->with(['uniteVentes' => fn ($q) => $q->where('actif', true)->orderBy('facteur')])
+                ->with([
+                    'uniteBase',
+                    'uniteVentes' => fn ($q) => $q->where('actif', true)->orderBy('facteur'),
+                    'uniteVentes.unite',
+                ])
                 ->orderBy('nom')
                 ->get()
                 ->map(fn (self $p) => [
@@ -131,6 +155,7 @@ class Produit extends Model implements HasMedia
                     'libelle_distinctif' => $p->libelle_distinctif,
                     'libelle_affichage' => $p->libelle_affichage,
                     'prix_piece' => $p->prix_piece,
+                    'unite_base_libelle' => $p->unite_base_libelle,
                     'unites' => $p->uniteVentes->map(fn (UniteVente $u) => [
                         'id' => $u->id,
                         'libelle' => $u->libelle,

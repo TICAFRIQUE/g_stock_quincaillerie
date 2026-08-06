@@ -25,6 +25,7 @@ class ParametreController extends Controller
             'slogan' => ['nullable', 'string', 'max:255'],
             'numero' => ['nullable', 'string', 'max:50'],
             'adresse' => ['nullable', 'string', 'max:255'],
+            'duree_validite_devis_jours' => ['required', 'integer', 'min:1', 'max:365'],
             'logo' => ['nullable', 'image', 'max:2048'],
         ]);
 

@@ -3,8 +3,10 @@
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\CaisseController;
 use App\Http\Controllers\CategorieController;
+use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CommandeAchatController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DevisController;
 use App\Http\Controllers\FournisseurController;
 use App\Http\Controllers\InventaireController;
 use App\Http\Controllers\JournalActiviteController;
@@ -14,11 +16,13 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ParametreController;
 use App\Http\Controllers\ProduitController;
 use App\Http\Controllers\RapportController;
+use App\Http\Controllers\ReglementClientController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SessionCaisseController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\StockMouvementController;
 use App\Http\Controllers\TransfertController;
+use App\Http\Controllers\UniteController;
 use App\Http\Controllers\UniteVenteController;
 use App\Http\Controllers\UtilisateurController;
 use App\Http\Controllers\VenteController;
@@ -63,6 +67,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('moyens-paiement', MoyenPaiementController::class)
             ->except(['show'])
             ->parameters(['moyens-paiement' => 'moyenPaiement']);
+
+        Route::resource('unites', UniteController::class)->except(['show']);
     });
 
     Route::middleware('can:parametre.gerer')->group(function () {
@@ -73,6 +79,27 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('can:fournisseur.gerer')->group(function () {
         Route::resource('fournisseurs', FournisseurController::class)->except(['show']);
+    });
+
+    Route::middleware('can:client.voir')->group(function () {
+        Route::get('clients', [ClientController::class, 'index'])->name('clients.index');
+    });
+
+    // /clients/creer avant /clients/{client} : sinon "creer" serait capturé
+    // comme un {client} par la route de consultation ci-dessous.
+    Route::middleware('can:client.gerer')->group(function () {
+        Route::get('clients/creer', [ClientController::class, 'create'])->name('clients.create');
+        Route::post('clients', [ClientController::class, 'store'])->name('clients.store');
+        Route::post('clients/rapide', [ClientController::class, 'storeRapide'])->name('clients.rapide');
+        Route::get('clients/{client}/modifier', [ClientController::class, 'edit'])->name('clients.edit');
+        Route::put('clients/{client}', [ClientController::class, 'update'])->name('clients.update');
+        Route::delete('clients/{client}', [ClientController::class, 'destroy'])->name('clients.destroy');
+    });
+
+    Route::middleware('can:client.voir')->group(function () {
+        Route::get('clients/{client}', [ClientController::class, 'show'])->name('clients.show');
+        Route::get('clients/{client}/ventes/excel', [ClientController::class, 'exporterVentes'])->name('clients.ventes.excel');
+        Route::get('clients/{client}/devis/excel', [ClientController::class, 'exporterDevis'])->name('clients.devis.excel');
     });
 
     Route::middleware('can:achat.voir')->group(function () {
@@ -141,6 +168,9 @@ Route::middleware('auth')->group(function () {
         // withTrashed() : une vente annulée reste consultable (ticket avec
         // mention "Annulée"), jamais un 404.
         Route::get('ventes/{vente}/ticket', [VenteController::class, 'ticket'])->name('ventes.ticket')->withTrashed();
+        Route::get('ventes/{vente}/facture', [VenteController::class, 'facture'])->name('ventes.facture')->withTrashed();
+        Route::get('ventes/{vente}/pdf', [VenteController::class, 'pdf'])->name('ventes.pdf')->withTrashed();
+        Route::get('ventes/{vente}/excel', [VenteController::class, 'excel'])->name('ventes.excel')->withTrashed();
     });
 
     Route::middleware('can:vente.signaler')->group(function () {
@@ -151,6 +181,37 @@ Route::middleware('auth')->group(function () {
     // échouer (404 sur la liaison de route), pas la re-traiter.
     Route::middleware('can:vente.annuler')->group(function () {
         Route::post('ventes/{vente}/annuler', [VenteController::class, 'annuler'])->name('ventes.annuler');
+    });
+
+    Route::middleware('can:client.reglement')->group(function () {
+        Route::get('sessions/{session}/reglements/creer', [ReglementClientController::class, 'create'])->name('reglements.create');
+        Route::post('sessions/{session}/reglements', [ReglementClientController::class, 'store'])->name('reglements.store');
+    });
+
+    Route::middleware('can:devis.voir')->group(function () {
+        Route::get('devis', [DevisController::class, 'index'])->name('devis.index');
+    });
+
+    // /devis/creer avant /devis/{devis} : sinon "creer" serait capturé comme
+    // un {devis} par la route de consultation ci-dessous.
+    Route::middleware('can:devis.gerer')->group(function () {
+        Route::get('devis/creer', [DevisController::class, 'create'])->name('devis.create');
+        Route::post('devis', [DevisController::class, 'store'])->name('devis.store');
+        Route::get('devis/{devis}/modifier', [DevisController::class, 'edit'])->name('devis.edit');
+        Route::put('devis/{devis}', [DevisController::class, 'update'])->name('devis.update');
+        Route::post('devis/{devis}/annuler', [DevisController::class, 'annuler'])->name('devis.annuler');
+    });
+
+    Route::middleware('can:devis.voir')->group(function () {
+        Route::get('devis/{devis}', [DevisController::class, 'show'])->name('devis.show');
+        Route::get('devis/{devis}/facture', [DevisController::class, 'facture'])->name('devis.facture');
+        Route::get('devis/{devis}/pdf', [DevisController::class, 'pdf'])->name('devis.pdf');
+        Route::get('devis/{devis}/excel', [DevisController::class, 'excel'])->name('devis.excel');
+    });
+
+    Route::middleware('can:devis.transformer')->group(function () {
+        Route::get('sessions/{session}/devis/{devis}/transformer', [VenteController::class, 'transformerDevisForm'])->name('devis.transformer.form');
+        Route::post('sessions/{session}/devis/{devis}/transformer', [VenteController::class, 'transformerDevis'])->name('devis.transformer');
     });
 
     Route::middleware('can:ventenattente.gerer')->group(function () {

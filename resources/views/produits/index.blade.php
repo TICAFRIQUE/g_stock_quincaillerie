@@ -21,7 +21,7 @@
                         <x-th-tri champ="sku" label="SKU" />
                         <x-th-tri champ="nom" label="Nom" />
                         <th>Catégorie</th>
-                        <x-th-tri champ="prix_piece" label="Prix pièce" />
+                        <x-th-tri champ="prix_piece" label="Prix / unité" />
                         <th>Seuil d'alerte</th>
                         <x-th-tri champ="actif" label="Statut" />
                         <th class="text-end">Actions</th>
@@ -40,7 +40,7 @@
                             <td><code>{{ $produit->sku }}</code></td>
                             <td>{{ $produit->libelle_affichage }}</td>
                             <td>{{ $produit->categorie->nom }}</td>
-                            <td>{{ number_format($produit->prix_piece, 0, ',', ' ') }} F</td>
+                            <td>{{ number_format($produit->prix_piece, 0, ',', ' ') }} F / {{ $produit->unite_base_libelle }}</td>
                             <td>{{ $produit->seuil_alerte }}</td>
                             <td>
                                 @if ($produit->actif)

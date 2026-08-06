@@ -7,6 +7,7 @@ use App\Models\Categorie;
 use App\Models\Fournisseur;
 use App\Models\Magasin;
 use App\Models\Produit;
+use App\Models\Unite;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -159,6 +160,9 @@ class DemoCatalogueSeeder extends Seeder
             ['Set de table bambou', null, 'Général', 1200, 15, []],
         ];
 
+        $unitePiece = Unite::firstOrCreate(['nom' => 'Pièce'], ['actif' => true]);
+        $uniteLot = Unite::firstOrCreate(['nom' => 'Lot'], ['actif' => true]);
+
         foreach ($definitions as [$nom, $libelle, $categorieNom, $prixPiece, $seuil, $unites]) {
             $produit = Produit::create([
                 'sku' => $this->genererSku(),
@@ -166,12 +170,13 @@ class DemoCatalogueSeeder extends Seeder
                 'libelle_distinctif' => $libelle,
                 'categorie_id' => $categories[$categorieNom]->id,
                 'prix_piece' => $prixPiece,
+                'unite_base_id' => $unitePiece->id,
                 'seuil_alerte' => $seuil,
             ]);
 
             foreach ($unites as [$facteur, $prix]) {
                 $produit->uniteVentes()->create([
-                    'libelle' => "Lot de {$facteur}",
+                    'unite_id' => $uniteLot->id,
                     'facteur' => $facteur,
                     'prix' => $prix,
                     'actif' => true,

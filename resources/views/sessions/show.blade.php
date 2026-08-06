@@ -45,6 +45,11 @@
                         <i class="bi bi-cart-plus me-1"></i>Vendre
                     </a>
                 @endcan
+                @can('client.reglement')
+                    <a href="{{ route('reglements.create', $session) }}" class="btn btn-outline-primary">
+                        <i class="bi bi-credit-card me-1"></i>Encaisser un règlement
+                    </a>
+                @endcan
                 @can('caisse.cloturer')
                     @if ($session->vente_en_attentes_count > 0)
                         <button type="button" class="btn btn-outline-secondary disabled" disabled
@@ -109,8 +114,14 @@
                 <div class="row g-3">
                     <div class="col-6 col-md-3">
                         <div class="text-secondary small">Théorique</div>
-                        <div class="fw-medium">{{ number_format($session->fond_de_caisse + $session->total_ventes_especes, 0, ',', ' ') }} F</div>
+                        <div class="fw-medium">{{ number_format($session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes, 0, ',', ' ') }} F</div>
                     </div>
+                    @if ($session->total_reglements_especes > 0)
+                        <div class="col-6 col-md-3">
+                            <div class="text-secondary small">Règlements clients (espèces)</div>
+                            <div class="fw-medium">{{ number_format($session->total_reglements_especes, 0, ',', ' ') }} F</div>
+                        </div>
+                    @endif
                     <div class="col-6 col-md-3">
                         <div class="text-secondary small">Compté</div>
                         <div class="fw-medium">{{ number_format($session->montant_compte, 0, ',', ' ') }} F</div>

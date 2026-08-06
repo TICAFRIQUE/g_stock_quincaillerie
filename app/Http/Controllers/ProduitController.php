@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\Categorie;
 use App\Models\Produit;
+use App\Models\Unite;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,6 +42,7 @@ class ProduitController extends Controller
 
         return view('produits.create', [
             'categories' => Categorie::orderBy('nom')->get(),
+            'unites' => Unite::where('actif', true)->orderBy('nom')->get(),
             'nomsExistants' => Produit::where('actif', true)->pluck('nom'),
         ]);
     }
@@ -82,11 +84,17 @@ class ProduitController extends Controller
 
     public function edit(Produit $produit): View
     {
-        $produit->load(['categorie', 'uniteVentes' => fn ($q) => $q->orderBy('libelle')]);
+        $produit->load(['categorie', 'uniteBase', 'uniteVentes' => fn ($q) => $q->orderBy('facteur'), 'uniteVentes.unite']);
 
         return view('produits.edit', [
             'produit' => $produit,
             'categories' => Categorie::orderBy('nom')->get(),
+            // Pré-sélectionne le bon parent dans le select "Catégorie" pour
+            // faire apparaître le select "Sous-catégorie" dès l'ouverture,
+            // que le produit soit rattaché à une catégorie racine ou à une
+            // sous-catégorie.
+            'categorieParentInitiale' => $produit->categorie?->parent_id ?? $produit->categorie_id,
+            'unites' => Unite::where('actif', true)->orderBy('nom')->get(),
             'nomsExistants' => Produit::where('actif', true)->where('id', '!=', $produit->id)->pluck('nom'),
             'peutModifier' => $this->peut('produit.modifier'),
             'peutSupprimer' => $this->peut('produit.supprimer'),
@@ -139,19 +147,37 @@ class ProduitController extends Controller
     }
 
     /**
-     * @return array<int, array{libelle: string, facteur: int, prix: int}>
+     * @return array<int, array{unite_id: int, facteur: int, prix: int}>
      */
     private function validerLots(Request $request): array
     {
+        $vus = [];
+
         $donnees = $request->validate([
             'unites_vente' => ['nullable', 'array'],
-            'unites_vente.*.facteur' => ['required', 'integer', 'min:2', 'distinct'],
+            'unites_vente.*.unite_id' => ['required', 'exists:unites,id'],
+            'unites_vente.*.facteur' => [
+                'required', 'integer', 'min:2',
+                // Deux variantes de la même unité avec le même facteur
+                // seraient indiscernables à la vente (ex. deux "Carton de
+                // 24") — la contrainte unique en base le refuserait de toute
+                // façon, mieux vaut un message clair ici.
+                function (string $attribute, mixed $value, \Closure $fail) use ($request, &$vus) {
+                    preg_match('/unites_vente\.(\d+)\.facteur/', $attribute, $m);
+                    $index = (int) $m[1];
+                    $uniteId = $request->input("unites_vente.{$index}.unite_id");
+                    $cle = $uniteId.'|'.$value;
+
+                    if (isset($vus[$cle])) {
+                        $fail('Cette combinaison unité + facteur est déjà utilisée pour une autre variante.');
+                    }
+                    $vus[$cle] = true;
+                },
+            ],
             'unites_vente.*.prix' => ['required', 'integer', 'min:0'],
         ]);
 
-        return collect($donnees['unites_vente'] ?? [])
-            ->map(fn (array $lot) => $lot + ['libelle' => "Lot de {$lot['facteur']}"])
-            ->all();
+        return $donnees['unites_vente'] ?? [];
     }
 
     private function valider(Request $request, ?Produit $produit = null): array
@@ -171,6 +197,7 @@ class ProduitController extends Controller
             'code_barre' => ['nullable', 'string', 'max:255', 'unique:produits,code_barre,'.($produit?->id)],
             'categorie_id' => ['required', 'exists:categories,id'],
             'prix_piece' => ['required', 'integer', 'min:0'],
+            'unite_base_id' => ['required', 'exists:unites,id'],
             'seuil_alerte' => ['required', 'integer', 'min:0'],
             'actif' => ['boolean'],
             'image' => ['nullable', 'image', 'max:4096'],

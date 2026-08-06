@@ -16,7 +16,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * pour bénéficier du cache (lu sur presque chaque page : sidebar, connexion,
  * tickets, e-mails).
  */
-#[Fillable(['nom', 'slogan', 'numero', 'adresse'])]
+#[Fillable(['nom', 'slogan', 'numero', 'adresse', 'duree_validite_devis_jours'])]
 class Parametre extends Model implements HasMedia
 {
     use InteractsWithMedia, LogsActivity;
@@ -45,7 +45,7 @@ class Parametre extends Model implements HasMedia
     {
         $attributs = Cache::rememberForever(self::CACHE_KEY, function () {
             return self::query()->firstOrCreate(['id' => 1], [
-                'nom' => "Plaisir d'Offrir, Joie de Recevoir",
+                'nom' => 'GStockQuincaillerie',
             ])->getAttributes();
         });
 

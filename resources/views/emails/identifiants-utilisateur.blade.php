@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8">
 </head>
-<body style="font-family: Arial, sans-serif; color: #212529; background: #f4f6f4; padding: 24px;">
+<body style="font-family: Arial, sans-serif; color: #212529; background: #f6f3ef; padding: 24px;">
     <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 8px; padding: 24px;">
-        <h2 style="color: #163126; margin-top: 0;">{{ $parametre->nom }}</h2>
+        <h2 style="color: #e8590c; margin-top: 0;">{{ $parametre->nom }}</h2>
 
         <p>Bonjour {{ $utilisateur->name }},</p>
 

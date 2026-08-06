@@ -5,18 +5,21 @@ namespace App\Services;
 use App\Enums\MouvementStockType;
 use App\Exceptions\SessionNonOuverteException;
 use App\Models\Caisse;
+use App\Models\Client;
+use App\Models\Magasin;
 use App\Models\Produit;
 use App\Models\SessionCaisse;
 use App\Models\UniteVente;
 use App\Models\User;
 use App\Models\Vente;
-use App\Support\Arrondi;
+use App\Support\Remise;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
- * Vente atomique : stock (mouvements) + paiements + rattachement à la session,
- * dans une seule transaction. Tout ou rien (règle non négociable n°3).
+ * Vente atomique : stock (mouvements) + paiements + rattachement à la session
+ * + (si à crédit) écriture de dette client, dans une seule transaction. Tout
+ * ou rien (règle non négociable n°3).
  *
  * Remises : lignes d'abord, puis remise sur le sous-total. Chaque montant
  * résolu est stocké à côté du type/de la valeur saisie pour un ticket et des
@@ -24,7 +27,10 @@ use InvalidArgumentException;
  */
 class VenteService
 {
-    public function __construct(private readonly StockService $stockService) {}
+    public function __construct(
+        private readonly StockService $stockService,
+        private readonly CompteClientService $compteClientService,
+    ) {}
 
     /**
      * @param  array<int, array{produit_id:int, unite_vente_id?:?int, quantite:int, remise_type?:?string, remise_valeur?:?int}>  $lignes
@@ -38,6 +44,8 @@ class VenteService
         ?string $remiseTotaleType = null,
         ?int $remiseTotaleValeur = null,
         ?int $montantRecu = null,
+        ?Client $client = null,
+        bool $autoriserDepassementLimite = false,
     ): Vente {
         if (empty($lignes)) {
             throw new InvalidArgumentException('Une vente doit comporter au moins une ligne.');
@@ -48,7 +56,7 @@ class VenteService
             throw new SessionNonOuverteException();
         }
 
-        return DB::transaction(function () use ($session, $caissier, $lignes, $paiements, $remiseTotaleType, $remiseTotaleValeur, $montantRecu) {
+        return DB::transaction(function () use ($session, $caissier, $lignes, $paiements, $remiseTotaleType, $remiseTotaleValeur, $montantRecu, $client, $autoriserDepassementLimite) {
             $caisse = Caisse::whereKey($session->caisse_id)->lockForUpdate()->firstOrFail();
             $magasin = $caisse->magasin;
 
@@ -61,7 +69,18 @@ class VenteService
             $totalNet = $sousTotal - $remiseTotaleMontant;
 
             $totalPaiements = array_sum(array_column($paiements, 'montant'));
-            if ($totalPaiements !== $totalNet) {
+            $soldeDu = $totalNet - $totalPaiements;
+
+            if ($soldeDu < 0) {
+                throw new InvalidArgumentException(
+                    "Le total des paiements ({$totalPaiements}) ne peut pas dépasser le net à payer ({$totalNet})."
+                );
+            }
+
+            // Vente à crédit (règle 13) : un solde restant dû n'est autorisé
+            // que si un client est identifié. Sans client, la vente doit
+            // être payée intégralement, comme avant l'introduction du crédit.
+            if ($soldeDu > 0 && $client === null) {
                 throw new InvalidArgumentException(
                     "Le total des paiements ({$totalPaiements}) ne correspond pas au net à payer ({$totalNet})."
                 );
@@ -79,6 +98,7 @@ class VenteService
                 'magasin_id' => $magasin->id,
                 'session_caisse_id' => $session->id,
                 'caissier_id' => $caissier->id,
+                'client_id' => $client?->id,
                 'sous_total' => $sousTotal,
                 'remise_totale_type' => $remiseTotaleType,
                 'remise_totale_valeur' => $remiseTotaleValeur,
@@ -117,8 +137,30 @@ class VenteService
                 ]);
             }
 
+            if ($soldeDu > 0) {
+                $this->compteClientService->crediterDette(
+                    $client, $soldeDu, $vente, $caissier, $autoriserDepassementLimite,
+                );
+            }
+
             return $vente->refresh();
         });
+    }
+
+    /**
+     * Net à payer pour des lignes non encore vendues, aux prix/remises
+     * courants — utilisé pour vérifier en amont (avant d'appeler vendre())
+     * qu'un paiement partiel resterait autorisé, sans dupliquer la
+     * résolution des lignes (ex. transformation d'un devis, voir
+     * VenteController::transformerDevis()).
+     *
+     * @param  array<int, array{produit_id:int, unite_vente_id?:?int, quantite:int, remise_type?:?string, remise_valeur?:?int}>  $lignes
+     */
+    public function calculerTotalNet(array $lignes, ?string $remiseTotaleType, ?int $remiseTotaleValeur, Magasin $magasin): int
+    {
+        [, $sousTotal] = $this->resoudreLignes($lignes, $magasin);
+
+        return $sousTotal - $this->resoudreRemise($remiseTotaleType, $remiseTotaleValeur, $sousTotal);
     }
 
     /**
@@ -173,17 +215,6 @@ class VenteService
 
     private function resoudreRemise(?string $type, ?int $valeur, int $base): int
     {
-        if ($type === null || $valeur === null) {
-            return 0;
-        }
-
-        $montant = match ($type) {
-            'montant' => $valeur,
-            'pourcentage' => Arrondi::entier($base * $valeur / 100),
-            default => throw new InvalidArgumentException("Type de remise inconnu : {$type}"),
-        };
-
-        // Ne jamais dépasser la base : pas de sous-total ou de net à payer négatif.
-        return min($montant, $base);
+        return Remise::resoudre($type, $valeur, $base);
     }
 }

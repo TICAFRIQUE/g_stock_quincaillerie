@@ -12,7 +12,7 @@ use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 #[Fillable([
-    'numero', 'magasin_id', 'session_caisse_id', 'caissier_id', 'sous_total',
+    'numero', 'magasin_id', 'session_caisse_id', 'caissier_id', 'client_id', 'sous_total',
     'remise_totale_type', 'remise_totale_valeur', 'remise_totale_montant', 'total_net',
     'montant_recu', 'monnaie_rendue', 'motif_annulation', 'annulee_par',
 ])]
@@ -71,6 +71,11 @@ class Vente extends Model
         return $this->belongsTo(User::class, 'annulee_par');
     }
 
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
+    }
+
     public function lignes(): HasMany
     {
         return $this->hasMany(LigneVente::class);
@@ -79,5 +84,14 @@ class Vente extends Model
     public function paiements(): HasMany
     {
         return $this->hasMany(Paiement::class);
+    }
+
+    /**
+     * Reste dû par le client : net à payer moins les paiements réellement
+     * encaissés (0 pour une vente comptant). Suppose `paiements` chargée.
+     */
+    public function soldeDu(): int
+    {
+        return $this->total_net - $this->paiements->sum('montant');
     }
 }

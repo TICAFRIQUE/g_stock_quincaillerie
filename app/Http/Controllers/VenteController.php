@@ -3,13 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Enums\MouvementStockType;
+use App\Exceptions\DevisNonTransformableException;
+use App\Exceptions\LimiteCreditDepasseeException;
 use App\Exceptions\SessionNonOuverteException;
 use App\Exceptions\StockInsuffisantException;
 use App\Http\Controllers\Concerns\AutoriseMagasin;
 use App\Http\Controllers\Concerns\AutoriseVenteEnAttente;
 use App\Http\Controllers\Concerns\ValideRemises;
+use App\Models\Client;
+use App\Models\Devis;
 use App\Models\MoyenPaiement;
 use App\Models\Paiement;
+use App\Models\Parametre;
 use App\Models\Produit;
 use App\Models\SessionCaisse;
 use App\Models\Stock;
@@ -17,13 +22,19 @@ use App\Models\User;
 use App\Models\Vente;
 use App\Models\VenteEnAttente;
 use App\Notifications\VenteSignalee;
+use App\Services\DevisService;
 use App\Services\StockService;
 use App\Services\VenteService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use InvalidArgumentException;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class VenteController extends Controller
 {
@@ -49,7 +60,24 @@ class VenteController extends Controller
         return $this->formulaire($venteEnAttente->sessionCaisse, $venteEnAttente);
     }
 
-    private function formulaire(SessionCaisse $session, ?VenteEnAttente $venteEnAttente = null): View
+    /**
+     * Transformer un devis n'est pas non plus un flux à part : même écran de
+     * caisse, panier pré-rempli des lignes du devis (montants indicatifs
+     * repris au prix courant), mais le client est imposé par le devis — pas
+     * de sélecteur (voir CLAUDE.md, section Devis, et règle 15).
+     */
+    public function transformerDevisForm(SessionCaisse $session, Devis $devis): View
+    {
+        $this->assurerMagasin($session->caisse->magasin_id);
+        abort_if($devis->magasin_id !== $session->caisse->magasin_id, 403, 'Ce devis appartient à un autre magasin.');
+        abort_if(! $devis->peutEtreTransforme(), 403, 'Ce devis ne peut plus être transformé en vente.');
+
+        $devis->load(['client', 'lignes.produit', 'lignes.uniteVente']);
+
+        return $this->formulaire($session, devisTransformation: $devis);
+    }
+
+    private function formulaire(SessionCaisse $session, ?VenteEnAttente $venteEnAttente = null, ?Devis $devisTransformation = null): View
     {
         $this->assurerMagasin($session->caisse->magasin_id);
         abort_if($session->date_cloture || $session->date_fermeture, 403, 'Cette session n\'est plus ouverte.');
@@ -67,8 +95,21 @@ class VenteController extends Controller
             ])
             ->values();
 
-        $panierInitial = $venteEnAttente
-            ? $venteEnAttente->lignes->map(fn ($ligne) => [
+        $panierInitial = match (true) {
+            $devisTransformation !== null => $devisTransformation->lignes->map(fn ($ligne) => [
+                'produit_id' => $ligne->produit_id,
+                'unite_vente_id' => $ligne->unite_vente_id,
+                'produitLibelle' => $ligne->produit->libelle_affichage,
+                'uniteLibelle' => $ligne->uniteVente?->libelle,
+                'facteur' => $ligne->uniteVente?->facteur ?? 1,
+                'quantite' => $ligne->quantite,
+                'prixUnitaire' => $ligne->uniteVente?->prix ?? $ligne->produit->prix_piece,
+                // Remise indicative du devis reprise comme point de départ,
+                // modifiable avant finalisation (jamais figée, règle 15).
+                'remise_type' => $ligne->remise_type ?? '',
+                'remise_valeur' => $ligne->remise_valeur,
+            ])->values(),
+            $venteEnAttente !== null => $venteEnAttente->lignes->map(fn ($ligne) => [
                 'produit_id' => $ligne->produit_id,
                 'unite_vente_id' => $ligne->unite_vente_id,
                 'produitLibelle' => $ligne->produit->libelle_affichage,
@@ -78,8 +119,9 @@ class VenteController extends Controller
                 'prixUnitaire' => $ligne->uniteVente?->prix ?? $ligne->produit->prix_piece,
                 'remise_type' => '',
                 'remise_valeur' => null,
-            ])->values()
-            : collect();
+            ])->values(),
+            default => collect(),
+        };
 
         // Un caissier ne voit (et ne finalise) que ses propres ventes en
         // attente : le badge doit refléter ce même périmètre, pas le total
@@ -95,13 +137,25 @@ class VenteController extends Controller
             'moyensPaiement' => MoyenPaiement::actifs(),
             'venteEnAttentesCount' => $venteEnAttentesCount,
             'venteEnAttente' => $venteEnAttente,
+            'devisTransformation' => $devisTransformation,
             'panierInitial' => $panierInitial,
+            'clients' => request()->user()->can('vente.credit')
+                ? Client::where('actif', true)->orderBy('nom')->get(['id', 'nom', 'telephone'])
+                : collect(),
         ]);
     }
 
-    public function store(Request $request, SessionCaisse $session, VenteService $venteService): RedirectResponse
+    /**
+     * Le client de la vente résultante est toujours celui du devis (jamais
+     * un champ du formulaire) — voir DevisService::transformer(). La
+     * permission vente.credit reste vérifiée ici : sans elle, aucun solde
+     * restant dû n'est autorisé, même si le devis impose un client (sinon
+     * la permission serait contournable en passant par un devis).
+     */
+    public function transformerDevis(Request $request, SessionCaisse $session, Devis $devis, DevisService $devisService, VenteService $venteService): RedirectResponse
     {
         $this->assurerMagasin($session->caisse->magasin_id);
+        abort_if($devis->magasin_id !== $session->caisse->magasin_id, 403, 'Ce devis appartient à un autre magasin.');
         $this->nettoyerChampsOptionnels($request);
         $this->bloquerRemiseSansPermission($request);
 
@@ -114,11 +168,70 @@ class VenteController extends Controller
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
             'remise_totale_type' => ['nullable', 'in:montant,pourcentage'],
             'remise_totale_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
-            'paiements' => ['required', 'array', 'min:1'],
+            'paiements' => ['present', 'array'],
             'paiements.*.moyen_paiement_id' => ['required', 'exists:moyen_paiements,id'],
             'paiements.*.montant' => ['required', 'integer', 'min:1'],
             'montant_recu' => ['nullable', 'integer', 'min:0'],
         ]);
+
+        if (! $request->user()->can('vente.credit')) {
+            $totalNet = $venteService->calculerTotalNet(
+                $donnees['lignes'],
+                $donnees['remise_totale_type'] ?? null,
+                $donnees['remise_totale_valeur'] ?? null,
+                $session->caisse->magasin,
+            );
+            $totalPaiements = array_sum(array_column($donnees['paiements'], 'montant'));
+            abort_if($totalPaiements < $totalNet, 403, 'Vous n\'avez pas la permission de vendre à crédit.');
+        }
+
+        try {
+            $vente = $devisService->transformer(
+                devis: $devis,
+                session: $session,
+                caissier: $request->user(),
+                lignes: $donnees['lignes'],
+                paiements: $donnees['paiements'],
+                remiseTotaleType: $donnees['remise_totale_type'] ?? null,
+                remiseTotaleValeur: $donnees['remise_totale_valeur'] ?? null,
+                montantRecu: $donnees['montant_recu'] ?? null,
+                autoriserDepassementLimite: $request->user()->can('client.depasser_limite'),
+            );
+        } catch (StockInsuffisantException|SessionNonOuverteException|InvalidArgumentException|LimiteCreditDepasseeException|DevisNonTransformableException $e) {
+            return back()->withInput()->with('erreur', $e->getMessage());
+        }
+
+        return redirect()->route('ventes.ticket', $vente)->with('succes', 'Devis transformé en vente.');
+    }
+
+    public function store(Request $request, SessionCaisse $session, VenteService $venteService): RedirectResponse
+    {
+        $this->assurerMagasin($session->caisse->magasin_id);
+        $this->nettoyerChampsOptionnels($request);
+        $this->bloquerRemiseSansPermission($request);
+        $this->bloquerCreditSansPermission($request);
+
+        $donnees = $request->validate([
+            'lignes' => ['required', 'array', 'min:1'],
+            'lignes.*.produit_id' => ['required', 'exists:produits,id'],
+            'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
+            'lignes.*.quantite' => ['required', 'integer', 'min:1'],
+            'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
+            'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
+            'remise_totale_type' => ['nullable', 'in:montant,pourcentage'],
+            'remise_totale_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
+            // Un panier vendu à crédit à 100 % (aucun acompte) envoie un
+            // tableau de paiements vide : "present" plutôt que "required" pour
+            // l'autoriser, la cohérence montant/net à payer reste vérifiée par
+            // VenteService.
+            'paiements' => ['present', 'array'],
+            'paiements.*.moyen_paiement_id' => ['required', 'exists:moyen_paiements,id'],
+            'paiements.*.montant' => ['required', 'integer', 'min:1'],
+            'montant_recu' => ['nullable', 'integer', 'min:0'],
+            'client_id' => ['nullable', 'exists:clients,id'],
+        ]);
+
+        $client = ! empty($donnees['client_id']) ? Client::findOrFail($donnees['client_id']) : null;
 
         try {
             $vente = $venteService->vendre(
@@ -129,8 +242,10 @@ class VenteController extends Controller
                 remiseTotaleType: $donnees['remise_totale_type'] ?? null,
                 remiseTotaleValeur: $donnees['remise_totale_valeur'] ?? null,
                 montantRecu: $donnees['montant_recu'] ?? null,
+                client: $client,
+                autoriserDepassementLimite: $request->user()->can('client.depasser_limite'),
             );
-        } catch (StockInsuffisantException|SessionNonOuverteException|InvalidArgumentException $e) {
+        } catch (StockInsuffisantException|SessionNonOuverteException|InvalidArgumentException|LimiteCreditDepasseeException $e) {
             return back()->withInput()->with('erreur', $e->getMessage());
         }
 
@@ -141,7 +256,7 @@ class VenteController extends Controller
     {
         $this->assurerMagasin($vente->magasin_id);
 
-        $vente->load(['lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement', 'magasin', 'caissier', 'sessionCaisse.caisse', 'annulateur']);
+        $vente->load(['lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement', 'magasin', 'caissier', 'sessionCaisse.caisse', 'annulateur', 'client']);
 
         $signalements = $vente->activities()
             ->where('description', 'like', '%» signalée :%')
@@ -150,6 +265,110 @@ class VenteController extends Controller
             ->get();
 
         return view('ventes.ticket', ['vente' => $vente, 'signalements' => $signalements]);
+    }
+
+    public function facture(Vente $vente): View
+    {
+        $this->assurerMagasin($vente->magasin_id);
+
+        return view('ventes.facture', $this->chargerDonneesFacture($vente));
+    }
+
+    public function pdf(Vente $vente): Response
+    {
+        $this->assurerMagasin($vente->magasin_id);
+
+        $pdf = Pdf::loadView('ventes.facture', $this->chargerDonneesFacture($vente) + ['pourPdf' => true]);
+
+        return $pdf->download("facture-{$vente->numero}.pdf");
+    }
+
+    public function excel(Vente $vente): StreamedResponse
+    {
+        $this->assurerMagasin($vente->magasin_id);
+
+        $vente->load(['client', 'magasin', 'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement']);
+
+        $spreadsheet = new Spreadsheet();
+        $feuille = $spreadsheet->getActiveSheet();
+        $feuille->setTitle('Vente');
+
+        $parametre = Parametre::actuel();
+        $feuille->setCellValue('A1', $parametre->nom);
+        $feuille->setCellValue('A2', $parametre->adresse);
+        $feuille->setCellValue('A3', $parametre->numero ? 'Tél : '.$parametre->numero : '');
+
+        $feuille->setCellValue('D1', 'FACTURE');
+        $feuille->setCellValue('D2', 'N° '.$vente->numero);
+        $feuille->setCellValue('D3', 'Date : '.$vente->created_at->format('d/m/Y H:i'));
+        $feuille->setCellValue('D4', 'Magasin : '.$vente->magasin->nom);
+
+        $feuille->setCellValue('A6', 'Client');
+        $feuille->setCellValue('A7', $vente->client->nom ?? 'Client comptant');
+        $feuille->setCellValue('A8', $vente->client->telephone ?? '');
+        $feuille->setCellValue('A9', $vente->client->adresse ?? '');
+
+        $ligneEnTete = 11;
+        foreach (['A' => 'Désignation', 'B' => 'Unité', 'C' => 'Quantité', 'D' => 'Prix unitaire', 'E' => 'Remise', 'F' => 'Total'] as $colonne => $libelle) {
+            $feuille->setCellValue("{$colonne}{$ligneEnTete}", $libelle);
+        }
+
+        $ligne = $ligneEnTete + 1;
+        foreach ($vente->lignes as $ligneVente) {
+            $feuille->setCellValue("A{$ligne}", $ligneVente->produit->libelle_affichage);
+            $feuille->setCellValue("B{$ligne}", $ligneVente->uniteVente->libelle ?? $ligneVente->produit->unite_base_libelle);
+            $feuille->setCellValue("C{$ligne}", $ligneVente->quantite);
+            $feuille->setCellValue("D{$ligne}", $ligneVente->prix_unitaire_applique);
+            $feuille->setCellValue("E{$ligne}", $ligneVente->remise_ligne_montant);
+            $feuille->setCellValue("F{$ligne}", $ligneVente->total_ligne);
+            $ligne++;
+        }
+
+        $ligne++;
+        $feuille->setCellValue("E{$ligne}", 'Total net');
+        $feuille->setCellValue("F{$ligne}", $vente->total_net);
+        $ligne++;
+        foreach ($vente->paiements as $paiement) {
+            $feuille->setCellValue("E{$ligne}", $paiement->moyenPaiement->nom);
+            $feuille->setCellValue("F{$ligne}", $paiement->montant);
+            $ligne++;
+        }
+        if ($vente->soldeDu() > 0) {
+            $feuille->setCellValue("E{$ligne}", 'Solde à crédit');
+            $feuille->setCellValue("F{$ligne}", $vente->soldeDu());
+        }
+
+        foreach (['A', 'B', 'C', 'D', 'E', 'F'] as $colonne) {
+            $feuille->getColumnDimension($colonne)->setAutoSize(true);
+        }
+
+        $nomFichier = "facture-{$vente->numero}.xlsx";
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $nomFichier, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
+    /**
+     * Logo encodé en data URI (comme pour le devis) : dompdf ne charge une
+     * image distante que si enable_remote est activé côté serveur.
+     */
+    private function chargerDonneesFacture(Vente $vente): array
+    {
+        $vente->load(['client', 'magasin', 'caissier', 'sessionCaisse.caisse', 'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement']);
+
+        $parametre = Parametre::actuel();
+        $logo = $parametre->getFirstMedia('logo');
+        $logoDataUri = ($logo && is_file($logo->getPath()))
+            ? 'data:'.$logo->mime_type.';base64,'.base64_encode(file_get_contents($logo->getPath()))
+            : null;
+
+        return [
+            'vente' => $vente,
+            'parametre' => $parametre,
+            'logoDataUri' => $logoDataUri,
+        ];
     }
 
     /**
@@ -248,5 +467,22 @@ class VenteController extends Controller
             'remise_totale_type' => $request->input('remise_totale_type') ?: null,
             'remise_totale_valeur' => $request->input('remise_totale_valeur') ?: null,
         ]);
+    }
+
+    /**
+     * Sans la permission vente.credit, aucune vente ne doit jamais être
+     * rattachée à un client (donc jamais à crédit) — même logique que
+     * bloquerRemiseSansPermission pour les remises : on efface le champ
+     * avant validation plutôt que de faire confiance à l'écran (qui masque
+     * déjà le sélecteur client), au cas où une requête serait construite à
+     * la main. Le superadmin passe toujours (bypass Gate::before).
+     */
+    private function bloquerCreditSansPermission(Request $request): void
+    {
+        if ($request->user()->can('vente.credit')) {
+            return;
+        }
+
+        $request->merge(['client_id' => null]);
     }
 }

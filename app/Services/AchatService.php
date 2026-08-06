@@ -23,7 +23,7 @@ class AchatService
         }
 
         return DB::transaction(function () use ($commandeAchat, $auteur) {
-            $commandeAchat->loadMissing('lignes.produit');
+            $commandeAchat->loadMissing('lignes.produit', 'lignes.uniteVente');
 
             foreach ($commandeAchat->lignes as $ligne) {
                 $this->stockService->enregistrerMouvement(
@@ -63,7 +63,7 @@ class AchatService
         }
 
         return DB::transaction(function () use ($commandeAchat, $auteur, $motif) {
-            $commandeAchat->loadMissing('lignes.produit');
+            $commandeAchat->loadMissing('lignes.produit', 'lignes.uniteVente');
 
             foreach ($commandeAchat->lignes as $ligne) {
                 $this->stockService->enregistrerMouvement(

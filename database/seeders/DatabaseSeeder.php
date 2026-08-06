@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class,
             MoyenPaiementSeeder::class,
             ParametreSeeder::class,
+            UniteSeeder::class,
         ]);
 
         if (app()->environment('local')) {

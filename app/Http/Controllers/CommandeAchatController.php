@@ -7,6 +7,7 @@ use App\Models\CommandeAchat;
 use App\Models\Fournisseur;
 use App\Models\Magasin;
 use App\Models\Produit;
+use App\Models\UniteVente;
 use App\Services\AchatService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -48,10 +49,27 @@ class CommandeAchatController extends Controller
 
     public function create(): View
     {
+        $produits = Produit::where('actif', true)->orderBy('nom')
+            ->with(['uniteBase', 'uniteVentes' => fn ($q) => $q->where('actif', true)->with('unite')])
+            ->get(['id', 'sku', 'nom', 'libelle_distinctif', 'unite_base_id']);
+
         return view('commande-achats.create', [
             'fournisseurs' => Fournisseur::where('actif', true)->orderBy('nom')->get(),
             'magasins' => Magasin::where('actif', true)->orderBy('nom')->get(),
-            'produits' => Produit::where('actif', true)->orderBy('nom')->get(['id', 'sku', 'nom', 'libelle_distinctif']),
+            'produits' => $produits,
+            // Unités disponibles par produit (base + variantes déjà définies
+            // au catalogue de vente) : évite de ressaisir un facteur à
+            // l'achat qui pourrait diverger de celui utilisé à la vente.
+            'unitesParProduit' => $produits->mapWithKeys(fn (Produit $p) => [
+                $p->id => [
+                    'basePiece' => $p->unite_base_libelle,
+                    'variantes' => $p->uniteVentes->map(fn (UniteVente $uv) => [
+                        'id' => $uv->id,
+                        'libelle' => $uv->libelle,
+                        'facteur' => $uv->facteur,
+                    ])->values(),
+                ],
+            ]),
             'peutValider' => request()->user()->can('achat.valider'),
         ]);
     }
@@ -69,16 +87,13 @@ class CommandeAchatController extends Controller
         $lignes = $request->validate([
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'distinct', 'exists:produits,id'],
-            'lignes.*.unite_achat' => ['required', 'in:piece,groupe'],
-            'lignes.*.qte_par_groupe' => ['required_if:lignes.*.unite_achat,groupe', 'nullable', 'integer', 'min:2'],
+            'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.prix_achat' => ['required', 'integer', 'min:0'],
         ])['lignes'];
 
         foreach ($lignes as &$ligne) {
-            if ($ligne['unite_achat'] !== 'groupe') {
-                $ligne['qte_par_groupe'] = null;
-            }
+            $ligne['unite_vente_id'] = $ligne['unite_vente_id'] ?: null;
         }
         unset($ligne);
 
@@ -122,7 +137,7 @@ class CommandeAchatController extends Controller
 
     public function show(CommandeAchat $commandeAchat): View
     {
-        $commandeAchat->load(['fournisseur', 'magasin', 'lignes.produit', 'auteur', 'validateur', 'annulateur']);
+        $commandeAchat->load(['fournisseur', 'magasin', 'lignes.produit', 'lignes.uniteVente', 'auteur', 'validateur', 'annulateur']);
 
         return view('commande-achats.show', [
             'commande' => $commandeAchat,

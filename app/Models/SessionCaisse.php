@@ -12,7 +12,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 #[Fillable([
     'caisse_id', 'caissier_id', 'fond_de_caisse', 'date_ouverture',
-    'date_cloture', 'date_fermeture', 'total_ventes_especes',
+    'date_cloture', 'date_fermeture', 'total_ventes_especes', 'total_reglements_especes',
     'montant_compte', 'ecart', 'cloture_by', 'alerte_ouverture_envoyee_at',
 ])]
 class SessionCaisse extends Model
@@ -27,6 +27,7 @@ class SessionCaisse extends Model
             'date_cloture' => 'datetime',
             'date_fermeture' => 'datetime',
             'total_ventes_especes' => 'integer',
+            'total_reglements_especes' => 'integer',
             'montant_compte' => 'integer',
             'ecart' => 'integer',
             'alerte_ouverture_envoyee_at' => 'datetime',
@@ -66,5 +67,10 @@ class SessionCaisse extends Model
     public function venteEnAttentes(): HasMany
     {
         return $this->hasMany(VenteEnAttente::class);
+    }
+
+    public function reglementClients(): HasMany
+    {
+        return $this->hasMany(ReglementClient::class);
     }
 }
