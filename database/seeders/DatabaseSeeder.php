@@ -37,8 +37,9 @@ class DatabaseSeeder extends Seeder
             // 20 enregistrements par module transactionnel), pour tester avec du
             // volume réaliste plutôt que des listes vides.
             $this->call([
-                DemoCatalogueSeeder::class,
-                DemoTransactionsSeeder::class,
+                // DemoCatalogueSeeder::class,
+                // DemoTransactionsSeeder::class,
+                QuincaillerieTestSeeder::class,
             ]);
         }
     }
