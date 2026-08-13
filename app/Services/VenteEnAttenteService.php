@@ -21,7 +21,7 @@ class VenteEnAttenteService
     public function __construct(private readonly VenteService $venteService) {}
 
     /**
-     * @param  array<int, array{produit_id:int, unite_vente_id?:?int, quantite:int}>  $lignes
+     * @param  array<int, array{produit_id:int, unite_vente_id?:?int, magasin_source_id?:?int, quantite:int}>  $lignes
      */
     public function mettreEnAttente(
         SessionCaisse $session,
@@ -56,6 +56,7 @@ class VenteEnAttenteService
                 $venteEnAttente->lignes()->create([
                     'produit_id' => $ligne['produit_id'],
                     'unite_vente_id' => $ligne['unite_vente_id'] ?? null,
+                    'magasin_source_id' => $ligne['magasin_source_id'] ?? null,
                     'quantite' => $ligne['quantite'],
                 ]);
             }

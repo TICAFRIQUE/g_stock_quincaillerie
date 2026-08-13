@@ -12,7 +12,7 @@ use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 #[Fillable([
-    'numero', 'fournisseur_id', 'magasin_id', 'statut', 'date_commande',
+    'numero', 'fournisseur_id', 'statut', 'date_commande',
     'created_by', 'valide_by', 'valide_at', 'motif_annulation', 'annulee_par',
 ])]
 class CommandeAchat extends Model
@@ -34,17 +34,12 @@ class CommandeAchat extends Model
 
     /**
      * withTrashed() : une commande d'achat est un historique, elle doit
-     * rester affichable même si le fournisseur ou le magasin ont été
-     * supprimés (soft delete) depuis.
+     * rester affichable même si le fournisseur a été supprimé (soft delete)
+     * depuis.
      */
     public function fournisseur(): BelongsTo
     {
         return $this->belongsTo(Fournisseur::class)->withTrashed();
-    }
-
-    public function magasin(): BelongsTo
-    {
-        return $this->belongsTo(Magasin::class)->withTrashed();
     }
 
     public function auteur(): BelongsTo
@@ -65,5 +60,39 @@ class CommandeAchat extends Model
     public function lignes(): HasMany
     {
         return $this->hasMany(LigneCommandeAchat::class);
+    }
+
+    /**
+     * Suppose `lignes` chargée (loadMissing en amont, voir
+     * CommandeAchatController::show()).
+     */
+    public function totalHt(): int
+    {
+        return $this->lignes->sum(fn (LigneCommandeAchat $ligne) => $ligne->montantHt());
+    }
+
+    public function totalTtc(): int
+    {
+        return $this->lignes->sum(fn (LigneCommandeAchat $ligne) => $ligne->montantTtc());
+    }
+
+    public function totalTaxes(): int
+    {
+        return $this->totalTtc() - $this->totalHt();
+    }
+
+    public function paiements(): HasMany
+    {
+        return $this->hasMany(PaiementAchat::class);
+    }
+
+    /**
+     * Reste dû au fournisseur : total TTC moins les paiements réellement
+     * versés à la validation (0 pour un achat payé comptant). Suppose
+     * `lignes` et `paiements` chargées.
+     */
+    public function resteDu(): int
+    {
+        return $this->totalTtc() - $this->paiements->sum('montant');
     }
 }

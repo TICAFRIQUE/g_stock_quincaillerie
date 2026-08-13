@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['vente_en_attente_id', 'produit_id', 'unite_vente_id', 'quantite'])]
+#[Fillable(['vente_en_attente_id', 'produit_id', 'unite_vente_id', 'magasin_source_id', 'quantite'])]
 class LigneVenteEnAttente extends Model
 {
     use HasFactory;
@@ -37,5 +37,10 @@ class LigneVenteEnAttente extends Model
     public function uniteVente(): BelongsTo
     {
         return $this->belongsTo(UniteVente::class)->withTrashed();
+    }
+
+    public function magasinSource(): BelongsTo
+    {
+        return $this->belongsTo(Magasin::class, 'magasin_source_id')->withTrashed();
     }
 }

@@ -1,17 +1,19 @@
 @extends('layouts.app')
 
-@section('title', 'Vente')
+@section('title', 'Facture')
 
 @section('content')
     <div x-data="posApp(
         {{ \Illuminate\Support\Js::from($produits) }},
         {{ \Illuminate\Support\Js::from($panierInitial) }},
         {{ \Illuminate\Support\Js::from($venteEnAttente->libelle ?? '') }},
-        {{ \Illuminate\Support\Js::from($devisTransformation->client_id ?? '') }}
+        {{ \Illuminate\Support\Js::from($devisTransformation->client_id ?? '') }},
+        {{ \Illuminate\Support\Js::from($session->caisse->magasin_id) }},
+        {{ \Illuminate\Support\Js::from($session->caisse->magasin->nom) }}
     )">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
             <div>
-                <h2 class="h4 mb-0">Vente — {{ $session->caisse->nom }}</h2>
+                <h2 class="h4 mb-0">Facture — {{ $session->caisse->nom }}</h2>
                 <p class="text-secondary small mb-0">
                     {{ $session->caisse->magasin->nom }}
                     @if ($venteEnAttente)
@@ -86,7 +88,18 @@
                                     </template>
                                     <template x-for="(ligne, index) in panier" :key="index">
                                         <tr>
-                                            <td class="small" x-text="ligne.produitLibelle + ' (Stock : ' + produitDe(ligne).stock + ')'"></td>
+                                            <td class="small">
+                                                <div x-text="ligne.produitLibelle + ' (Stock : ' + stockDisponible(ligne) + ')'"></div>
+                                                <select class="form-select form-select-sm mt-1 text-secondary" style="min-width: 170px; font-size: .75rem;"
+                                                        @focus="chargerSources(ligne)"
+                                                        @change="choisirSource(ligne, $event.target.value)">
+                                                    <option value="" :selected="!ligne.magasin_source_id" x-text="'Depuis : ' + magasinCaisseNom + ' (défaut)'"></option>
+                                                    <template x-for="source in autresSources(ligne)" :key="source.id">
+                                                        <option :value="source.id" :selected="source.id === ligne.magasin_source_id"
+                                                                x-text="'Depuis : ' + source.nom + (source.type === 'depot' ? ' (dépôt)' : '') + ' — ' + source.quantite + ' dispo'"></option>
+                                                    </template>
+                                                </select>
+                                            </td>
                                             <td>
                                                 <div class="d-flex align-items-center gap-1">
                                                     <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" @click="changerQuantite(ligne, -1)">−</button>
@@ -291,6 +304,7 @@
                                 <span>
                                     <input type="hidden" :name="'lignes['+index+'][produit_id]'" :value="ligne.produit_id">
                                     <input type="hidden" :name="'lignes['+index+'][unite_vente_id]'" :value="ligne.unite_vente_id">
+                                    <input type="hidden" :name="'lignes['+index+'][magasin_source_id]'" :value="ligne.magasin_source_id">
                                     <input type="hidden" :name="'lignes['+index+'][quantite]'" :value="ligne.quantite">
                                     <input type="hidden" :name="'lignes['+index+'][remise_type]'" :value="ligne.remise_type">
                                     <input type="hidden" :name="'lignes['+index+'][remise_valeur]'" :value="ligne.remise_valeur">

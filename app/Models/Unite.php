@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -24,6 +25,18 @@ class Unite extends Model
         return [
             'actif' => 'boolean',
         ];
+    }
+
+    /**
+     * Nom complet suivi de l'abréviation entre parenthèses (ex. « Boîte
+     * (Bte) »), pour un affichage lisible sans ambiguïté. Sans abréviation
+     * renseignée, le nom seul suffit.
+     */
+    protected function nomAvecAbbreviation(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->abbreviation ? "{$this->nom} ({$this->abbreviation})" : $this->nom,
+        );
     }
 
     public function produits(): HasMany

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'vente_id', 'produit_id', 'unite_vente_id', 'quantite', 'quantite_pieces',
+    'vente_id', 'produit_id', 'unite_vente_id', 'magasin_source_id', 'quantite', 'quantite_pieces',
     'prix_unitaire_applique', 'cout_applique', 'sous_total_ligne',
     'remise_ligne_type', 'remise_ligne_valeur', 'remise_ligne_montant', 'total_ligne',
 ])]
@@ -50,5 +50,14 @@ class LigneVente extends Model
     public function uniteVente(): BelongsTo
     {
         return $this->belongsTo(UniteVente::class)->withTrashed();
+    }
+
+    /**
+     * withTrashed() : ligne historique, doit rester affichable même si le
+     * magasin/dépôt source a été supprimé depuis.
+     */
+    public function magasinSource(): BelongsTo
+    {
+        return $this->belongsTo(Magasin::class, 'magasin_source_id')->withTrashed();
     }
 }

@@ -6,6 +6,8 @@ use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\Categorie;
 use App\Models\Produit;
 use App\Models\Unite;
+use App\Services\StockService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +17,16 @@ use Illuminate\View\View;
 class ProduitController extends Controller
 {
     use TrieListe;
+
+    /**
+     * Disponibilité d'un produit par magasin/dépôt — alimente le sélecteur
+     * de source à la vente (voir CLAUDE.md), interrogé à la demande quand le
+     * caissier veut prélever ailleurs qu'au magasin de sa caisse.
+     */
+    public function stockParMagasin(Produit $produit, StockService $stockService): JsonResponse
+    {
+        return response()->json($stockService->disponibiliteParMagasin($produit)->values());
+    }
 
     public function index(Request $request): View
     {

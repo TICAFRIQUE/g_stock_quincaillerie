@@ -13,10 +13,10 @@
                         @csrf
 
                         <div class="mb-3">
-                            <label for="magasin_id" class="form-label">Magasin<span class="required-marker">*</span></label>
+                            <label for="magasin_id" class="form-label">Destination<span class="required-marker">*</span></label>
                             <select name="magasin_id" id="magasin_id" class="form-select @error('magasin_id') is-invalid @enderror"
                                     onchange="window.location.href = '{{ route('stock.mouvements.create') }}?magasin_id=' + this.value" required>
-                                <option value="">— Choisir le magasin —</option>
+                                <option value="">— Choisir la destination —</option>
                                 @foreach ($magasins as $magasin)
                                     <option value="{{ $magasin->id }}" @selected(old('magasin_id', $magasinId) == $magasin->id)>{{ $magasin->nom }}</option>
                                 @endforeach

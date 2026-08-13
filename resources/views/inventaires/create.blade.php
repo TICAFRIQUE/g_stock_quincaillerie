@@ -11,7 +11,7 @@
                 @csrf
 
                 <div class="mb-3">
-                    <label for="magasin_id" class="form-label">Magasin<span class="required-marker">*</span></label>
+                    <label for="magasin_id" class="form-label">Destination<span class="required-marker">*</span></label>
                     <select name="magasin_id" id="magasin_id" class="form-select @error('magasin_id') is-invalid @enderror" required>
                         <option value="">— Choisir —</option>
                         @foreach ($magasins as $magasin)

@@ -5,12 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
-#[Fillable(['nom', 'telephone', 'adresse', 'limite_credit', 'actif'])]
+#[Fillable(['nom', 'type_client_id', 'telephone', 'adresse', 'limite_credit', 'actif'])]
 class Client extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
@@ -31,6 +32,11 @@ class Client extends Model
     public function ventes(): HasMany
     {
         return $this->hasMany(Vente::class);
+    }
+
+    public function typeClient(): BelongsTo
+    {
+        return $this->belongsTo(TypeClient::class);
     }
 
     public function ecritures(): HasMany

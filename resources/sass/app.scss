@@ -38,18 +38,27 @@ $input-bg: #ffffff;
     --erp-accent: #{$info};
 }
 
-.erp-sidebar {
+// Menu horizontal (voir CLAUDE.md — Interface) : une seule barre en haut de
+// page, plus de sidebar. Les dropdowns par section remplacent les groupes de
+// liens verticaux, mêmes couleurs/comportement actif que l'ancienne sidebar.
+.erp-navbar {
     background-color: var(--erp-sidebar-bg);
-    width: 260px;
-    position: fixed;
-    z-index: 1040;
+    position: sticky;
     top: 0;
-    bottom: 0;
-    left: 0;
-    overflow-y: auto;
-    transition: margin-left 0.2s ease-in-out;
+    z-index: 1040;
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
 
-    .nav-link {
+    .navbar-toggler {
+        border-color: var(--erp-sidebar-color);
+
+        .navbar-toggler-icon {
+            filter: invert(1);
+        }
+    }
+
+    .nav-link,
+    .dropdown-item {
         color: var(--erp-sidebar-color);
         border-radius: $border-radius-sm;
 
@@ -60,25 +69,20 @@ $input-bg: #ffffff;
         }
     }
 
-    @media (max-width: 991.98px) {
-        margin-left: -260px;
-
-        &.erp-sidebar-open {
-            margin-left: 0;
-        }
+    .dropdown-menu {
+        background-color: var(--erp-sidebar-bg);
+        border: 1px solid var(--erp-sidebar-bg-active);
+        min-width: 14rem;
     }
-}
-
-.erp-sidebar-backdrop {
-    display: none;
 
     @media (max-width: 991.98px) {
-        &.erp-sidebar-open {
-            display: block;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.4);
-            z-index: 1030;
+        .navbar-nav {
+            padding-top: 0.5rem;
+        }
+
+        .dropdown-menu {
+            border: none;
+            padding-left: 1rem;
         }
     }
 }
@@ -115,21 +119,8 @@ $input-bg: #ffffff;
     background-color: $info;
 }
 
-.erp-topbar {
-    background-color: #fff;
-    border-bottom: 1px solid $border-color;
-}
-
 .erp-main {
     background-color: $body-bg;
-    min-height: 100vh;
-    margin-left: 260px;
-    width: calc(100% - 260px);
-
-    @media (max-width: 991.98px) {
-        margin-left: 0;
-        width: 100%;
-    }
 }
 
 // --- Lisibilité des formulaires ---
@@ -273,9 +264,7 @@ $input-bg: #ffffff;
 // --- Reçu de caisse (impression POS) : seule la carte .recu-pos sort sur le
 // papier, à la largeur d'un ticket thermique 80mm — pas la sidebar/topbar.
 @media print {
-    .erp-sidebar,
-    .erp-sidebar-backdrop,
-    .erp-topbar,
+    .erp-navbar,
     .d-print-none {
         display: none !important;
     }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\Client;
 use App\Models\EcritureCompteClient;
+use App\Models\TypeClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class ClientController extends Controller
     public function index(Request $request): View
     {
         $query = Client::query()
+            ->with('typeClient')
             ->when($request->filled('recherche'), function ($q) use ($request) {
                 $recherche = $request->string('recherche');
                 $q->where(function ($sub) use ($recherche) {
@@ -46,7 +48,7 @@ class ClientController extends Controller
 
     public function create(): View
     {
-        return view('clients.create');
+        return view('clients.create', ['typesClient' => TypeClient::where('actif', true)->orderBy('nom')->get()]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -74,6 +76,7 @@ class ClientController extends Controller
         $validateur = Validator::make($request->all(), [
             'nom' => ['required', 'string', 'max:255'],
             'telephone' => ['nullable', 'string', 'max:50'],
+            'type_client_id' => ['nullable', 'exists:type_clients,id'],
         ]);
 
         if ($validateur->fails()) {
@@ -185,7 +188,10 @@ class ClientController extends Controller
 
     public function edit(Client $client): View
     {
-        return view('clients.edit', ['client' => $client]);
+        return view('clients.edit', [
+            'client' => $client,
+            'typesClient' => TypeClient::where('actif', true)->orderBy('nom')->get(),
+        ]);
     }
 
     public function update(Request $request, Client $client): RedirectResponse
@@ -212,6 +218,7 @@ class ClientController extends Controller
     {
         $donnees = $request->validate([
             'nom' => ['required', 'string', 'max:255'],
+            'type_client_id' => ['nullable', 'exists:type_clients,id'],
             'telephone' => ['nullable', 'string', 'max:50'],
             'adresse' => ['nullable', 'string', 'max:255'],
             'limite_credit' => ['nullable', 'integer', 'min:0'],

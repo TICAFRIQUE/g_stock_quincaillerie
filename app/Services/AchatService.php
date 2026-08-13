@@ -6,6 +6,7 @@ use App\Enums\MouvementStockType;
 use App\Models\CommandeAchat;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use RuntimeException;
 
 /**
@@ -14,27 +15,54 @@ use RuntimeException;
  */
 class AchatService
 {
-    public function __construct(private readonly StockService $stockService) {}
+    public function __construct(
+        private readonly StockService $stockService,
+        private readonly CompteFournisseurService $compteFournisseurService,
+    ) {}
 
-    public function valider(CommandeAchat $commandeAchat, User $auteur): CommandeAchat
+    /**
+     * @param  array<int, array{moyen_paiement_id:int, montant:int}>  $paiements
+     */
+    public function valider(CommandeAchat $commandeAchat, User $auteur, array $paiements = []): CommandeAchat
     {
         if ($commandeAchat->statut !== 'brouillon') {
             throw new RuntimeException("La commande {$commandeAchat->numero} n'est pas au statut brouillon.");
         }
 
-        return DB::transaction(function () use ($commandeAchat, $auteur) {
-            $commandeAchat->loadMissing('lignes.produit', 'lignes.uniteVente');
+        return DB::transaction(function () use ($commandeAchat, $auteur, $paiements) {
+            $commandeAchat->loadMissing('lignes.produit', 'lignes.uniteVente', 'lignes.magasinDestination', 'lignes.taxe');
 
             foreach ($commandeAchat->lignes as $ligne) {
                 $this->stockService->enregistrerMouvement(
                     produit: $ligne->produit,
-                    magasin: $commandeAchat->magasin,
+                    magasin: $ligne->magasinDestination,
                     quantite: $ligne->quantite_pieces,
                     type: MouvementStockType::Reception,
                     auteur: $auteur,
                     reference: $commandeAchat,
                     prixAchat: $ligne->prixAchatParPiece(),
                 );
+            }
+
+            $totalTtc = $commandeAchat->totalTtc();
+            $totalPaiements = array_sum(array_column($paiements, 'montant'));
+
+            if ($totalPaiements > $totalTtc) {
+                throw new InvalidArgumentException(
+                    "Le total des paiements ({$totalPaiements}) ne peut pas dépasser le total TTC ({$totalTtc})."
+                );
+            }
+
+            foreach ($paiements as $p) {
+                $commandeAchat->paiements()->create([
+                    'moyen_paiement_id' => $p['moyen_paiement_id'],
+                    'montant' => $p['montant'],
+                ]);
+            }
+
+            $resteDu = $totalTtc - $totalPaiements;
+            if ($resteDu > 0) {
+                $this->compteFournisseurService->crediterDette($commandeAchat->fournisseur, $resteDu, $commandeAchat, $auteur);
             }
 
             $commandeAchat->update([
@@ -63,12 +91,12 @@ class AchatService
         }
 
         return DB::transaction(function () use ($commandeAchat, $auteur, $motif) {
-            $commandeAchat->loadMissing('lignes.produit', 'lignes.uniteVente');
+            $commandeAchat->loadMissing('lignes.produit', 'lignes.uniteVente', 'lignes.magasinDestination');
 
             foreach ($commandeAchat->lignes as $ligne) {
                 $this->stockService->enregistrerMouvement(
                     produit: $ligne->produit,
-                    magasin: $commandeAchat->magasin,
+                    magasin: $ligne->magasinDestination,
                     quantite: -$ligne->quantite_pieces,
                     type: MouvementStockType::Annulation,
                     auteur: $auteur,

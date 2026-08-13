@@ -22,7 +22,7 @@
             <table class="table table-hover align-middle mb-0">
                 <thead>
                     <tr>
-                        <th>Magasin</th>
+                        <th>Destination</th>
                         <th>Quantité (pièces)</th>
                         <th>Valeur (CMP)</th>
                     </tr>

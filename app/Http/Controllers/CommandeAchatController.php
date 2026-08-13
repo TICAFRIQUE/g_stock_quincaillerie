@@ -6,7 +6,9 @@ use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\CommandeAchat;
 use App\Models\Fournisseur;
 use App\Models\Magasin;
+use App\Models\MoyenPaiement;
 use App\Models\Produit;
+use App\Models\Taxe;
 use App\Models\UniteVente;
 use App\Services\AchatService;
 use Carbon\Carbon;
@@ -14,6 +16,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use InvalidArgumentException;
 use RuntimeException;
 
 class CommandeAchatController extends Controller
@@ -26,14 +29,13 @@ class CommandeAchatController extends Controller
         $fin = $request->filled('date_fin') ? Carbon::parse($request->string('date_fin')) : now()->endOfMonth();
 
         $query = CommandeAchat::query()
-            ->with(['fournisseur', 'magasin'])
+            ->with('fournisseur')
             ->whereBetween('date_commande', [$debut->toDateString(), $fin->toDateString()])
             ->when($request->filled('recherche'), function ($q) use ($request) {
                 $recherche = $request->string('recherche');
                 $q->where('numero', 'like', "%{$recherche}%");
             })
-            ->when($request->filled('statut'), fn ($q) => $q->where('statut', $request->string('statut')))
-            ->when($request->filled('magasin_id'), fn ($q) => $q->where('magasin_id', $request->integer('magasin_id')));
+            ->when($request->filled('statut'), fn ($q) => $q->where('statut', $request->string('statut')));
 
         $commandes = $this->appliquerTri($query, $request, ['numero', 'date_commande', 'statut'], 'created_at')
             ->paginate(20)
@@ -43,7 +45,6 @@ class CommandeAchatController extends Controller
             'commandes' => $commandes,
             'dateDebut' => $debut->toDateString(),
             'dateFin' => $fin->toDateString(),
-            'magasins' => Magasin::orderBy('nom')->get(),
         ]);
     }
 
@@ -56,16 +57,22 @@ class CommandeAchatController extends Controller
         return view('commande-achats.create', [
             'fournisseurs' => Fournisseur::where('actif', true)->orderBy('nom')->get(),
             'magasins' => Magasin::where('actif', true)->orderBy('nom')->get(),
+            'taxes' => Taxe::where('actif', true)->orderBy('nom')->get(),
+            'moyensPaiement' => MoyenPaiement::actifs(),
             'produits' => $produits,
             // Unités disponibles par produit (base + variantes déjà définies
             // au catalogue de vente) : évite de ressaisir un facteur à
             // l'achat qui pourrait diverger de celui utilisé à la vente.
+            // Libellé affiché volontairement sans le facteur (nom complet +
+            // abréviation entre parenthèses, ex. "Boîte (Bte)") — le facteur
+            // reste utilisé en interne pour convertir en pièces, jamais
+            // montré à la saisie.
             'unitesParProduit' => $produits->mapWithKeys(fn (Produit $p) => [
                 $p->id => [
                     'basePiece' => $p->unite_base_libelle,
                     'variantes' => $p->uniteVentes->map(fn (UniteVente $uv) => [
                         'id' => $uv->id,
-                        'libelle' => $uv->libelle,
+                        'libelle' => $uv->unite->nom_avec_abbreviation,
                         'facteur' => $uv->facteur,
                     ])->values(),
                 ],
@@ -79,27 +86,40 @@ class CommandeAchatController extends Controller
         $donnees = $request->validate([
             'numero' => ['nullable', 'string', 'max:255', 'unique:commande_achats,numero'],
             'fournisseur_id' => ['required', 'exists:fournisseurs,id'],
-            'magasin_id' => ['required', 'exists:magasins,id'],
             'date_commande' => ['required', 'date'],
             'action' => ['required', 'in:brouillon,valider'],
         ]);
 
+        // Pas de contrainte "distinct" sur produit_id seul : deux lignes du
+        // même produit avec une unité de vente différente (pièce vs carton)
+        // sont légitimes, seul le doublon (produit + unité) est bloqué côté
+        // client (voir estDoublon dans commande-achats/create.blade.php),
+        // même logique que le panier de vente.
         $lignes = $request->validate([
             'lignes' => ['required', 'array', 'min:1'],
-            'lignes.*.produit_id' => ['required', 'distinct', 'exists:produits,id'],
+            'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
+            'lignes.*.taxe_id' => ['nullable', 'exists:taxes,id'],
+            'lignes.*.magasin_destination_id' => ['required', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.prix_achat' => ['required', 'integer', 'min:0'],
         ])['lignes'];
 
         foreach ($lignes as &$ligne) {
             $ligne['unite_vente_id'] = $ligne['unite_vente_id'] ?: null;
+            $ligne['taxe_id'] = $ligne['taxe_id'] ?: null;
         }
         unset($ligne);
 
         $validerImmediatement = $donnees['action'] === 'valider';
         abort_if($validerImmediatement && ! $request->user()->can('achat.valider'), 403);
         unset($donnees['action']);
+
+        $paiements = $validerImmediatement ? $request->validate([
+            'paiements' => ['sometimes', 'array'],
+            'paiements.*.moyen_paiement_id' => ['required_with:paiements', 'exists:moyen_paiements,id'],
+            'paiements.*.montant' => ['required_with:paiements', 'integer', 'min:1'],
+        ])['paiements'] ?? [] : [];
 
         $numeroGenere = blank($donnees['numero']);
         if ($numeroGenere) {
@@ -121,8 +141,8 @@ class CommandeAchatController extends Controller
 
         if ($validerImmediatement) {
             try {
-                $achatService->valider($commande, $request->user());
-            } catch (RuntimeException $e) {
+                $achatService->valider($commande, $request->user(), $paiements);
+            } catch (RuntimeException|InvalidArgumentException $e) {
                 return redirect()->route('commande-achats.show', $commande)->with('erreur', $e->getMessage());
             }
 
@@ -137,12 +157,16 @@ class CommandeAchatController extends Controller
 
     public function show(CommandeAchat $commandeAchat): View
     {
-        $commandeAchat->load(['fournisseur', 'magasin', 'lignes.produit', 'lignes.uniteVente', 'auteur', 'validateur', 'annulateur']);
+        $commandeAchat->load([
+            'fournisseur', 'lignes.produit', 'lignes.uniteVente.unite', 'lignes.taxe', 'lignes.magasinDestination',
+            'paiements.moyenPaiement', 'auteur', 'validateur', 'annulateur',
+        ]);
 
         return view('commande-achats.show', [
             'commande' => $commandeAchat,
             'peutValider' => request()->user()->can('achat.valider'),
             'peutAnnuler' => request()->user()->can('achat.annuler'),
+            'moyensPaiement' => MoyenPaiement::actifs(),
         ]);
     }
 
@@ -150,9 +174,15 @@ class CommandeAchatController extends Controller
     {
         abort_unless($request->user()->can('achat.valider'), 403);
 
+        $paiements = $request->validate([
+            'paiements' => ['sometimes', 'array'],
+            'paiements.*.moyen_paiement_id' => ['required_with:paiements', 'exists:moyen_paiements,id'],
+            'paiements.*.montant' => ['required_with:paiements', 'integer', 'min:1'],
+        ])['paiements'] ?? [];
+
         try {
-            $achatService->valider($commandeAchat, $request->user());
-        } catch (RuntimeException $e) {
+            $achatService->valider($commandeAchat, $request->user(), $paiements);
+        } catch (RuntimeException|InvalidArgumentException $e) {
             return redirect()->route('commande-achats.show', $commandeAchat)->with('erreur', $e->getMessage());
         }
 

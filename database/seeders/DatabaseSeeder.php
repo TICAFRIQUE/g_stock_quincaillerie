@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             MoyenPaiementSeeder::class,
             ParametreSeeder::class,
             UniteSeeder::class,
+            TaxeSeeder::class,
         ]);
 
         if (app()->environment('local')) {

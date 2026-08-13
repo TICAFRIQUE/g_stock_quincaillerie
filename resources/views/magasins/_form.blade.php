@@ -6,6 +6,16 @@
 </div>
 
 <div class="mb-3">
+    <label for="type" class="form-label">Type<span class="required-marker">*</span></label>
+    <select name="type" id="type" class="form-select @error('type') is-invalid @enderror" required>
+        <option value="magasin" @selected(old('type', $magasin->type ?? 'magasin') === 'magasin')>Magasin (point de vente)</option>
+        <option value="depot" @selected(old('type', $magasin->type ?? 'magasin') === 'depot')>Dépôt (stockage uniquement)</option>
+    </select>
+    <div class="form-text">Un dépôt sert uniquement au stockage : il n'a ni caisse ni session de vente.</div>
+    @error('type') <div class="invalid-feedback">{{ $message }}</div> @enderror
+</div>
+
+<div class="mb-3">
     <label for="adresse" class="form-label">Adresse</label>
     <input type="text" name="adresse" id="adresse" class="form-control @error('adresse') is-invalid @enderror"
            value="{{ old('adresse', $magasin->adresse ?? '') }}">

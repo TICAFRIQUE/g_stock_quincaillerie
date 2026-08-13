@@ -15,6 +15,15 @@
                     <label for="clientRapideTelephone" class="form-label">Téléphone</label>
                     <input type="text" id="clientRapideTelephone" class="form-control">
                 </div>
+                <div class="mb-3">
+                    <label for="clientRapideTypeClient" class="form-label">Type de client</label>
+                    <select id="clientRapideTypeClient" class="form-select">
+                        <option value="">— Aucun —</option>
+                        @foreach ($typesClient ?? [] as $type)
+                            <option value="{{ $type->id }}">{{ $type->nom }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-link" data-bs-dismiss="modal">Annuler</button>

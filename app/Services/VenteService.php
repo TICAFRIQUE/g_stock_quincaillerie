@@ -33,7 +33,7 @@ class VenteService
     ) {}
 
     /**
-     * @param  array<int, array{produit_id:int, unite_vente_id?:?int, quantite:int, remise_type?:?string, remise_valeur?:?int}>  $lignes
+     * @param  array<int, array{produit_id:int, unite_vente_id?:?int, magasin_source_id?:?int, quantite:int, remise_type?:?string, remise_valeur?:?int}>  $lignes
      * @param  array<int, array{moyen_paiement_id:int, montant:int}>  $paiements
      */
     public function vendre(
@@ -112,6 +112,7 @@ class VenteService
                 $vente->lignes()->create([
                     'produit_id' => $l['produit']->id,
                     'unite_vente_id' => $l['unite_vente']?->id,
+                    'magasin_source_id' => $l['magasin_source']->id,
                     'quantite' => $l['quantite'],
                     'quantite_pieces' => $l['quantite_pieces'],
                     'prix_unitaire_applique' => $l['prix_unitaire_applique'],
@@ -125,8 +126,10 @@ class VenteService
 
                 // Lève StockInsuffisantException si le stock est insuffisant, ce qui
                 // annule toute la transaction (vente, lignes, paiements compris).
+                // Chaque ligne prélève sur son propre magasin/dépôt source, qui
+                // peut différer du magasin de la vente (voir CLAUDE.md).
                 $this->stockService->enregistrerMouvement(
-                    $l['produit'], $magasin, -$l['quantite_pieces'], MouvementStockType::Vente, $caissier, reference: $vente,
+                    $l['produit'], $l['magasin_source'], -$l['quantite_pieces'], MouvementStockType::Vente, $caissier, reference: $vente,
                 );
             }
 
@@ -164,10 +167,20 @@ class VenteService
     }
 
     /**
+     * $magasinParDefaut : magasin de la vente (caisse), utilisé pour toute
+     * ligne qui ne précise pas explicitement sa propre source (magasin ou
+     * dépôt de prélèvement — un produit peut être vendu depuis un lieu
+     * différent du magasin de la vente, voir CLAUDE.md).
+     *
      * @return array{0: array<int, array<string, mixed>>, 1: int}
      */
-    private function resoudreLignes(array $lignes, $magasin): array
+    private function resoudreLignes(array $lignes, Magasin $magasinParDefaut): array
     {
+        $magasinSourceIds = collect($lignes)->pluck('magasin_source_id')->filter()->unique();
+        $magasinsParId = $magasinSourceIds->isNotEmpty()
+            ? Magasin::whereIn('id', $magasinSourceIds)->get()->keyBy('id')
+            : collect();
+
         $resolues = [];
         $sousTotal = 0;
 
@@ -176,6 +189,14 @@ class VenteService
             $uniteVente = ! empty($ligne['unite_vente_id'])
                 ? UniteVente::findOrFail($ligne['unite_vente_id'])
                 : null;
+
+            $magasinSource = $magasinParDefaut;
+            if (! empty($ligne['magasin_source_id'])) {
+                $magasinSource = $magasinsParId->get($ligne['magasin_source_id']);
+                if ($magasinSource === null) {
+                    throw new InvalidArgumentException('Magasin source introuvable pour une ligne de vente.');
+                }
+            }
 
             $quantite = $ligne['quantite'];
             if ($quantite <= 0) {
@@ -198,10 +219,11 @@ class VenteService
             $resolues[] = [
                 'produit' => $produit,
                 'unite_vente' => $uniteVente,
+                'magasin_source' => $magasinSource,
                 'quantite' => $quantite,
                 'quantite_pieces' => $quantitePieces,
                 'prix_unitaire_applique' => $prixUnitaireApplique,
-                'cout_applique' => $this->stockService->coutMoyenPondere($produit, $magasin),
+                'cout_applique' => $this->stockService->coutMoyenPondere($produit, $magasinSource),
                 'sous_total_ligne' => $sousTotalLigne,
                 'remise_ligne_type' => $ligne['remise_type'] ?? null,
                 'remise_ligne_valeur' => $ligne['remise_valeur'] ?? null,

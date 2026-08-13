@@ -17,11 +17,14 @@ use App\Http\Controllers\ParametreController;
 use App\Http\Controllers\ProduitController;
 use App\Http\Controllers\RapportController;
 use App\Http\Controllers\ReglementClientController;
+use App\Http\Controllers\ReglementFournisseurController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SessionCaisseController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\StockMouvementController;
+use App\Http\Controllers\TaxeController;
 use App\Http\Controllers\TransfertController;
+use App\Http\Controllers\TypeClientController;
 use App\Http\Controllers\UniteController;
 use App\Http\Controllers\UniteVenteController;
 use App\Http\Controllers\UtilisateurController;
@@ -71,14 +74,46 @@ Route::middleware('auth')->group(function () {
         Route::resource('unites', UniteController::class)->except(['show']);
     });
 
+    Route::middleware('can:taxe.gerer')->group(function () {
+        Route::resource('taxes', TaxeController::class)
+            ->except(['show'])
+            ->parameters(['taxes' => 'taxe']);
+    });
+
     Route::middleware('can:parametre.gerer')->group(function () {
         Route::get('parametres', [ParametreController::class, 'edit'])->name('parametres.edit');
         Route::put('parametres', [ParametreController::class, 'update'])->name('parametres.update');
         Route::post('parametres/backup', [ParametreController::class, 'backup'])->name('parametres.backup');
     });
 
+    Route::middleware('can:fournisseur.voir')->group(function () {
+        Route::get('fournisseurs', [FournisseurController::class, 'index'])->name('fournisseurs.index');
+    });
+
+    // /fournisseurs/creer avant /fournisseurs/{fournisseur} : sinon "creer"
+    // serait capturé comme un {fournisseur} par la route de consultation
+    // ci-dessous (même précaution que pour clients).
     Route::middleware('can:fournisseur.gerer')->group(function () {
-        Route::resource('fournisseurs', FournisseurController::class)->except(['show']);
+        Route::get('fournisseurs/creer', [FournisseurController::class, 'create'])->name('fournisseurs.create');
+        Route::post('fournisseurs', [FournisseurController::class, 'store'])->name('fournisseurs.store');
+        Route::get('fournisseurs/{fournisseur}/modifier', [FournisseurController::class, 'edit'])->name('fournisseurs.edit');
+        Route::put('fournisseurs/{fournisseur}', [FournisseurController::class, 'update'])->name('fournisseurs.update');
+        Route::delete('fournisseurs/{fournisseur}', [FournisseurController::class, 'destroy'])->name('fournisseurs.destroy');
+    });
+
+    Route::middleware('can:fournisseur.voir')->group(function () {
+        Route::get('fournisseurs/{fournisseur}', [FournisseurController::class, 'show'])->name('fournisseurs.show');
+    });
+
+    Route::middleware('can:fournisseur.reglement')->group(function () {
+        Route::get('fournisseurs/{fournisseur}/reglements/creer', [ReglementFournisseurController::class, 'create'])->name('reglements-fournisseur.create');
+        Route::post('fournisseurs/{fournisseur}/reglements', [ReglementFournisseurController::class, 'store'])->name('reglements-fournisseur.store');
+    });
+
+    Route::middleware('can:typeclient.gerer')->group(function () {
+        Route::resource('type-clients', TypeClientController::class)
+            ->except(['show'])
+            ->parameters(['type-clients' => 'typeClient']);
     });
 
     Route::middleware('can:client.voir')->group(function () {
@@ -165,6 +200,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:vente.creer')->group(function () {
         Route::get('sessions/{session}/vente', [VenteController::class, 'create'])->name('ventes.create');
         Route::post('sessions/{session}/vente', [VenteController::class, 'store'])->name('ventes.store');
+        Route::get('produits/{produit}/stock-magasins', [ProduitController::class, 'stockParMagasin'])->name('produits.stock-magasins');
         // withTrashed() : une vente annulée reste consultable (ticket avec
         // mention "Annulée"), jamais un 404.
         Route::get('ventes/{vente}/ticket', [VenteController::class, 'ticket'])->name('ventes.ticket')->withTrashed();

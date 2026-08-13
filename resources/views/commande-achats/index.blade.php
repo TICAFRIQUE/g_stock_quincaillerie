@@ -11,7 +11,7 @@
     </div>
 
     <x-recherche-form :action="route('commande-achats.index')" placeholder="Numéro de commande…"
-        :autres-params="['date_debut', 'date_fin', 'statut', 'magasin_id']">
+        :autres-params="['date_debut', 'date_fin', 'statut']">
         <div>
             <label for="date_debut" class="form-label small mb-1">Du</label>
             <input type="date" name="date_debut" id="date_debut" class="form-control" value="{{ $dateDebut }}" onchange="this.form.submit()">
@@ -28,15 +28,6 @@
                 <option value="validee" @selected(request('statut') === 'validee')>Validée</option>
             </select>
         </div>
-        <div>
-            <label for="magasin_id" class="form-label small mb-1">Magasin</label>
-            <select name="magasin_id" id="magasin_id" class="form-select" onchange="this.form.submit()">
-                <option value="">Tous les magasins</option>
-                @foreach ($magasins as $magasin)
-                    <option value="{{ $magasin->id }}" @selected(request('magasin_id') == $magasin->id)>{{ $magasin->nom }}</option>
-                @endforeach
-            </select>
-        </div>
     </x-recherche-form>
 
     <div class="card">
@@ -46,7 +37,6 @@
                     <tr>
                         <x-th-tri champ="numero" label="Numéro" />
                         <th>Fournisseur</th>
-                        <th>Magasin</th>
                         <x-th-tri champ="date_commande" label="Date" />
                         <x-th-tri champ="statut" label="Statut" />
                         <th class="text-end">Actions</th>
@@ -57,7 +47,6 @@
                         <tr>
                             <td><code>{{ $commande->numero }}</code></td>
                             <td>{{ $commande->fournisseur->nom }}</td>
-                            <td>{{ $commande->magasin->nom }}</td>
                             <td>{{ $commande->date_commande->format('d/m/Y') }}</td>
                             <td>
                                 @if ($commande->statut === 'validee')
@@ -75,7 +64,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center text-secondary py-4">Aucune commande d'achat pour l'instant.</td>
+                            <td colspan="5" class="text-center text-secondary py-4">Aucune commande d'achat pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>

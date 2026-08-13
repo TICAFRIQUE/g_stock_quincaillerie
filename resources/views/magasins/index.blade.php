@@ -16,6 +16,7 @@
                 <thead>
                     <tr>
                         <x-th-tri champ="nom" label="Nom" />
+                        <th>Type</th>
                         <th>Adresse</th>
                         <th>Téléphone</th>
                         <x-th-tri champ="actif" label="Statut" />
@@ -26,6 +27,13 @@
                     @forelse ($magasins as $magasin)
                         <tr>
                             <td>{{ $magasin->nom }}</td>
+                            <td>
+                                @if ($magasin->estDepot())
+                                    <span class="badge text-bg-info">Dépôt</span>
+                                @else
+                                    <span class="badge text-bg-primary">Magasin</span>
+                                @endif
+                            </td>
                             <td>{{ $magasin->adresse ?? '—' }}</td>
                             <td>{{ $magasin->telephone ?? '—' }}</td>
                             <td>
@@ -42,7 +50,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="text-center text-secondary py-4">Aucun magasin pour l'instant.</td>
+                            <td colspan="6" class="text-center text-secondary py-4">Aucun magasin pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>

@@ -11,6 +11,7 @@ use App\Models\Magasin;
 use App\Models\Parametre;
 use App\Models\Produit;
 use App\Models\SessionCaisse;
+use App\Models\TypeClient;
 use App\Services\DevisService;
 use App\Support\Remise;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -58,6 +59,7 @@ class DevisController extends Controller
             'clients' => Client::where('actif', true)->orderBy('nom')->get(['id', 'nom', 'telephone']),
             'magasins' => Magasin::where('actif', true)->orderBy('nom')->get(),
             'panierInitial' => collect(),
+            'typesClient' => TypeClient::where('actif', true)->orderBy('nom')->get(),
         ]);
     }
 

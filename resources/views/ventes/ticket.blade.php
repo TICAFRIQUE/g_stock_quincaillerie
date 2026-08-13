@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
-        <h2 class="h4 mb-0">Détail de la vente</h2>
+        <h2 class="h4 mb-0">Détail de la facture</h2>
         <div class="d-flex gap-2">
             <a href="{{ route('sessions.show', $vente->sessionCaisse) }}" class="btn btn-link">
                 <i class="bi bi-arrow-left me-1"></i>Retour à la session
@@ -22,7 +22,7 @@
                 <i class="bi bi-file-earmark-excel me-1"></i>Excel
             </a>
             <a href="{{ route('ventes.create', $vente->sessionCaisse) }}" class="btn btn-primary">
-                <i class="bi bi-cart-plus me-1"></i>Nouvelle vente
+                <i class="bi bi-cart-plus me-1"></i>Nouvelle facture
             </a>
         </div>
     </div>

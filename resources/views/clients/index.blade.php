@@ -18,6 +18,7 @@
                 <thead>
                     <tr>
                         <x-th-tri champ="nom" label="Nom" />
+                        <th>Type</th>
                         <th>Téléphone</th>
                         <th>Solde dû</th>
                         <th>Limite de crédit</th>
@@ -30,6 +31,7 @@
                         @php $solde = (int) ($soldes[$client->id] ?? 0); @endphp
                         <tr>
                             <td><a href="{{ route('clients.show', $client) }}">{{ $client->nom }}</a></td>
+                            <td>{{ $client->typeClient->nom ?? '—' }}</td>
                             <td>{{ $client->telephone ?? '—' }}</td>
                             <td class="{{ $solde > 0 ? 'text-danger fw-medium' : '' }}">{{ number_format($solde, 0, ',', ' ') }} F</td>
                             <td>{{ $client->limite_credit !== null ? number_format($client->limite_credit, 0, ',', ' ').' F' : 'Illimitée' }}</td>
@@ -49,7 +51,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center text-secondary py-4">Aucun client pour l'instant.</td>
+                            <td colspan="7" class="text-center text-secondary py-4">Aucun client pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>

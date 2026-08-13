@@ -52,7 +52,7 @@
                         <th>Date</th>
                         <th>Type</th>
                         <th>Produit</th>
-                        <th>Magasin</th>
+                        <th>Destination</th>
                         <th>Quantité</th>
                         <th>Auteur</th>
                         <th>Motif</th>

@@ -122,6 +122,30 @@ class StockService
             ->value('cout_moyen_pondere') ?? 0;
     }
 
+    /**
+     * Disponibilité d'un produit sur chaque magasin/dépôt actif — utilisé
+     * par le sélecteur "source" à la vente (voir CLAUDE.md, un produit peut
+     * être vendu depuis un lieu différent du magasin de la caisse). Une
+     * requête, tous les magasins actifs même sans ligne `stocks` (0 par
+     * défaut) pour que la liste des lieux proposés reste complète.
+     *
+     * @return \Illuminate\Support\Collection<int, array{id:int, nom:string, type:string, quantite:int}>
+     */
+    public function disponibiliteParMagasin(Produit $produit): \Illuminate\Support\Collection
+    {
+        $quantitesParMagasin = Stock::where('produit_id', $produit->id)->pluck('quantite', 'magasin_id');
+
+        return Magasin::where('actif', true)
+            ->orderBy('nom')
+            ->get(['id', 'nom', 'type'])
+            ->map(fn (Magasin $magasin) => [
+                'id' => $magasin->id,
+                'nom' => $magasin->nom,
+                'type' => $magasin->type,
+                'quantite' => (int) ($quantitesParMagasin[$magasin->id] ?? 0),
+            ]);
+    }
+
     private function notifierStockSousSeuil(Produit $produit, Magasin $magasin, int $quantite): void
     {
         $destinataires = User::gerantsEtSuperadmins($magasin->id);

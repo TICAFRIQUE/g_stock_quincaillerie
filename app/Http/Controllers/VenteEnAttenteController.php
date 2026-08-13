@@ -47,6 +47,7 @@ class VenteEnAttenteController extends Controller
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
+            'lignes.*.magasin_source_id' => ['nullable', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'libelle' => ['nullable', 'string', 'max:255'],
         ]);
@@ -78,6 +79,7 @@ class VenteEnAttenteController extends Controller
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
+            'lignes.*.magasin_source_id' => ['nullable', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'libelle' => ['nullable', 'string', 'max:255'],
         ]);
@@ -111,6 +113,7 @@ class VenteEnAttenteController extends Controller
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
+            'lignes.*.magasin_source_id' => ['nullable', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
@@ -154,6 +157,7 @@ class VenteEnAttenteController extends Controller
     {
         $lignes = collect($request->input('lignes', []))->map(function (array $ligne) {
             $ligne['unite_vente_id'] = ($ligne['unite_vente_id'] ?? null) ?: null;
+            $ligne['magasin_source_id'] = ($ligne['magasin_source_id'] ?? null) ?: null;
             $ligne['remise_type'] = ($ligne['remise_type'] ?? null) ?: null;
             $ligne['remise_valeur'] = ($ligne['remise_valeur'] ?? null) ?: null;
 

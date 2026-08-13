@@ -6,6 +6,17 @@
 </div>
 
 <div class="mb-3">
+    <label for="type_client_id" class="form-label">Type de client</label>
+    <select name="type_client_id" id="type_client_id" class="form-select @error('type_client_id') is-invalid @enderror">
+        <option value="">— Aucun —</option>
+        @foreach ($typesClient as $type)
+            <option value="{{ $type->id }}" @selected(old('type_client_id', $client->type_client_id ?? '') == $type->id)>{{ $type->nom }}</option>
+        @endforeach
+    </select>
+    @error('type_client_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+</div>
+
+<div class="mb-3">
     <label for="telephone" class="form-label">Téléphone</label>
     <input type="text" name="telephone" id="telephone" class="form-control @error('telephone') is-invalid @enderror"
            value="{{ old('telephone', $client->telephone ?? '') }}">

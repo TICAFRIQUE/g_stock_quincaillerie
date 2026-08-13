@@ -10,10 +10,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
-#[Fillable(['nom', 'adresse', 'telephone', 'actif'])]
+#[Fillable(['nom', 'type', 'adresse', 'telephone', 'actif'])]
 class Magasin extends Model
 {
     use HasFactory, SoftDeletes, LogsActivity;
+
+    const TYPE_MAGASIN = 'magasin';
+
+    const TYPE_DEPOT = 'depot';
 
     protected function casts(): array
     {
@@ -25,6 +29,21 @@ class Magasin extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()->logFillable()->logOnlyDirty();
+    }
+
+    public function estDepot(): bool
+    {
+        return $this->type === self::TYPE_DEPOT;
+    }
+
+    public function scopeMagasins($query)
+    {
+        return $query->where('type', self::TYPE_MAGASIN);
+    }
+
+    public function scopeDepots($query)
+    {
+        return $query->where('type', self::TYPE_DEPOT);
     }
 
     public function caisses(): HasMany
@@ -52,9 +71,9 @@ class Magasin extends Model
         return $this->hasMany(Vente::class);
     }
 
-    public function commandeAchats(): HasMany
+    public function lignesCommandeAchat(): HasMany
     {
-        return $this->hasMany(CommandeAchat::class);
+        return $this->hasMany(LigneCommandeAchat::class, 'magasin_destination_id');
     }
 
     public function devis(): HasMany

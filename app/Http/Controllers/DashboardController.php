@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Caisse;
+use App\Models\EcritureCompteFournisseur;
 use App\Models\Magasin;
 use App\Models\Paiement;
 use App\Models\SessionCaisse;
@@ -95,6 +96,10 @@ class DashboardController extends Controller
             'produitsSousSeuil' => $this->produitsSousSeuil($magasinId),
             'produitsSousSeuilCount' => $this->produitsSousSeuilCount($magasinId),
             'valeurStock' => $this->valeurStock($magasinId),
+            // Le fournisseur n'est pas rattaché à un magasin (référentiel
+            // central, comme le catalogue) : la dette totale est la même
+            // pour un gérant que pour le superadmin, jamais filtrée.
+            'detteFournisseurs' => $this->detteFournisseurs(),
             'ecartsCaisse' => $this->ecartsCaisseRecents($magasinId),
             'caissesOuvertes' => $this->caissesOuvertes($magasinId),
             'evolutionVentes' => $this->evolutionVentes($magasinId),
@@ -145,6 +150,15 @@ class DashboardController extends Controller
             ->when($magasinId, fn ($q) => $q->where('magasin_id', $magasinId))
             ->selectRaw('COALESCE(SUM(quantite * cout_moyen_pondere), 0) as valeur')
             ->value('valeur');
+    }
+
+    /**
+     * Somme des écritures de tous les comptes fournisseurs (solde dérivé,
+     * jamais stocké — même principe que le solde d'un compte client).
+     */
+    private function detteFournisseurs(): int
+    {
+        return (int) EcritureCompteFournisseur::sum('montant');
     }
 
     private function ecartsCaisseRecents(?int $magasinId, int $limite = 5)

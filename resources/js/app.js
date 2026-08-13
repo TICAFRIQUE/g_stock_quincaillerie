@@ -68,7 +68,7 @@ window.dataTableFrLang = {
  * côté client pour griser en amont (voir CLAUDE.md), le serveur revalide tout
  * de toute façon dans VenteService avant d'écrire le moindre mouvement.
  */
-window.posApp = function (produits, panierInitial = [], libelleInitial = '', clientIdInitial = '') {
+window.posApp = function (produits, panierInitial = [], libelleInitial = '', clientIdInitial = '', magasinCaisseId = null, magasinCaisseNom = '') {
     return {
         produits,
         panier: panierInitial,
@@ -81,6 +81,75 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
         // Pré-rempli et figé lors de la transformation d'un devis (le client
         // vient toujours du devis, jamais d'un choix libre à cet écran).
         clientId: clientIdInitial,
+
+        // Lieu de prélèvement du stock, par ligne (voir CLAUDE.md — un
+        // produit peut être vendu depuis un magasin ou un dépôt différent du
+        // magasin de la caisse). Par défaut chaque ligne prélève sur le
+        // magasin de la caisse (magasin_source_id null) ; le détail par lieu
+        // n'est chargé qu'à la demande, jamais préchargé pour tous les
+        // produits (voir chargerSources).
+        magasinCaisseId,
+        magasinCaisseNom,
+        sourcesParProduit: {},
+
+        async chargerSources(ligne) {
+            const produitId = ligne.produit_id;
+            if (this.sourcesParProduit[produitId]) return;
+
+            try {
+                const response = await fetch(`/produits/${produitId}/stock-magasins`, {
+                    headers: { Accept: 'application/json' },
+                });
+                if (!response.ok) return;
+                this.sourcesParProduit[produitId] = await response.json();
+            } catch {
+                // Silencieux : le sélecteur retombe sur le magasin de la caisse par défaut.
+            }
+        },
+
+        autresSources(ligne) {
+            return (this.sourcesParProduit[ligne.produit_id] || []).filter((s) => s.id !== this.magasinCaisseId);
+        },
+
+        choisirSource(ligne, valeur) {
+            if (!valeur) {
+                ligne.magasin_source_id = null;
+                ligne.magasinSourceNom = null;
+            } else {
+                const source = (this.sourcesParProduit[ligne.produit_id] || []).find((s) => String(s.id) === String(valeur));
+                ligne.magasin_source_id = Number(valeur);
+                ligne.magasinSourceNom = source ? source.nom : null;
+            }
+
+            // Le stock disponible change avec la source : si la quantité déjà
+            // saisie dépasse ce qui est dispo au nouveau lieu (en tenant compte
+            // des autres lignes qui prélèvent déjà sur ce même lieu), on la
+            // ramène au maximum possible — la ligne est retirée si le nouveau
+            // lieu n'a plus rien de disponible.
+            const facteur = ligne.facteur || 1;
+            const dispo = this.stockDisponible(ligne);
+            const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * facteur;
+            const maxQuantite = Math.floor(Math.max(dispo - autresPieces, 0) / facteur);
+
+            if (ligne.quantite > maxQuantite) {
+                if (maxQuantite < 1) {
+                    this.panier.splice(this.panier.indexOf(ligne), 1);
+                } else {
+                    ligne.quantite = maxQuantite;
+                }
+            }
+        },
+
+        // Stock du lieu effectivement choisi pour cette ligne (magasin de la
+        // caisse par défaut, ou le lieu explicitement sélectionné).
+        stockDisponible(ligne) {
+            if (!ligne.magasin_source_id) {
+                return this.produitDe(ligne)?.stock ?? 0;
+            }
+
+            const source = (this.sourcesParProduit[ligne.produit_id] || []).find((s) => s.id === ligne.magasin_source_id);
+            return source ? source.quantite : 0;
+        },
 
         // La barre du haut ajoute une ligne « vierge » (aucune variante choisie,
         // aucun calcul) — l'utilisateur choisit ensuite pièce/lot directement
@@ -118,6 +187,8 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
                 prixUnitaire: null,
                 remise_type: '',
                 remise_valeur: null,
+                magasin_source_id: null,
+                magasinSourceNom: null,
             });
         },
 
@@ -133,12 +204,17 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
                 prixUnitaire: null,
                 remise_type: '',
                 remise_valeur: null,
+                magasin_source_id: original.magasin_source_id ?? null,
+                magasinSourceNom: original.magasinSourceNom ?? null,
             });
         },
 
-        piecesReservees(produitId) {
+        // magasinSourceId : null = magasin de la caisse (défaut). Deux lignes
+        // du même produit prélevant sur des lieux différents ont des stocks
+        // indépendants, donc jamais cumulées entre elles.
+        piecesReservees(produitId, magasinSourceId = null) {
             return this.panier
-                .filter((l) => l.produit_id === produitId)
+                .filter((l) => l.produit_id === produitId && (l.magasin_source_id || null) === (magasinSourceId || null))
                 .reduce((somme, l) => somme + l.quantite * (l.facteur || 0), 0);
         },
 
@@ -184,8 +260,8 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
             const facteur = unite ? unite.facteur : 1;
             const prixUnitaire = unite ? unite.prix : produit.prix_piece;
 
-            const autresPieces = this.piecesReservees(ligne.produit_id) - ligne.quantite * (ligne.facteur || 0);
-            if (autresPieces + ligne.quantite * facteur > produit.stock) return;
+            const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * (ligne.facteur || 0);
+            if (autresPieces + ligne.quantite * facteur > this.stockDisponible(ligne)) return;
 
             ligne.unite_vente_id = unite ? unite.id : null;
             ligne.uniteLibelle = unite ? unite.libelle : null;
@@ -194,14 +270,13 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
         },
 
         changerQuantite(ligne, delta) {
-            const produit = this.produitDe(ligne);
             const nouvelle = ligne.quantite + delta;
             if (nouvelle < 1) {
                 this.panier.splice(this.panier.indexOf(ligne), 1);
                 return;
             }
-            const autresPieces = this.piecesReservees(ligne.produit_id) - ligne.quantite * (ligne.facteur || 0);
-            if (autresPieces + nouvelle * (ligne.facteur || 0) > produit.stock) return;
+            const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * (ligne.facteur || 0);
+            if (autresPieces + nouvelle * (ligne.facteur || 0) > this.stockDisponible(ligne)) return;
             ligne.quantite = nouvelle;
         },
 
@@ -648,6 +723,7 @@ window.soumettreClientRapide = function () {
     const bouton = document.getElementById('clientRapideBouton');
     const nom = nomInput.value.trim();
     const telephone = document.getElementById('clientRapideTelephone').value.trim();
+    const typeClientId = document.getElementById('clientRapideTypeClient').value;
 
     nomInput.classList.remove('is-invalid');
     erreurEl.textContent = '';
@@ -668,7 +744,7 @@ window.soumettreClientRapide = function () {
             Accept: 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
         },
-        body: JSON.stringify({ nom, telephone: telephone || null }),
+        body: JSON.stringify({ nom, telephone: telephone || null, type_client_id: typeClientId || null }),
     })
         .then(async (response) => {
             const data = await response.json();

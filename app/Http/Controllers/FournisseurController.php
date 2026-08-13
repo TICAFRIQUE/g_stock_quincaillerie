@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\TrieListe;
+use App\Models\EcritureCompteFournisseur;
 use App\Models\Fournisseur;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,37 @@ class FournisseurController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return view('fournisseurs.index', ['fournisseurs' => $fournisseurs]);
+        // Le solde est dérivé (mirroring ClientController::index()) : calculé
+        // en une seule requête groupée plutôt qu'une somme par ligne.
+        $soldes = EcritureCompteFournisseur::whereIn('fournisseur_id', $fournisseurs->pluck('id'))
+            ->selectRaw('fournisseur_id, SUM(montant) as solde')
+            ->groupBy('fournisseur_id')
+            ->pluck('solde', 'fournisseur_id');
+
+        return view('fournisseurs.index', ['fournisseurs' => $fournisseurs, 'soldes' => $soldes]);
+    }
+
+    public function show(Fournisseur $fournisseur): View
+    {
+        $fournisseur->loadCount('commandeAchats');
+
+        $ecritures = $fournisseur->ecritures()
+            ->with('auteur')
+            ->latest('created_at')
+            ->paginate(15, ['*'], 'ecritures_page');
+
+        $commandes = $fournisseur->commandeAchats()
+            ->withTrashed()
+            ->with(['lignes.taxe', 'lignes.magasinDestination'])
+            ->latest('created_at')
+            ->paginate(10, ['*'], 'commandes_page');
+
+        return view('fournisseurs.show', [
+            'fournisseur' => $fournisseur,
+            'solde' => $fournisseur->solde(),
+            'ecritures' => $ecritures,
+            'commandes' => $commandes,
+        ]);
     }
 
     public function create(): View

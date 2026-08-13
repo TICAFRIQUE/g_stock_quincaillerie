@@ -87,7 +87,7 @@
                 <thead>
                     <tr>
                         <x-th-tri champ="nom" label="Produit" />
-                        <th>Magasin</th>
+                        <th>Destination</th>
                         <x-th-tri champ="quantite" label="Quantité" />
                         <th>Seuil d'alerte</th>
                         <th>Coût moyen pondéré</th>

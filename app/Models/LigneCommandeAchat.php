@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * quantite_pieces n'est volontairement pas fillable : c'est un champ dérivé,
  * calculé côté serveur (voir booted()), jamais saisi directement.
  */
-#[Fillable(['commande_achat_id', 'produit_id', 'unite_vente_id', 'quantite', 'prix_achat'])]
+#[Fillable(['commande_achat_id', 'produit_id', 'unite_vente_id', 'taxe_id', 'magasin_destination_id', 'quantite', 'prix_achat'])]
 class LigneCommandeAchat extends Model
 {
     use HasFactory;
@@ -58,6 +58,24 @@ class LigneCommandeAchat extends Model
     }
 
     /**
+     * withTrashed() : ligne historique, doit rester affichable même si la
+     * taxe a été désactivée/supprimée depuis.
+     */
+    public function taxe(): BelongsTo
+    {
+        return $this->belongsTo(Taxe::class)->withTrashed();
+    }
+
+    /**
+     * withTrashed() : ligne historique, doit rester affichable même si le
+     * magasin/dépôt destinataire a été supprimé depuis.
+     */
+    public function magasinDestination(): BelongsTo
+    {
+        return $this->belongsTo(Magasin::class, 'magasin_destination_id')->withTrashed();
+    }
+
+    /**
      * Nombre de pièces contenues dans l'unité d'achat choisie (1 si achetée
      * à la pièce/unité de base, le facteur de l'UniteVente sinon).
      */
@@ -75,5 +93,21 @@ class LigneCommandeAchat extends Model
         $facteur = $this->facteurPieces();
 
         return $facteur > 1 ? Arrondi::entier($this->prix_achat / $facteur) : $this->prix_achat;
+    }
+
+    /**
+     * prix_achat est HT (voir CLAUDE.md) : total HT de la ligne = prix
+     * unitaire de l'unité d'achat choisie × quantité de cette unité.
+     */
+    public function montantHt(): int
+    {
+        return $this->prix_achat * $this->quantite;
+    }
+
+    public function montantTtc(): int
+    {
+        $ht = $this->montantHt();
+
+        return $ht + Arrondi::entier($ht * ($this->taxe?->taux ?? 0) / 100);
     }
 }

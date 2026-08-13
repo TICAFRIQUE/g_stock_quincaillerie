@@ -31,7 +31,7 @@ class CaisseController extends Controller
 
     public function create(): View
     {
-        return view('caisses.create', ['magasins' => Magasin::where('actif', true)->orderBy('nom')->get()]);
+        return view('caisses.create', ['magasins' => Magasin::magasins()->where('actif', true)->orderBy('nom')->get()]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -47,7 +47,7 @@ class CaisseController extends Controller
     {
         return view('caisses.edit', [
             'caisse' => $caisse,
-            'magasins' => Magasin::where('actif', true)->orderBy('nom')->get(),
+            'magasins' => Magasin::magasins()->where('actif', true)->orderBy('nom')->get(),
         ]);
     }
 

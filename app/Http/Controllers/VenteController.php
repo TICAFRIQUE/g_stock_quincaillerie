@@ -18,6 +18,7 @@ use App\Models\Parametre;
 use App\Models\Produit;
 use App\Models\SessionCaisse;
 use App\Models\Stock;
+use App\Models\TypeClient;
 use App\Models\User;
 use App\Models\Vente;
 use App\Models\VenteEnAttente;
@@ -55,7 +56,7 @@ class VenteController extends Controller
     {
         $this->assurerProprietaireOuGerant($venteEnAttente);
 
-        $venteEnAttente->load(['lignes.produit', 'lignes.uniteVente', 'sessionCaisse']);
+        $venteEnAttente->load(['lignes.produit', 'lignes.uniteVente', 'lignes.magasinSource', 'sessionCaisse']);
 
         return $this->formulaire($venteEnAttente->sessionCaisse, $venteEnAttente);
     }
@@ -119,6 +120,11 @@ class VenteController extends Controller
                 'prixUnitaire' => $ligne->uniteVente?->prix ?? $ligne->produit->prix_piece,
                 'remise_type' => '',
                 'remise_valeur' => null,
+                // Lieu de prélèvement choisi avant la mise en attente, s'il
+                // différait du magasin de la caisse (voir CLAUDE.md) ; null =
+                // magasin de la caisse par défaut.
+                'magasin_source_id' => $ligne->magasin_source_id !== $magasinId ? $ligne->magasin_source_id : null,
+                'magasinSourceNom' => $ligne->magasin_source_id !== $magasinId ? $ligne->magasinSource?->nom : null,
             ])->values(),
             default => collect(),
         };
@@ -142,6 +148,7 @@ class VenteController extends Controller
             'clients' => request()->user()->can('vente.credit')
                 ? Client::where('actif', true)->orderBy('nom')->get(['id', 'nom', 'telephone'])
                 : collect(),
+            'typesClient' => TypeClient::where('actif', true)->orderBy('nom')->get(),
         ]);
     }
 
@@ -163,6 +170,7 @@ class VenteController extends Controller
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
+            'lignes.*.magasin_source_id' => ['nullable', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
@@ -215,6 +223,7 @@ class VenteController extends Controller
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
+            'lignes.*.magasin_source_id' => ['nullable', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
@@ -416,13 +425,16 @@ class VenteController extends Controller
             'motif' => ['required', 'string', 'max:500'],
         ]);
 
-        $vente->load('lignes.produit', 'magasin');
+        $vente->load('lignes.produit', 'lignes.magasinSource', 'magasin');
 
         DB::transaction(function () use ($vente, $donnees, $request, $stockService) {
             foreach ($vente->lignes as $ligne) {
+                // Chaque ligne restitue son propre magasin/dépôt source, qui
+                // peut différer du magasin de la vente (voir CLAUDE.md) —
+                // jamais le magasin de la vente pour toutes les lignes.
                 $stockService->enregistrerMouvement(
                     produit: $ligne->produit,
-                    magasin: $vente->magasin,
+                    magasin: $ligne->magasinSource,
                     quantite: $ligne->quantite_pieces,
                     type: MouvementStockType::Annulation,
                     auteur: $request->user(),
@@ -456,6 +468,7 @@ class VenteController extends Controller
     {
         $lignes = collect($request->input('lignes', []))->map(function (array $ligne) {
             $ligne['unite_vente_id'] = $ligne['unite_vente_id'] ?: null;
+            $ligne['magasin_source_id'] = ($ligne['magasin_source_id'] ?? null) ?: null;
             $ligne['remise_type'] = $ligne['remise_type'] ?: null;
             $ligne['remise_valeur'] = $ligne['remise_valeur'] ?: null;
 

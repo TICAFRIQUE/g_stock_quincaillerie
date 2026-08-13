@@ -66,6 +66,7 @@ class MagasinController extends Controller
     {
         return $request->validate([
             'nom' => ['required', 'string', 'max:255', 'unique:magasins,nom,'.($magasin?->id)],
+            'type' => ['required', 'in:magasin,depot'],
             'adresse' => ['nullable', 'string', 'max:255'],
             'telephone' => ['nullable', 'string', 'max:50'],
             'actif' => ['boolean'],

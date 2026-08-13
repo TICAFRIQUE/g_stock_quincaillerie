@@ -69,6 +69,13 @@ client, réglé plus tard.
     vente le fait, dans les mêmes conditions qu'une vente normale (règle 6) — avec les
     prix et remises **courants** du catalogue, jamais les montants indicatifs figés sur
     le devis.
+16. **Le solde d'un compte fournisseur est dérivé, jamais écrasé.** Même principe que le
+    stock (règle 1) et le compte client (règle 12) : solde = somme des écritures
+    (`EcritureCompteFournisseur`). Jamais d'`UPDATE fournisseurs SET solde = X`.
+17. **Un règlement fournisseur est indépendant de la caisse.** Contrairement au règlement
+    client (règle 14), il n'exige aucune session de caisse ouverte et n'entre jamais dans
+    le comptage du tiroir (règle 10 reste limitée aux espèces de vente et de règlement
+    client) — c'est un flux de trésorerie distinct de la caisse magasin.
 
 ---
 
@@ -130,6 +137,44 @@ client, réglé plus tard.
 
 ---
 
+## Achat à crédit et comptes fournisseurs
+
+- **Fournisseur** : fiche référentielle (nom, téléphone, e-mail, adresse, actif),
+  symétrique du `Client` mais sans notion de limite de crédit.
+- **Chaque ligne d'achat précise sa destination** (magasin ou dépôt, voir « Dépôts »
+  ci-dessous) : une même commande d'achat peut livrer plusieurs sites en une fois. Le
+  magasin porté par l'en-tête de la commande reste le magasin gestionnaire (qui passe la
+  commande), pas nécessairement l'unique destinataire du stock.
+- **Taxe par ligne d'achat** : optionnelle, choisie parmi un référentiel `Taxe`
+  préenregistré (nom + taux %). `prix_achat` sur une ligne est **HT** ; le **TTC** est
+  dérivé (jamais stocké), calculé et affiché par ligne et en récapitulatif de commande
+  (total HT, total TTC) — voir règle d'arrondi unique.
+- **Règlement à la validation** : à la validation d'une commande d'achat, un ou plusieurs
+  paiements immédiats (`PaiementAchat`, paiement mixte comme pour une vente) peuvent être
+  saisis ; le reste (total TTC − paiements) devient une dette portée au compte du
+  fournisseur (règle 16). Aucun paiement saisi = dette intégrale.
+- **Solde fournisseur dérivé** (règle 16) : somme des `EcritureCompteFournisseur`
+  (+dette à chaque achat à crédit, −dette à chaque règlement) — même logique que le
+  compte client.
+- **Règlement fournisseur** : encaissement ultérieur d'une dette (partiel ou total, un ou
+  plusieurs moyens de paiement), **indépendant de toute session de caisse** (règle 17,
+  contrairement au règlement client). Immuable, comme un règlement client.
+- Pas de limite de crédit fournisseur ni de blocage associé dans le MVP.
+
+---
+
+## Dépôts
+
+- Un **dépôt** est un lieu de stockage sans vente : même entité `Magasin`, différenciée
+  par un champ `type` (`magasin` | `depot`).
+- Un dépôt ne peut **jamais** avoir de caisse ni de session — la création d'une caisse ne
+  propose que les magasins de type `magasin`.
+- Partout ailleurs (stock, mouvements, transferts, destination de ligne d'achat, devis,
+  inventaire, rapports), un dépôt se comporte comme un magasin normal : il détient du
+  stock et peut être source/destination d'un transfert.
+
+---
+
 ## Remises (vente)
 
 - **Par ligne** : montant OU pourcentage. **Sur le total** : montant OU pourcentage.
@@ -143,9 +188,12 @@ client, réglé plus tard.
 
 - Devise **XOF**, **sans sous-unité** → montants en **entiers (francs)**. Jamais de flottant.
 - Remise en pourcentage → montant arrondi à l'entier ; règle d'arrondi unique, appliquée partout.
-- Pas de taxes dans le MVP (aucun taux, aucune ligne taxe sur le ticket).
+- **Pas de taxes côté vente** dans le MVP (aucun taux, aucune ligne taxe sur le ticket).
+  Les taxes existent **uniquement côté achat** (voir « Achat à crédit et comptes
+  fournisseurs ») : `prix_achat` = HT, TTC dérivé et arrondi avec la même règle unique.
 - Clôture de session = `fond de caisse + total ventes espèces + total règlements clients
-  espèces` (pas de mouvement de caisse hors-vente/hors-règlement au MVP).
+  espèces` (pas de mouvement de caisse hors-vente/hors-règlement au MVP ; un règlement
+  fournisseur n'entre jamais dans ce calcul, voir règle 17).
 
 ---
 
@@ -157,8 +205,9 @@ client, réglé plus tard.
   `devis.creer`, `devis.transformer`, `achat.creer`, `achat.receptionner`, `produit.voir`,
   `produit.modifier`, `stock.ajuster`, `stock.transferer`, `inventaire.realiser`,
   `caisse.ouvrir`, `caisse.cloturer`, `client.gerer`, `client.reglement`,
-  `client.depasser_limite`, `rapport.voir`, `utilisateur.gerer`, `role.gerer`,
-  `parametre.gerer`.
+  `client.depasser_limite`, `fournisseur.voir`, `fournisseur.gerer`,
+  `fournisseur.reglement`, `taxe.gerer`, `typeclient.gerer`, `rapport.voir`,
+  `utilisateur.gerer`, `role.gerer`, `parametre.gerer`.
 - **Superadmin** : bypass total via `Gate::before` (ne reçoit pas de permissions).
 - **Noyau de permissions système protégé** : non attribuable aux rôles créés à la volée.
 - Rôles par défaut seedés : Superadmin, Gérant, Caissier — **modifiables**.
@@ -167,7 +216,8 @@ client, réglé plus tard.
 
 ## Modèle de domaine (entités clés)
 
-- **Magasin** : point de vente.
+- **Magasin** : point de vente ou dépôt de stockage, distingués par un champ `type`
+  (`magasin` | `depot`, voir « Dépôts »). Un dépôt n'a jamais de caisse.
 - **Produit** : SKU (unique), nom, libellé distinctif, catégorie, **prix pièce** (prix de
   vente unitaire de l'unité de base — pas nécessairement une pièce physique : peut être le
   mètre, le kilo, le litre… selon le produit), seuil d'alerte, image (medialibrary).
@@ -183,11 +233,21 @@ client, réglé plus tard.
   quantité en pièces ; magasin ; référence source.
 - **Inventaire** : fiche par magasin (date, statut brouillon/validé).
 - **LigneInventaire** : produit + quantité comptée + écart calculé.
-- **Fournisseur**, **CommandeAchat** : pas d'entité « Réception » séparée — une commande
-  d'achat a un numéro, une date, des lignes (produit + quantité + **prix d'achat**) ; à sa
-  **validation**, le stock est directement impacté (mouvements d'entrée) et le CMP
-  recalculé. Un produit peut être acheté à des prix différents dans le temps : le CMP
-  lisse ça en une seule valeur de référence par (produit × magasin).
+- **Fournisseur** : nom, téléphone, e-mail, adresse, actif. Référentiel central, comme
+  `Client`.
+- **CommandeAchat** : pas d'entité « Réception » séparée — un numéro, un fournisseur, un
+  magasin gestionnaire, une date, des lignes ; à sa **validation**, le stock est
+  directement impacté (mouvements d'entrée, un par ligne vers sa propre destination) et
+  le CMP recalculé. Un produit peut être acheté à des prix différents dans le temps : le
+  CMP lisse ça en une seule valeur de référence par (produit × magasin).
+- **LigneCommandeAchat** : produit + unité d'achat (pièce ou `UniteVente`, même
+  référentiel qu'à la vente) + quantité + **prix d'achat HT** + **taxe** optionnelle
+  (`Taxe`) + **destination** (`Magasin`, magasin ou dépôt) ; TTC dérivé, jamais stocké.
+- **Taxe** : nom + taux (%) + actif. Référentiel préenregistré, utilisé uniquement côté
+  achat (voir « Argent et arrondis »).
+- **PaiementAchat** : rattaché à une commande d'achat ; moyen + montant (paiement mixte
+  possible), saisi à la validation. Le reste (total TTC − paiements) devient une dette
+  fournisseur (voir « Achat à crédit et comptes fournisseurs »).
 - **Caisse** : rattachée à un magasin ; au plus une session ouverte à la fois.
 - **SessionCaisse** : caissier + fond de caisse + ouverture/clôture + écart. Pas de
   mouvement de caisse hors-vente (appoint/prélèvement) au MVP ; clôture = fond de caisse +
@@ -202,13 +262,25 @@ client, réglé plus tard.
 - **MoyenPaiement** : configurable, actif/inactif ; espèces par défaut.
 - **VenteEnAttente** : panier non finalisé + caissier propriétaire ; sans mouvement ni
   paiement ; reprise = continuation du panier au **prix courant** (pas de figeage de prix).
-- **Client** : nom, téléphone, adresse, **limite de crédit** (nullable = illimitée),
-  actif. Référentiel central, comme le catalogue.
+- **Client** : nom, **type de client** (`TypeClient`, optionnel), téléphone, adresse,
+  **limite de crédit** (nullable = illimitée), actif. Référentiel central, comme le
+  catalogue.
+- **TypeClient** : nom + actif. Référentiel libre (ex. particulier, maçon, entrepreneur),
+  associé à un client pour catégorisation/reporting — aucune logique métier attachée dans
+  le MVP.
 - **EcritureCompteClient** : immuable ; type = vente_credit | reglement ; montant signé ;
   client ; référence source (`Vente` ou `ReglementClient`) ; auteur. Le solde du client
   est la somme de ses écritures (règle 12).
 - **ReglementClient** : encaissement d'une dette client ; client + montant + moyen de
   paiement + session de caisse + caissier ; immuable, comme une vente (règle 14).
+- **EcritureCompteFournisseur** : immuable ; type = achat_credit | reglement ; montant
+  signé ; fournisseur ; référence source (`CommandeAchat` ou `ReglementFournisseur`) ;
+  auteur. Le solde du fournisseur est la somme de ses écritures (règle 16).
+- **ReglementFournisseur** : encaissement d'une dette fournisseur ; fournisseur + montant
+  + auteur ; **pas** de session de caisse (règle 17, contrairement à `ReglementClient`).
+  Immuable.
+- **ReglementFournisseurPaiement** : rattaché à un règlement fournisseur ; moyen + montant
+  (paiement mixte possible).
 - **Devis** : client (obligatoire), magasin, auteur, statut (brouillon | refusé |
   transformé | expiré), remise totale, date de validité, référence vers la `Vente` une
   fois transformé. Modifiable tant que non transformé/expiré.
@@ -220,8 +292,10 @@ client, réglé plus tard.
 
 ## Interface (ERP type Odoo)
 
-- **Layout à sidebar** : Tableau de bord, Ventes, Devis, Clients, Caisses, Stock,
-  Inventaire, Achats, Catalogue, Rapports, Administration.
+- **Layout à menu horizontal** (pas de sidebar) : une seule barre en haut de page,
+  repliable en mode burger sur mobile ; sections regroupées en menus déroulants (Ventes,
+  Stock, Catalogue, Rapports, Administration) — mêmes regroupements et permissions
+  qu'auparavant, seule la disposition change.
 - **Dashboard adapté au rôle** : caissier → sa session ; gérant → son magasin (CA, panier
   moyen, top produits, stock sous seuil, écarts de caisse, **total des créances clients**,
   clients en dépassement de limite) ; superadmin → consolidé multi-magasin. Graphiques
@@ -232,7 +306,7 @@ client, réglé plus tard.
   et suivantes) — toujours modifier la palette à cet endroit, jamais de
   couleur codée en dur dans une vue.
 - Listes en **DataTables serveur** (jamais charger toute une table en mémoire).
-- Feedback explicite (toasts), sentence case, responsive (sidebar repliable sur mobile).
+- Feedback explicite (toasts), sentence case, responsive (menu repliable sur mobile).
 - **Rupture de stock** : produit ou unité de vente en stock insuffisant affiché **grisé**
   avec mention « rupture de stock », non sélectionnable au panier (blocage en amont dans
   l'UI, pas d'erreur après coup).
@@ -254,8 +328,8 @@ client, réglé plus tard.
 ## Traçabilité
 
 - **activitylog** sur entités sensibles (produits, prix, mouvements, ventes, sessions,
-  utilisateurs, rôles, **clients, limites de crédit, règlements, devis**) : auteur, date,
-  avant/après.
+  utilisateurs, rôles, **clients, limites de crédit, règlements, devis, fournisseurs,
+  règlements fournisseurs, taxes**) : auteur, date, avant/après.
 - **Historique connexions** : login/logout, date, utilisateur, IP (écouter les événements d'auth).
 
 ---
@@ -264,8 +338,9 @@ client, réglé plus tard.
 
 - Terminologie métier en **français** (magasin, caisse, mouvement, unité de vente,
   client, règlement…).
-- Écritures stock/vente/**compte client** **uniquement via une couche service**
-  encapsulant la transaction ; pas d'écriture directe depuis les contrôleurs.
+- Écritures stock/vente/**compte client**/**compte fournisseur** **uniquement via une
+  couche service** encapsulant la transaction ; pas d'écriture directe depuis les
+  contrôleurs.
 - Rapports = agrégats/vues, sans dupliquer la logique métier.
 
 ---
@@ -275,10 +350,14 @@ client, réglé plus tard.
 - Hors-ligne, base locale, synchronisation.
 - Facture normalisée FNE — mais **structurer la vente** pour la brancher plus tard.
 - Fidélité, promotions avancées, comptabilité, paie.
-- **Taxes** — aucun taux, aucune ligne taxe.
+- **Taxes côté vente** — aucun taux, aucune ligne taxe sur le ticket (les taxes existent
+  côté achat, voir « Achat à crédit et comptes fournisseurs »).
 - **Retours et avoirs clients** — aucun flux de retour (distinct de la vente à crédit :
   un client à crédit doit une somme d'argent, il ne rapporte pas de marchandise).
-- **Mouvements de caisse hors-vente** (appoint, prélèvement).
+- **Mouvements de caisse hors-vente** (appoint, prélèvement) — un règlement fournisseur
+  n'y fait pas exception : il est volontairement tenu hors caisse (règle 17), pas traité
+  comme un mouvement de tiroir.
+- **Limite de crédit fournisseur** — pas de blocage, contrairement au client.
 - Entité « Réception » séparée d'une commande d'achat — la validation d'une commande
   d'achat impacte le stock directement (voir modèle de domaine).
 - **Transformation partielle d'un devis** — un devis se transforme en bloc, pas ligne
@@ -298,5 +377,14 @@ stock directe à la validation (pas de « Réception » séparée), coût suivi 
 crédit** sur compte client, solde dérivé d'écritures immuables, limite de crédit
 optionnelle bloquante, règlement encaissé en session de caisse ; **devis** hors caisse à
 montants indicatifs, transformable en vente (totalité, prix courants) pendant sa durée
-de validité ; taxes, retours et mouvements de caisse hors-vente exclus du MVP (voir
+de validité ; taxes vente, retours et mouvements de caisse hors-vente exclus du MVP (voir
 « Hors périmètre » ci-dessus).
+
+Extension post-MVP (retours utilisateur) : **dépôts** ajoutés au référentiel magasin
+(champ `type`, sans caisse) ; **taxes** introduites côté achat uniquement (prix d'achat
+HT, TTC dérivé par ligne, jamais côté vente) ; **destination par ligne d'achat**
+(magasin ou dépôt, une commande peut livrer plusieurs sites) ; **compte fournisseur**
+symétrique du compte client (solde dérivé, règlement encaissé à la validation de l'achat
+ou ultérieurement) mais **volontairement hors caisse** — aucune session requise, aucun
+impact sur le tiroir ; **types de client** en référentiel libre, sans logique métier
+attachée ; **menu horizontal** en remplacement de la sidebar.

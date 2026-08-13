@@ -28,9 +28,9 @@
             </select>
         </div>
         <div class="col-auto">
-            <label for="magasin_id" class="form-label small mb-1">Magasin</label>
+            <label for="magasin_id" class="form-label small mb-1">Destination</label>
             <select name="magasin_id" id="magasin_id" class="form-select" onchange="this.form.submit()">
-                <option value="">Tous les magasins</option>
+                <option value="">Toutes les destinations</option>
                 @foreach ($magasins as $magasin)
                     <option value="{{ $magasin->id }}" @selected(request('magasin_id') == $magasin->id)>{{ $magasin->nom }}</option>
                 @endforeach
@@ -51,7 +51,7 @@
                 <thead>
                     <tr>
                         <x-th-tri champ="date" label="Date" />
-                        <th>Magasin</th>
+                        <th>Destination</th>
                         <x-th-tri champ="statut" label="Statut" />
                         <th class="text-end">Actions</th>
                     </tr>

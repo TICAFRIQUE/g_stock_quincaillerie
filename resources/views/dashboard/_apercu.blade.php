@@ -59,6 +59,14 @@
             </div>
         </div>
     </div>
+    <div class="col-6 col-md-3">
+        <div class="card h-100 {{ $detteFournisseurs > 0 ? 'border-warning' : '' }}">
+            <div class="card-body">
+                <div class="text-secondary small">Dette fournisseurs</div>
+                <div class="fs-5 fw-medium {{ $detteFournisseurs > 0 ? 'text-warning-emphasis' : '' }}">{{ number_format($detteFournisseurs, 0, ',', ' ') }} F</div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="row g-3 mb-3">
