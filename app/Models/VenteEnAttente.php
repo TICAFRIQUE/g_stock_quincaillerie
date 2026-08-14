@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['magasin_id', 'caisse_id', 'session_caisse_id', 'caissier_id', 'libelle'])]
+#[Fillable(['magasin_id', 'caisse_id', 'session_caisse_id', 'caissier_id', 'client_id', 'libelle'])]
 class VenteEnAttente extends Model
 {
     use HasFactory;
@@ -20,6 +20,11 @@ class VenteEnAttente extends Model
     public function magasin(): BelongsTo
     {
         return $this->belongsTo(Magasin::class)->withTrashed();
+    }
+
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
     }
 
     public function caisse(): BelongsTo

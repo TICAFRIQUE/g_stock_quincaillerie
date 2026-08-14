@@ -1,12 +1,12 @@
 @extends('layouts.app')
 
-@section('title', "Commandes d'achat")
+@section('title', 'Bons de commande')
 
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="h4 mb-0">Commandes d'achat</h2>
+        <h2 class="h4 mb-0">Bons de commande</h2>
         @can('achat.creer')
-            <a href="{{ route('commande-achats.create') }}" class="btn btn-primary">Nouvelle commande</a>
+            <a href="{{ route('commande-achats.create') }}" class="btn btn-primary">Nouveau bon de commande</a>
         @endcan
     </div>
 
@@ -64,7 +64,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="text-center text-secondary py-4">Aucune commande d'achat pour l'instant.</td>
+                            <td colspan="5" class="text-center text-secondary py-4">Aucun bon de commande pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>

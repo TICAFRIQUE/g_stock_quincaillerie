@@ -7,17 +7,23 @@ use App\Models\CommandeAchat;
 use App\Models\Fournisseur;
 use App\Models\Magasin;
 use App\Models\MoyenPaiement;
+use App\Models\Parametre;
 use App\Models\Produit;
 use App\Models\Taxe;
 use App\Models\UniteVente;
 use App\Services\AchatService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use InvalidArgumentException;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CommandeAchatController extends Controller
 {
@@ -90,6 +96,13 @@ class CommandeAchatController extends Controller
             'action' => ['required', 'in:brouillon,valider'],
         ]);
 
+        // Un select laissé sur son option vide envoie "" (chaîne), pas
+        // l'absence du champ : "nullable" ne l'exempte pas de la règle
+        // "exists" (qui ne s'applique qu'à une valeur réellement null), donc
+        // sans cette normalisation AVANT validate(), une unité/taxe non
+        // choisie échouait avec "La valeur sélectionnée ... est invalide."
+        $this->nettoyerLignes($request);
+
         // Pas de contrainte "distinct" sur produit_id seul : deux lignes du
         // même produit avec une unité de vente différente (pièce vs carton)
         // sont légitimes, seul le doublon (produit + unité) est bloqué côté
@@ -104,12 +117,6 @@ class CommandeAchatController extends Controller
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.prix_achat' => ['required', 'integer', 'min:0'],
         ])['lignes'];
-
-        foreach ($lignes as &$ligne) {
-            $ligne['unite_vente_id'] = $ligne['unite_vente_id'] ?: null;
-            $ligne['taxe_id'] = $ligne['taxe_id'] ?: null;
-        }
-        unset($ligne);
 
         $validerImmediatement = $donnees['action'] === 'valider';
         abort_if($validerImmediatement && ! $request->user()->can('achat.valider'), 403);
@@ -147,10 +154,10 @@ class CommandeAchatController extends Controller
             }
 
             return redirect()->route('commande-achats.show', $commande)
-                ->with('succes', 'Commande d\'achat créée et validée : le stock a été mis à jour.');
+                ->with('succes', 'Bon de commande créé et validé : le stock a été mis à jour.');
         }
 
-        $message = 'Commande d\'achat créée.'.($numeroGenere ? " Numéro généré automatiquement : {$commande->numero}." : '');
+        $message = 'Bon de commande créé.'.($numeroGenere ? " Numéro généré automatiquement : {$commande->numero}." : '');
 
         return redirect()->route('commande-achats.show', $commande)->with('succes', $message);
     }
@@ -159,15 +166,122 @@ class CommandeAchatController extends Controller
     {
         $commandeAchat->load([
             'fournisseur', 'lignes.produit', 'lignes.uniteVente.unite', 'lignes.taxe', 'lignes.magasinDestination',
-            'paiements.moyenPaiement', 'auteur', 'validateur', 'annulateur',
+            'paiements.moyenPaiement', 'reglementsFournisseur.paiements.moyenPaiement', 'reglementsFournisseur.auteur',
+            'auteur', 'validateur', 'annulateur',
         ]);
 
         return view('commande-achats.show', [
             'commande' => $commandeAchat,
             'peutValider' => request()->user()->can('achat.valider'),
             'peutAnnuler' => request()->user()->can('achat.annuler'),
+            'peutRegler' => request()->user()->can('fournisseur.reglement'),
             'moyensPaiement' => MoyenPaiement::actifs(),
         ]);
+    }
+
+    public function facture(CommandeAchat $commandeAchat): View
+    {
+        return view('commande-achats.facture', $this->chargerDonneesFacture($commandeAchat));
+    }
+
+    public function pdf(CommandeAchat $commandeAchat): Response
+    {
+        $pdf = Pdf::loadView('commande-achats.facture', $this->chargerDonneesFacture($commandeAchat) + ['pourPdf' => true]);
+
+        return $pdf->download("bon-de-commande-{$commandeAchat->numero}.pdf");
+    }
+
+    public function excel(CommandeAchat $commandeAchat): StreamedResponse
+    {
+        $commandeAchat->load(['fournisseur', 'lignes.produit', 'lignes.uniteVente.unite', 'lignes.taxe', 'lignes.magasinDestination', 'paiements.moyenPaiement', 'reglementsFournisseur']);
+
+        $spreadsheet = new Spreadsheet();
+        $feuille = $spreadsheet->getActiveSheet();
+        $feuille->setTitle('Bon de commande');
+
+        $parametre = Parametre::actuel();
+        $feuille->setCellValue('A1', $parametre->nom);
+        $feuille->setCellValue('A2', $parametre->adresse);
+        $feuille->setCellValue('A3', $parametre->numero ? 'Tél : '.$parametre->numero : '');
+
+        $feuille->setCellValue('D1', 'BON DE COMMANDE');
+        $feuille->setCellValue('D2', 'N° '.$commandeAchat->numero);
+        $feuille->setCellValue('D3', 'Date : '.$commandeAchat->date_commande->format('d/m/Y'));
+
+        $feuille->setCellValue('A6', 'Fournisseur');
+        $feuille->setCellValue('A7', $commandeAchat->fournisseur->nom);
+        $feuille->setCellValue('A8', $commandeAchat->fournisseur->telephone ?? '');
+        $feuille->setCellValue('A9', $commandeAchat->fournisseur->adresse ?? '');
+
+        $ligneEnTete = 11;
+        foreach (['A' => 'Désignation', 'B' => 'Unité', 'C' => 'Destination', 'D' => 'Quantité', 'E' => 'Prix HT', 'F' => 'Taxe', 'G' => 'Total HT', 'H' => 'Total TTC'] as $colonne => $libelle) {
+            $feuille->setCellValue("{$colonne}{$ligneEnTete}", $libelle);
+        }
+
+        $ligne = $ligneEnTete + 1;
+        foreach ($commandeAchat->lignes as $ligneAchat) {
+            $feuille->setCellValue("A{$ligne}", $ligneAchat->produit->libelle_affichage);
+            $feuille->setCellValue("B{$ligne}", $ligneAchat->uniteVente->unite->nom_avec_abbreviation ?? $ligneAchat->produit->unite_base_libelle);
+            $feuille->setCellValue("C{$ligne}", $ligneAchat->magasinDestination->nom);
+            $feuille->setCellValue("D{$ligne}", $ligneAchat->quantite);
+            $feuille->setCellValue("E{$ligne}", $ligneAchat->prix_achat);
+            $feuille->setCellValue("F{$ligne}", $ligneAchat->taxe->nom ?? '—');
+            $feuille->setCellValue("G{$ligne}", $ligneAchat->montantHt());
+            $feuille->setCellValue("H{$ligne}", $ligneAchat->montantTtc());
+            $ligne++;
+        }
+
+        $ligne++;
+        $feuille->setCellValue("F{$ligne}", 'Total HT');
+        $feuille->setCellValue("G{$ligne}", $commandeAchat->totalHt());
+        $ligne++;
+        $feuille->setCellValue("F{$ligne}", 'Total taxes');
+        $feuille->setCellValue("G{$ligne}", $commandeAchat->totalTaxes());
+        $ligne++;
+        $feuille->setCellValue("F{$ligne}", 'Total TTC');
+        $feuille->setCellValue("G{$ligne}", $commandeAchat->totalTtc());
+        $ligne++;
+        foreach ($commandeAchat->paiements as $paiement) {
+            $feuille->setCellValue("F{$ligne}", $paiement->moyenPaiement->nom);
+            $feuille->setCellValue("G{$ligne}", $paiement->montant);
+            $ligne++;
+        }
+        if ($commandeAchat->resteDu() > 0) {
+            $feuille->setCellValue("F{$ligne}", 'Reste dû au fournisseur');
+            $feuille->setCellValue("G{$ligne}", $commandeAchat->resteDu());
+        }
+
+        foreach (['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as $colonne) {
+            $feuille->getColumnDimension($colonne)->setAutoSize(true);
+        }
+
+        $nomFichier = "bon-de-commande-{$commandeAchat->numero}.xlsx";
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $nomFichier, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
+    /**
+     * Logo encodé en data URI (comme pour la vente/le devis) : dompdf ne
+     * charge une image distante que si enable_remote est activé côté serveur.
+     */
+    private function chargerDonneesFacture(CommandeAchat $commandeAchat): array
+    {
+        $commandeAchat->load(['fournisseur', 'lignes.produit', 'lignes.uniteVente.unite', 'lignes.taxe', 'lignes.magasinDestination', 'paiements.moyenPaiement', 'reglementsFournisseur']);
+
+        $parametre = Parametre::actuel();
+        $logo = $parametre->getFirstMedia('logo');
+        $logoDataUri = ($logo && is_file($logo->getPath()))
+            ? 'data:'.$logo->mime_type.';base64,'.base64_encode(file_get_contents($logo->getPath()))
+            : null;
+
+        return [
+            'commande' => $commandeAchat,
+            'parametre' => $parametre,
+            'logoDataUri' => $logoDataUri,
+        ];
     }
 
     public function valider(Request $request, CommandeAchat $commandeAchat, AchatService $achatService): RedirectResponse
@@ -194,7 +308,7 @@ class CommandeAchatController extends Controller
         abort_unless($request->user()->can('achat.annuler'), 403);
 
         if ($commandeAchat->statut !== 'brouillon') {
-            return redirect()->route('commande-achats.index')->with('erreur', 'Seule une commande en brouillon peut être supprimée : une commande validée a déjà mis à jour le stock, utilisez « Annuler l\'achat » à la place.');
+            return redirect()->route('commande-achats.index')->with('erreur', 'Seule une commande en brouillon peut être supprimée : une commande validée a déjà mis à jour le stock, utilisez « Annuler le bon de commande » à la place.');
         }
 
         $commandeAchat->delete();
@@ -232,5 +346,17 @@ class CommandeAchatController extends Controller
         } while (CommandeAchat::where('numero', $numero)->exists());
 
         return $numero;
+    }
+
+    private function nettoyerLignes(Request $request): void
+    {
+        $lignes = collect($request->input('lignes', []))->map(function (array $ligne) {
+            $ligne['unite_vente_id'] = ($ligne['unite_vente_id'] ?? null) ?: null;
+            $ligne['taxe_id'] = ($ligne['taxe_id'] ?? null) ?: null;
+
+            return $ligne;
+        })->all();
+
+        $request->merge(['lignes' => $lignes]);
     }
 }

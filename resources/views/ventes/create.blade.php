@@ -7,7 +7,7 @@
         {{ \Illuminate\Support\Js::from($produits) }},
         {{ \Illuminate\Support\Js::from($panierInitial) }},
         {{ \Illuminate\Support\Js::from($venteEnAttente->libelle ?? '') }},
-        {{ \Illuminate\Support\Js::from($devisTransformation->client_id ?? '') }},
+        {{ \Illuminate\Support\Js::from(old('client_id', $devisTransformation->client_id ?? $venteEnAttente->client_id ?? '')) }},
         {{ \Illuminate\Support\Js::from($session->caisse->magasin_id) }},
         {{ \Illuminate\Support\Js::from($session->caisse->magasin->nom) }}
     )">
@@ -89,22 +89,27 @@
                                     <template x-for="(ligne, index) in panier" :key="index">
                                         <tr>
                                             <td class="small">
-                                                <div x-text="ligne.produitLibelle + ' (Stock : ' + stockDisponible(ligne) + ')'"></div>
-                                                <select class="form-select form-select-sm mt-1 text-secondary" style="min-width: 170px; font-size: .75rem;"
+                                                <div x-text="ligne.produitLibelle + (stockDisponible(ligne) !== null ? ' (Stock : ' + stockDisponible(ligne) + ')' : '')"></div>
+                                                <select class="form-select form-select-sm mt-1"
+                                                        :class="ligne.magasin_source_id === undefined ? 'is-invalid' : 'text-secondary'"
+                                                        style="min-width: 170px; font-size: .75rem;"
                                                         @focus="chargerSources(ligne)"
-                                                        @change="choisirSource(ligne, $event.target.value)">
-                                                    <option value="" :selected="!ligne.magasin_source_id" x-text="'Depuis : ' + magasinCaisseNom + ' (défaut)'"></option>
-                                                    <template x-for="source in autresSources(ligne)" :key="source.id">
+                                                        @change="choisirSource(ligne, $event.target.value)" required>
+                                                    <option value="" :selected="ligne.magasin_source_id === undefined">— Choisir un lieu —</option>
+                                                    <template x-for="source in sourcesDisponibles(ligne)" :key="source.id">
                                                         <option :value="source.id" :selected="source.id === ligne.magasin_source_id"
-                                                                x-text="'Depuis : ' + source.nom + (source.type === 'depot' ? ' (dépôt)' : '') + ' — ' + source.quantite + ' dispo'"></option>
+                                                                x-text="'Depuis : ' + source.nom + (source.id === magasinCaisseId ? ' (votre caisse)' : '') + (source.type === 'depot' ? ' (dépôt)' : '') + ' — ' + source.quantite + ' dispo'"></option>
                                                     </template>
                                                 </select>
+                                                <div class="text-danger small mt-1" x-show="enRupture(ligne)" x-cloak>
+                                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>Stock insuffisant à ce lieu.
+                                                </div>
                                             </td>
                                             <td>
                                                 <div class="d-flex align-items-center gap-1">
                                                     <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" @click="changerQuantite(ligne, -1)">−</button>
                                                     <span x-text="ligne.quantite"></span>
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" @click="changerQuantite(ligne, 1)">+</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" :disabled="atteintMaxStock(ligne)" @click="changerQuantite(ligne, 1)">+</button>
                                                 </div>
                                             </td>
                                             <td>
@@ -291,6 +296,12 @@
                     <div class="text-danger small mb-2" x-show="aUneLigneNonChoisie" x-cloak>
                         <i class="bi bi-exclamation-triangle-fill me-1"></i>Choisissez une unité pour chaque ligne du panier.
                     </div>
+                    <div class="text-danger small mb-2" x-show="aUneSourceNonChoisie" x-cloak>
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>Choisissez le lieu de prélèvement pour chaque ligne du panier.
+                    </div>
+                    <div class="text-danger small mb-2" x-show="aUneLigneEnRupture" x-cloak>
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>Stock insuffisant pour au moins une ligne au lieu choisi : corrigez avant d'enregistrer.
+                    </div>
                     <div class="text-danger small mb-2" x-show="aUnDoublon" x-cloak>
                         <i class="bi bi-exclamation-triangle-fill me-1"></i>Un même produit ne peut pas apparaître deux fois avec la même unité : corrigez avant d'enregistrer.
                     </div>
@@ -330,7 +341,7 @@
                                 $gardeCredit = $devisTransformation ? \Illuminate\Support\Js::from(auth()->user()->can('vente.credit')) : 'clientId';
                             @endphp
                             <button type="button" class="btn btn-primary w-100"
-                                    :disabled="panier.length === 0 || (totalPaiements < totalNet && !({{ $gardeCredit }})) || aUnDoublon || aUneLigneNonChoisie || aUnPaiementSansMoyen"
+                                    :disabled="panier.length === 0 || (totalPaiements < totalNet && !({{ $gardeCredit }})) || aUnDoublon || aUneLigneNonChoisie || aUneSourceNonChoisie || aUneLigneEnRupture || aUnPaiementSansMoyen"
                                     @click="declencherFinalisation($event)"
                                     data-form-id="formVente"
                                     :data-message="clientId && totalPaiements < totalNet
@@ -353,9 +364,11 @@
                                     <span>
                                         <input type="hidden" :name="'lignes['+index+'][produit_id]'" :value="ligne.produit_id">
                                         <input type="hidden" :name="'lignes['+index+'][unite_vente_id]'" :value="ligne.unite_vente_id">
+                                        <input type="hidden" :name="'lignes['+index+'][magasin_source_id]'" :value="ligne.magasin_source_id">
                                         <input type="hidden" :name="'lignes['+index+'][quantite]'" :value="ligne.quantite">
                                     </span>
                                 </template>
+                                <input type="hidden" name="client_id" :value="clientId">
                                 <input type="text" name="libelle" x-model="libelleAttente" class="form-control form-control-sm mb-2" placeholder="Note (optionnel, ex. « Client au téléphone »)">
                                 <button type="button" class="btn btn-outline-secondary w-100"
                                         :disabled="panier.length === 0 || aUnDoublon || aUneLigneNonChoisie"

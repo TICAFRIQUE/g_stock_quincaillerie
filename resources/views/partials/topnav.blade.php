@@ -9,13 +9,13 @@
         <li class="nav-item dropdown">
             <a href="#" class="nav-link dropdown-toggle {{ request()->routeIs('sessions.*', 'ventes.*', 'ventes-en-attente.*', 'reglements.*', 'devis.*', 'clients.*') ? 'active' : '' }}"
                data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-cart3 me-1"></i>Factures
+                <i class="bi bi-cart3 me-1"></i>Vente
             </a>
             <ul class="dropdown-menu">
                 @can('caisse.ouvrir')
                     <li>
                         <a href="{{ route('sessions.index') }}" class="dropdown-item {{ request()->routeIs('sessions.*', 'ventes.*', 'ventes-en-attente.*', 'reglements.*') ? 'active' : '' }}">
-                            <i class="bi bi-cash-stack me-2"></i>Caisses
+                            <i class="bi bi-cash-stack me-2"></i>Facture
                         </a>
                     </li>
                 @endcan
@@ -68,7 +68,7 @@
                 @can('achat.voir')
                     <li>
                         <a href="{{ route('commande-achats.index') }}" class="dropdown-item {{ request()->routeIs('commande-achats.*') ? 'active' : '' }}">
-                            <i class="bi bi-truck me-2"></i>Achats
+                            <i class="bi bi-truck me-2"></i>Bons de commande
                         </a>
                     </li>
                 @endcan

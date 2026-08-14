@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="utf-8">
-    <title>Facture {{ $vente->numero }}</title>
+    <title>Bon de commande {{ $commande->numero }}</title>
     <style>
         /* Feuille de style volontairement autonome (pas de Bootstrap) : ce
            document sert aussi de source au PDF (dompdf), dont le support CSS
@@ -56,19 +56,14 @@
     @unless ($pourPdf ?? false)
         <div class="actions">
             <button type="button" onclick="window.print()">Imprimer</button>
-            <a href="{{ route('ventes.pdf', $vente) }}">Télécharger en PDF</a>
-            <a href="{{ route('ventes.excel', $vente) }}">Télécharger en Excel</a>
-            <a href="{{ route('ventes.ticket', $vente) }}">Voir le ticket de caisse</a>
+            <a href="{{ route('commande-achats.pdf', $commande) }}">Télécharger en PDF</a>
+            <a href="{{ route('commande-achats.excel', $commande) }}">Télécharger en Excel</a>
+            <a href="{{ route('commande-achats.show', $commande) }}">Voir le détail</a>
         </div>
-        <script>
-            // Le bouton "Facture" du détail vente ouvre directement cette page :
-            // déclenche l'impression immédiatement, sans clic supplémentaire.
-            window.addEventListener('load', () => setTimeout(() => window.print(), 200));
-        </script>
     @endunless
 
-    @if ($vente->trashed())
-        <div class="badge-annulee">VENTE ANNULÉE</div>
+    @if ($commande->trashed())
+        <div class="badge-annulee">COMMANDE ANNULÉE</div>
     @endif
 
     <table class="entete">
@@ -83,23 +78,21 @@
                 @if ($parametre->numero) Tél : {{ $parametre->numero }} @endif
             </td>
             <td style="width: 45%;">
-                <div class="facture-titre">FACTURE</div>
+                <div class="facture-titre">BON DE COMMANDE</div>
                 <div class="facture-meta">
-                    N° {{ $vente->numero }}<br>
-                    Date : {{ $vente->created_at->format('d/m/Y à H:i') }}<br>
-                    Magasin : {{ $vente->magasin->nom }}<br>
-                    Caisse : {{ $vente->sessionCaisse->caisse->nom }}<br>
-                    Caissier : {{ $vente->caissier->name }}
+                    N° {{ $commande->numero }}<br>
+                    Date : {{ $commande->date_commande->format('d/m/Y') }}<br>
+                    Statut : {{ $commande->statut === 'validee' ? 'Validée' : 'Brouillon' }}
                 </div>
             </td>
         </tr>
     </table>
 
     <div class="bloc-client">
-        <div class="label">Client</div>
-        <strong>{{ $vente->client->nom ?? 'Client comptant' }}</strong><br>
-        @if ($vente->client?->telephone) Tél : {{ $vente->client->telephone }}<br> @endif
-        @if ($vente->client?->adresse) {{ $vente->client->adresse }} @endif
+        <div class="label">Fournisseur</div>
+        <strong>{{ $commande->fournisseur->nom }}</strong><br>
+        @if ($commande->fournisseur->telephone) Tél : {{ $commande->fournisseur->telephone }}<br> @endif
+        @if ($commande->fournisseur->adresse) {{ $commande->fournisseur->adresse }} @endif
     </div>
 
     <table class="lignes">
@@ -107,21 +100,25 @@
             <tr>
                 <th>Désignation</th>
                 <th>Unité</th>
+                <th>Destination</th>
                 <th class="text-end">Qté</th>
-                <th class="text-end">Prix unitaire</th>
-                <th class="text-end">Remise</th>
-                <th class="text-end">Total</th>
+                <th class="text-end">Prix HT</th>
+                <th>Taxe</th>
+                <th class="text-end">Total HT</th>
+                <th class="text-end">Total TTC</th>
             </tr>
         </thead>
         <tbody>
-            @foreach ($vente->lignes as $ligne)
+            @foreach ($commande->lignes as $ligne)
                 <tr>
                     <td>{{ $ligne->produit->libelle_affichage }}</td>
-                    <td>{{ $ligne->uniteVente->libelle ?? $ligne->produit->unite_base_libelle }}</td>
+                    <td>{{ $ligne->uniteVente->unite->nom_avec_abbreviation ?? $ligne->produit->unite_base_libelle }}</td>
+                    <td>{{ $ligne->magasinDestination->nom }}</td>
                     <td class="text-end">{{ $ligne->quantite }}</td>
-                    <td class="text-end">{{ number_format($ligne->prix_unitaire_applique, 0, ',', ' ') }} F</td>
-                    <td class="text-end">{{ $ligne->remise_ligne_montant > 0 ? '− '.number_format($ligne->remise_ligne_montant, 0, ',', ' ').' F' : '—' }}</td>
-                    <td class="text-end">{{ number_format($ligne->total_ligne, 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ number_format($ligne->prix_achat, 0, ',', ' ') }} F</td>
+                    <td>{{ $ligne->taxe->nom ?? '—' }}</td>
+                    <td class="text-end">{{ number_format($ligne->montantHt(), 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ number_format($ligne->montantTtc(), 0, ',', ' ') }} F</td>
                 </tr>
             @endforeach
         </tbody>
@@ -129,45 +126,32 @@
 
     <table class="totaux">
         <tr>
-            <td>Sous-total</td>
-            <td class="text-end">{{ number_format($vente->sous_total, 0, ',', ' ') }} F</td>
+            <td>Total HT</td>
+            <td class="text-end">{{ number_format($commande->totalHt(), 0, ',', ' ') }} F</td>
         </tr>
-        @if ($vente->remise_totale_montant > 0)
-            <tr>
-                <td>Remise</td>
-                <td class="text-end">− {{ number_format($vente->remise_totale_montant, 0, ',', ' ') }} F</td>
-            </tr>
-        @endif
+        <tr>
+            <td>Total taxes</td>
+            <td class="text-end">{{ number_format($commande->totalTaxes(), 0, ',', ' ') }} F</td>
+        </tr>
         <tr class="net">
-            <td>Net à payer</td>
-            <td class="text-end">{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
+            <td>Total TTC</td>
+            <td class="text-end">{{ number_format($commande->totalTtc(), 0, ',', ' ') }} F</td>
         </tr>
-        @foreach ($vente->paiements as $paiement)
+        @foreach ($commande->paiements as $paiement)
             <tr>
                 <td>{{ $paiement->moyenPaiement->nom }}</td>
                 <td class="text-end">{{ number_format($paiement->montant, 0, ',', ' ') }} F</td>
             </tr>
         @endforeach
-        @if ($vente->monnaie_rendue > 0)
-            <tr>
-                <td>Monnaie rendue</td>
-                <td class="text-end">{{ number_format($vente->monnaie_rendue, 0, ',', ' ') }} F</td>
-            </tr>
-        @endif
-        @if ($vente->soldeDu() > 0)
-            <tr>
-                <td>Montant payé</td>
-                <td class="text-end">{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</td>
-            </tr>
+        @if ($commande->statut === 'validee' && $commande->resteDu() > 0)
             <tr class="credit">
-                <td>Reste à payer</td>
-                <td class="text-end">{{ number_format($vente->soldeDu(), 0, ',', ' ') }} F</td>
+                <td>Reste dû au fournisseur</td>
+                <td class="text-end">{{ number_format($commande->resteDu(), 0, ',', ' ') }} F</td>
             </tr>
         @endif
     </table>
 
     <div class="mention">
-        Merci de votre confiance.
         @if ($parametre->slogan) {{ $parametre->slogan }} @endif
     </div>
 </body>

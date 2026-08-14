@@ -71,7 +71,7 @@
     @if ($lignesEnRupture->isNotEmpty())
         <div class="alert alert-warning d-print-none">
             <i class="bi bi-exclamation-triangle-fill me-1"></i>
-            Stock insuffisant pour {{ $lignesEnRupture->count() > 1 ? 'ces produits' : 'ce produit' }} au magasin {{ $devis->magasin->nom }} —
+            Stock insuffisant pour {{ $lignesEnRupture->count() > 1 ? 'ces produits' : 'ce produit' }} (toutes localisations confondues) —
             le devis ne peut pas être transformé en vente en l'état.
             <ul class="mb-0 mt-1">
                 @foreach ($lignesEnRupture as $etat)
@@ -85,7 +85,7 @@
     @endif
 
     <div class="row g-3 mb-3">
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="card h-100">
                 <div class="card-body">
                     <div class="text-secondary small">Client</div>
@@ -93,15 +93,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body">
-                    <div class="text-secondary small">Magasin</div>
-                    <div class="fw-medium">{{ $devis->magasin->nom }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="card h-100">
                 <div class="card-body">
                     <div class="text-secondary small">Créé le</div>
@@ -109,7 +101,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="card h-100">
                 <div class="card-body">
                     <div class="text-secondary small">Valide jusqu'au</div>
@@ -128,6 +120,7 @@
                 <thead>
                     <tr>
                         <th>Désignation</th>
+                        <th class="d-print-none">Stock</th>
                         <th>Qté</th>
                         <th class="text-end">Prix unitaire</th>
                         <th class="text-end">Remise</th>
@@ -152,6 +145,15 @@
                                     </span>
                                 @endif
                             </td>
+                            <td class="d-print-none">
+                                <div class="d-flex flex-column">
+                                    @foreach ($stocksParProduit[$ligne->produit_id] ?? [] as $source)
+                                        <span class="small">
+                                            <span class="text-secondary">{{ $source['nom'] }}{{ $source['type'] === 'depot' ? ' (dépôt)' : '' }} : </span><span class="{{ $source['quantite'] === 0 ? 'text-danger' : 'text-secondary' }}">{{ $source['quantite'] }}</span>
+                                        </span>
+                                    @endforeach
+                                </div>
+                            </td>
                             <td>{{ $ligne->quantite }}</td>
                             <td class="text-end">{{ number_format($prixUnitaire, 0, ',', ' ') }} F</td>
                             <td class="text-end text-danger">{{ $remiseLigne > 0 ? '− '.number_format($remiseLigne, 0, ',', ' ').' F' : '—' }}</td>
@@ -161,7 +163,7 @@
                 </tbody>
                 <tfoot>
                     <tr class="fw-bold fs-5">
-                        <th colspan="4" class="text-end">Total indicatif</th>
+                        <th colspan="5" class="text-end">Total indicatif</th>
                         <th class="text-end">{{ number_format($montants['total_net'], 0, ',', ' ') }} F</th>
                     </tr>
                 </tfoot>

@@ -76,8 +76,7 @@
                 <div class="devis-meta">
                     N° {{ $devis->numero }}<br>
                     Date : {{ $devis->created_at->format('d/m/Y') }}<br>
-                    Valide jusqu'au : {{ $devis->date_validite->format('d/m/Y') }}<br>
-                    Magasin : {{ $devis->magasin->nom }}
+                    Valide jusqu'au : {{ $devis->date_validite->format('d/m/Y') }}
                 </div>
             </td>
         </tr>

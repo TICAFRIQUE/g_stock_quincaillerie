@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CommandeAchat;
 use App\Models\Fournisseur;
 use App\Models\ReglementFournisseur;
 use App\Models\User;
@@ -21,7 +22,7 @@ class ReglementFournisseurService
     /**
      * @param  array<int, array{moyen_paiement_id:int, montant:int}>  $paiements
      */
-    public function encaisser(Fournisseur $fournisseur, User $auteur, array $paiements): ReglementFournisseur
+    public function encaisser(Fournisseur $fournisseur, User $auteur, array $paiements, ?CommandeAchat $commandeAchat = null): ReglementFournisseur
     {
         if (empty($paiements)) {
             throw new InvalidArgumentException('Un règlement doit comporter au moins un paiement.');
@@ -32,9 +33,10 @@ class ReglementFournisseurService
             throw new InvalidArgumentException('Le montant du règlement doit être positif.');
         }
 
-        return DB::transaction(function () use ($fournisseur, $auteur, $paiements, $montant) {
+        return DB::transaction(function () use ($fournisseur, $auteur, $paiements, $montant, $commandeAchat) {
             $reglement = ReglementFournisseur::create([
                 'fournisseur_id' => $fournisseur->id,
+                'commande_achat_id' => $commandeAchat?->id,
                 'created_by' => $auteur->id,
                 'montant' => $montant,
             ]);

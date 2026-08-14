@@ -87,12 +87,32 @@ class CommandeAchat extends Model
     }
 
     /**
-     * Reste dû au fournisseur : total TTC moins les paiements réellement
-     * versés à la validation (0 pour un achat payé comptant). Suppose
-     * `lignes` et `paiements` chargées.
+     * Règlements ultérieurs explicitement imputés à cette commande (bouton
+     * "Régler" depuis son détail ou depuis une ligne de l'historique du
+     * compte fournisseur) — distinct des `paiements`, versés à la
+     * validation.
+     */
+    public function reglementsFournisseur(): HasMany
+    {
+        return $this->hasMany(ReglementFournisseur::class);
+    }
+
+    /**
+     * Total réglé au fournisseur pour cette commande : paiements versés à la
+     * validation + règlements ultérieurs imputés à cette commande. Suppose
+     * `paiements` et `reglementsFournisseur` chargées.
+     */
+    public function montantRegle(): int
+    {
+        return $this->paiements->sum('montant') + $this->reglementsFournisseur->sum('montant');
+    }
+
+    /**
+     * Reste dû au fournisseur : total TTC moins le montant réglé. Suppose
+     * `lignes`, `paiements` et `reglementsFournisseur` chargées.
      */
     public function resteDu(): int
     {
-        return $this->totalTtc() - $this->paiements->sum('montant');
+        return $this->totalTtc() - $this->montantRegle();
     }
 }

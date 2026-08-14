@@ -25,17 +25,6 @@
                             @csrf
 
                             <div class="mb-3">
-                                <label for="magasin_id" class="form-label">Magasin<span class="required-marker">*</span></label>
-                                <select name="magasin_id" id="magasin_id" class="form-select @error('magasin_id') is-invalid @enderror" required>
-                                    <option value="">— Choisir —</option>
-                                    @foreach ($magasins as $magasin)
-                                        <option value="{{ $magasin->id }}" {{ old('magasin_id', auth()->user()->magasin_id) == $magasin->id ? 'selected' : '' }}>{{ $magasin->nom }}</option>
-                                    @endforeach
-                                </select>
-                                @error('magasin_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                            </div>
-
-                            <div class="mb-3">
                                 <label for="client_id" class="form-label">Client<span class="required-marker">*</span></label>
                                 <div class="d-flex gap-1">
                                     <select name="client_id" id="client_id" class="form-select @error('client_id') is-invalid @enderror" required>

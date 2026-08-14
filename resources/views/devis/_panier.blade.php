@@ -15,11 +15,12 @@
         <p class="text-secondary small">Montants indicatifs, calculés au prix courant du catalogue — jamais figés.</p>
 
         <div class="table-responsive">
-            @php $colonnesPanier = auth()->user()->can('vente.remise') ? 6 : 5; @endphp
+            @php $colonnesPanier = auth()->user()->can('vente.remise') ? 7 : 6; @endphp
             <table class="table table-sm align-middle mb-0">
                 <thead>
                     <tr>
                         <th>Désignation</th>
+                        <th>Stock</th>
                         <th>Qté</th>
                         <th>Unité</th>
                         @can('vente.remise')
@@ -38,6 +39,15 @@
                     <template x-for="(ligne, index) in panier" :key="index">
                         <tr>
                             <td class="small" x-text="ligne.produitLibelle"></td>
+                            <td x-init="chargerSources(ligne)">
+                                <div class="d-flex flex-column">
+                                    <template x-for="source in (sourcesParProduit[ligne.produit_id] || [])" :key="source.id">
+                                        <span class="small">
+                                            <span class="text-secondary" x-text="source.nom + (source.type === 'depot' ? ' (dépôt)' : '') + ' : '"></span><span :class="source.quantite === 0 ? 'text-danger' : 'text-secondary'" x-text="source.quantite"></span>
+                                        </span>
+                                    </template>
+                                </div>
+                            </td>
                             <td>
                                 <div class="d-flex align-items-center gap-1">
                                     <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" @click="changerQuantite(ligne, -1)">−</button>
@@ -73,14 +83,9 @@
                             @endcan
                             <td class="text-end fw-medium" x-text="totalLigne(ligne) + ' F'"></td>
                             <td>
-                                <div class="d-flex gap-1">
-                                    <button type="button" class="btn btn-sm btn-icon btn-outline-secondary" title="Dupliquer (pour ajouter une autre variante de ce produit)" @click="dupliquerLigne(index)">
-                                        <i class="bi bi-copy"></i>
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-icon btn-outline-danger" @click="retirerLigne(index)">
-                                        <i class="bi bi-x-lg"></i>
-                                    </button>
-                                </div>
+                                <button type="button" class="btn btn-sm btn-icon btn-outline-danger" @click="retirerLigne(index)">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
                             </td>
                         </tr>
                     </template>

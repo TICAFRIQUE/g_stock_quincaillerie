@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\Client;
 use App\Models\EcritureCompteClient;
+use App\Models\MoyenPaiement;
+use App\Models\SessionCaisse;
 use App\Models\TypeClient;
+use App\Models\Vente;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -96,8 +99,15 @@ class ClientController extends Controller
     {
         $client->loadCount('ventes');
 
+        // Le "reste dû" par vente (bouton "Régler cette dette") a besoin de
+        // soldeDu() sur la vente référencée : précharger ses
+        // paiements/règlements pour éviter un N+1 (voir Vente::soldeDu()).
         $ecritures = $client->ecritures()
-            ->with('auteur')
+            ->with(['auteur', 'reference' => function ($morphTo) {
+                $morphTo->morphWith([
+                    Vente::class => ['paiements', 'reglementsClient'],
+                ]);
+            }])
             ->latest('created_at')
             ->paginate(15, ['*'], 'ecritures_page');
 
@@ -106,20 +116,30 @@ class ClientController extends Controller
         // logique que le ticket de vente.
         $ventes = $client->ventes()
             ->withTrashed()
-            ->with('magasin')
+            ->with(['magasin', 'paiements', 'reglementsClient'])
             ->latest('created_at')
             ->paginate(10, ['*'], 'ventes_page');
 
         $devis = $client->devis()
-            ->with('magasin')
             ->latest('created_at')
             ->paginate(10, ['*'], 'devis_page');
+
+        // Un règlement client exige une session de caisse ouverte (règle 14)
+        // — celle de l'utilisateur courant.
+        $sessionOuverte = SessionCaisse::where('caissier_id', request()->user()->id)
+            ->whereNull('date_fermeture')
+            ->whereNull('date_cloture')
+            ->with('caisse')
+            ->first();
 
         return view('clients.show', [
             'client' => $client,
             'solde' => $client->solde(),
             'ecritures' => $ecritures,
             'ventes' => $ventes,
+            'sessionOuverte' => $sessionOuverte,
+            'peutRegler' => request()->user()->can('client.reglement'),
+            'moyensPaiement' => MoyenPaiement::actifs(),
             'devis' => $devis,
         ]);
     }
@@ -157,24 +177,23 @@ class ClientController extends Controller
 
     public function exporterDevis(Client $client): StreamedResponse
     {
-        $devis = $client->devis()->with('magasin')->orderBy('created_at')->get();
+        $devis = $client->devis()->orderBy('created_at')->get();
 
         $spreadsheet = new Spreadsheet();
         $feuille = $spreadsheet->getActiveSheet();
         $feuille->setTitle('Devis');
-        $feuille->fromArray(['Numéro', 'Date', 'Magasin', 'Statut', 'Valide jusqu\'au'], null, 'A1');
+        $feuille->fromArray(['Numéro', 'Date', 'Statut', 'Valide jusqu\'au'], null, 'A1');
 
         $ligne = 2;
         foreach ($devis as $unDevis) {
             $feuille->setCellValue("A{$ligne}", $unDevis->numero);
             $feuille->setCellValue("B{$ligne}", $unDevis->created_at->format('d/m/Y H:i'));
-            $feuille->setCellValue("C{$ligne}", $unDevis->magasin->nom);
-            $feuille->setCellValue("D{$ligne}", $unDevis->statutEffectif()->libelle());
-            $feuille->setCellValue("E{$ligne}", $unDevis->date_validite->format('d/m/Y'));
+            $feuille->setCellValue("C{$ligne}", $unDevis->statutEffectif()->libelle());
+            $feuille->setCellValue("D{$ligne}", $unDevis->date_validite->format('d/m/Y'));
             $ligne++;
         }
 
-        foreach (['A', 'B', 'C', 'D', 'E'] as $colonne) {
+        foreach (['A', 'B', 'C', 'D'] as $colonne) {
             $feuille->getColumnDimension($colonne)->setAutoSize(true);
         }
 

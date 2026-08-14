@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\LimiteCreditDepasseeException;
 use App\Exceptions\SessionNonOuverteException;
 use App\Exceptions\StockInsuffisantException;
 use App\Http\Controllers\Concerns\AutoriseMagasin;
 use App\Http\Controllers\Concerns\AutoriseVenteEnAttente;
 use App\Http\Controllers\Concerns\ValideRemises;
+use App\Models\Client;
 use App\Models\SessionCaisse;
 use App\Models\VenteEnAttente;
 use App\Services\VenteEnAttenteService;
@@ -28,7 +30,7 @@ class VenteEnAttenteController extends Controller
         // (caisse.gerer) voit ceux de toute la caisse (voir CLAUDE.md).
         $ventesEnAttente = $session->venteEnAttentes()
             ->when(! $request->user()->can('caisse.gerer'), fn ($q) => $q->where('caissier_id', $request->user()->id))
-            ->with(['lignes.produit', 'lignes.uniteVente'])
+            ->with(['lignes.produit', 'lignes.uniteVente', 'client'])
             ->latest()
             ->get();
 
@@ -42,6 +44,7 @@ class VenteEnAttenteController extends Controller
     {
         $this->assurerMagasin($session->caisse->magasin_id);
         $this->nettoyerLignes($request);
+        $this->bloquerCreditSansPermission($request);
 
         $donnees = $request->validate([
             'lignes' => ['required', 'array', 'min:1'],
@@ -50,7 +53,10 @@ class VenteEnAttenteController extends Controller
             'lignes.*.magasin_source_id' => ['nullable', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'libelle' => ['nullable', 'string', 'max:255'],
+            'client_id' => ['nullable', 'exists:clients,id'],
         ]);
+
+        $client = ! empty($donnees['client_id']) ? Client::findOrFail($donnees['client_id']) : null;
 
         try {
             $venteEnAttenteService->mettreEnAttente(
@@ -58,6 +64,7 @@ class VenteEnAttenteController extends Controller
                 $request->user(),
                 $donnees['lignes'],
                 $donnees['libelle'] ?? null,
+                client: $client,
             );
         } catch (SessionNonOuverteException|InvalidArgumentException $e) {
             return back()->with('erreur', $e->getMessage());
@@ -74,6 +81,7 @@ class VenteEnAttenteController extends Controller
     {
         $this->assurerProprietaireOuGerant($venteEnAttente);
         $this->nettoyerLignes($request);
+        $this->bloquerCreditSansPermission($request);
 
         $donnees = $request->validate([
             'lignes' => ['required', 'array', 'min:1'],
@@ -82,7 +90,10 @@ class VenteEnAttenteController extends Controller
             'lignes.*.magasin_source_id' => ['nullable', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'libelle' => ['nullable', 'string', 'max:255'],
+            'client_id' => ['nullable', 'exists:clients,id'],
         ]);
+
+        $client = ! empty($donnees['client_id']) ? Client::findOrFail($donnees['client_id']) : null;
 
         try {
             $venteEnAttenteService->mettreEnAttente(
@@ -91,6 +102,7 @@ class VenteEnAttenteController extends Controller
                 $donnees['lignes'],
                 $donnees['libelle'] ?? null,
                 existant: $venteEnAttente,
+                client: $client,
             );
         } catch (SessionNonOuverteException|InvalidArgumentException $e) {
             return back()->withInput()->with('erreur', $e->getMessage());
@@ -108,22 +120,26 @@ class VenteEnAttenteController extends Controller
             'remise_totale_valeur' => $request->input('remise_totale_valeur') ?: null,
         ]);
         $this->bloquerRemiseSansPermission($request);
+        $this->bloquerCreditSansPermission($request);
 
         $donnees = $request->validate([
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
-            'lignes.*.magasin_source_id' => ['nullable', 'exists:magasins,id'],
+            'lignes.*.magasin_source_id' => ['required', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
             'remise_totale_type' => ['nullable', 'in:montant,pourcentage'],
             'remise_totale_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
-            'paiements' => ['required', 'array', 'min:1'],
+            'paiements' => ['present', 'array'],
             'paiements.*.moyen_paiement_id' => ['required', 'exists:moyen_paiements,id'],
             'paiements.*.montant' => ['required', 'integer', 'min:1'],
             'montant_recu' => ['nullable', 'integer', 'min:0'],
+            'client_id' => ['nullable', 'exists:clients,id'],
         ]);
+
+        $client = ! empty($donnees['client_id']) ? Client::findOrFail($donnees['client_id']) : null;
 
         try {
             $vente = $venteEnAttenteService->reprendre(
@@ -133,8 +149,10 @@ class VenteEnAttenteController extends Controller
                 $donnees['remise_totale_type'] ?? null,
                 $donnees['remise_totale_valeur'] ?? null,
                 $donnees['montant_recu'] ?? null,
+                client: $client,
+                autoriserDepassementLimite: $request->user()->can('client.depasser_limite'),
             );
-        } catch (StockInsuffisantException|SessionNonOuverteException|RuntimeException|InvalidArgumentException $e) {
+        } catch (StockInsuffisantException|SessionNonOuverteException|RuntimeException|InvalidArgumentException|LimiteCreditDepasseeException $e) {
             return back()->withInput()->with('erreur', $e->getMessage());
         }
 
@@ -164,6 +182,11 @@ class VenteEnAttenteController extends Controller
             return $ligne;
         })->all();
 
-        $request->merge(['lignes' => $lignes]);
+        // Une vente entièrement à crédit (aucun paiement saisi) ne génère
+        // aucun champ paiements[...] côté JS (boucle vide) : la clé n'existe
+        // alors pas du tout dans la requête — normalisée en tableau vide,
+        // autorisé (règle 13 : paiement partiel ou nul si un client est
+        // identifié — voir aussi VenteController::nettoyerChampsOptionnels()).
+        $request->merge(['lignes' => $lignes, 'paiements' => $request->input('paiements', [])]);
     }
 }

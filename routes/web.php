@@ -106,7 +106,6 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('can:fournisseur.reglement')->group(function () {
-        Route::get('fournisseurs/{fournisseur}/reglements/creer', [ReglementFournisseurController::class, 'create'])->name('reglements-fournisseur.create');
         Route::post('fournisseurs/{fournisseur}/reglements', [ReglementFournisseurController::class, 'store'])->name('reglements-fournisseur.store');
     });
 
@@ -144,6 +143,9 @@ Route::middleware('auth')->group(function () {
         // withTrashed() : une commande annulée reste consultable (détail avec
         // bandeau d'annulation), voir CommandeAchatController::show().
         Route::get('commande-achats/{commandeAchat}', [CommandeAchatController::class, 'show'])->name('commande-achats.show')->withTrashed();
+        Route::get('commande-achats/{commandeAchat}/facture', [CommandeAchatController::class, 'facture'])->name('commande-achats.facture')->withTrashed();
+        Route::get('commande-achats/{commandeAchat}/pdf', [CommandeAchatController::class, 'pdf'])->name('commande-achats.pdf')->withTrashed();
+        Route::get('commande-achats/{commandeAchat}/excel', [CommandeAchatController::class, 'excel'])->name('commande-achats.excel')->withTrashed();
         Route::post('commande-achats/{commandeAchat}/valider', [CommandeAchatController::class, 'valider'])->name('commande-achats.valider');
         // Pas de withTrashed() ici : tenter d'annuler une commande déjà
         // annulée doit échouer (404 sur la liaison de route), pas la re-traiter.
@@ -236,6 +238,10 @@ Route::middleware('auth')->group(function () {
         Route::get('devis/{devis}/modifier', [DevisController::class, 'edit'])->name('devis.edit');
         Route::put('devis/{devis}', [DevisController::class, 'update'])->name('devis.update');
         Route::post('devis/{devis}/annuler', [DevisController::class, 'annuler'])->name('devis.annuler');
+        // Même donnée que produits.stock-magasins (voir ProduitController),
+        // route dupliquée pour rester accessible à devis.gerer sans exiger
+        // vente.creer.
+        Route::get('devis/produits/{produit}/stock-magasins', [ProduitController::class, 'stockParMagasin'])->name('devis.produits.stock-magasins');
     });
 
     Route::middleware('can:devis.voir')->group(function () {

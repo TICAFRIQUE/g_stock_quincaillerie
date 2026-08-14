@@ -7,7 +7,6 @@ use App\Exceptions\DevisNonModifiableException;
 use App\Exceptions\DevisNonTransformableException;
 use App\Models\Client;
 use App\Models\Devis;
-use App\Models\Magasin;
 use App\Models\Parametre;
 use App\Models\SessionCaisse;
 use App\Models\User;
@@ -29,22 +28,17 @@ class DevisService
     /**
      * @param  array<int, array{produit_id:int, unite_vente_id?:?int, quantite:int, remise_type?:?string, remise_valeur?:?int}>  $lignes
      */
-    public function creer(Magasin $magasin, Client $client, User $auteur, array $lignes, ?int $dureeJours = null): Devis
+    public function creer(Client $client, User $auteur, array $lignes, ?int $dureeJours = null): Devis
     {
         if (empty($lignes)) {
             throw new InvalidArgumentException('Un devis doit comporter au moins une ligne.');
         }
 
-        return DB::transaction(function () use ($magasin, $client, $auteur, $lignes, $dureeJours) {
-            $magasin = Magasin::whereKey($magasin->id)->lockForUpdate()->firstOrFail();
-            $magasin->increment('sequence_devis');
-            $numero = sprintf('M%d-D-%06d', $magasin->id, $magasin->sequence_devis);
-
+        return DB::transaction(function () use ($client, $auteur, $lignes, $dureeJours) {
             $duree = $dureeJours ?? Parametre::actuel()->duree_validite_devis_jours;
 
             $devis = Devis::create([
-                'numero' => $numero,
-                'magasin_id' => $magasin->id,
+                'numero' => $this->genererNumero(),
                 'client_id' => $client->id,
                 'created_by' => $auteur->id,
                 'statut' => DevisStatut::Brouillon,
@@ -55,6 +49,21 @@ class DevisService
 
             return $devis->refresh();
         });
+    }
+
+    /**
+     * Numéro indépendant du magasin (comme CommandeAchat::genererNumero()) :
+     * un numéro lié au magasin choisi dans le formulaire créait une
+     * confusion pour l'utilisateur, qui n'a aucune raison d'associer ce
+     * champ à la numérotation du document.
+     */
+    private function genererNumero(): string
+    {
+        do {
+            $numero = 'DEV-'.str_pad((string) random_int(1, 999999), 6, '0', STR_PAD_LEFT);
+        } while (Devis::where('numero', $numero)->exists());
+
+        return $numero;
     }
 
     /**
@@ -100,7 +109,7 @@ class DevisService
      * ouverte, stock, crédit). Le client du devis est toujours celui de la
      * vente résultante.
      *
-     * @param  array<int, array{produit_id:int, unite_vente_id?:?int, quantite:int, remise_type?:?string, remise_valeur?:?int}>  $lignes
+     * @param  array<int, array{produit_id:int, unite_vente_id?:?int, magasin_source_id?:?int, quantite:int, remise_type?:?string, remise_valeur?:?int}>  $lignes
      * @param  array<int, array{moyen_paiement_id:int, montant:int}>  $paiements
      */
     public function transformer(

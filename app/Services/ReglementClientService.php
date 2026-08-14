@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ReglementClient;
 use App\Models\SessionCaisse;
 use App\Models\User;
+use App\Models\Vente;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -27,6 +28,7 @@ class ReglementClientService
         User $caissier,
         Client $client,
         array $paiements,
+        ?Vente $vente = null,
     ): ReglementClient {
         if (empty($paiements)) {
             throw new InvalidArgumentException('Un règlement doit comporter au moins un paiement.');
@@ -42,9 +44,10 @@ class ReglementClientService
             throw new InvalidArgumentException('Le montant du règlement doit être positif.');
         }
 
-        return DB::transaction(function () use ($session, $caissier, $client, $paiements, $montant) {
+        return DB::transaction(function () use ($session, $caissier, $client, $paiements, $montant, $vente) {
             $reglement = ReglementClient::create([
                 'client_id' => $client->id,
+                'vente_id' => $vente?->id,
                 'session_caisse_id' => $session->id,
                 'caissier_id' => $caissier->id,
                 'montant' => $montant,

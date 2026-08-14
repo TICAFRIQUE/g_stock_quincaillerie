@@ -10,11 +10,11 @@
                 <i class="bi bi-arrow-left me-1"></i>Retour à la session
             </a>
             <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
-                <i class="bi bi-printer me-1"></i>Imprimer le ticket
+                <i class="bi bi-printer me-1"></i>Ticket caisse
             </button>
-            <a href="{{ route('ventes.facture', $vente) }}" class="btn btn-outline-secondary" target="_blank" rel="noopener">
+            <button type="button" class="btn btn-outline-secondary" onclick="imprimerFacture()">
                 <i class="bi bi-receipt me-1"></i>Facture
-            </a>
+            </button>
             <a href="{{ route('ventes.pdf', $vente) }}" class="btn btn-outline-secondary">
                 <i class="bi bi-file-earmark-pdf me-1"></i>PDF
             </a>
@@ -36,69 +36,288 @@
         </div>
     @endif
 
-    @if (! $vente->trashed())
-        @can('vente.signaler')
-            <div class="card mx-auto mb-3 d-print-none" style="max-width: 420px;" x-data="{ ouvert: false }">
+    @php
+        $afficheReglerClient = ! $vente->trashed() && $peutRegler && $vente->soldeDu() > 0;
+        $afficheSignaler = ! $vente->trashed() && auth()->user()->can('vente.signaler');
+        $afficheAnnulerVente = ! $vente->trashed() && auth()->user()->can('vente.annuler');
+        $nombreActionsVente = collect([$afficheReglerClient, $afficheSignaler, $afficheAnnulerVente])->filter()->count();
+        $colActionVente = match ($nombreActionsVente) {
+            1 => 'col-md-6 col-lg-4',
+            2 => 'col-md-6',
+            default => 'col-md-4',
+        };
+    @endphp
+
+    <div class="row g-3 mb-3 d-print-none">
+        <div class="col-md-4">
+            <div class="card h-100 bg-primary-subtle border-0">
                 <div class="card-body">
-                    @forelse ($signalements as $signalement)
-                        <div class="alert alert-warning small mb-2">
-                            <i class="bi bi-flag-fill me-1"></i>
-                            Signalée par {{ $signalement->causer?->name ?? 'un utilisateur supprimé' }}
-                            le {{ $signalement->created_at->format('d/m/Y H:i') }} :
-                            {{ $signalement->properties['motif'] ?? '' }}
-                        </div>
-                    @empty
-                    @endforelse
-
-                    <button type="button" class="btn btn-outline-warning btn-sm w-100" @click="ouvert = !ouvert" x-show="!ouvert">
-                        <i class="bi bi-flag me-1"></i>Signaler un problème sur cette vente
-                    </button>
-
-                    <form method="POST" action="{{ route('ventes.signaler', $vente) }}" x-show="ouvert" x-cloak>
-                        @csrf
-                        <label for="motif" class="form-label small mt-2">
-                            Motif (ex. « vente enregistrée deux fois par erreur »)
-                        </label>
-                        <textarea name="motif" id="motif" class="form-control form-control-sm mb-2" rows="2" required></textarea>
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-warning btn-sm flex-fill">Envoyer le signalement</button>
-                            <button type="button" class="btn btn-link btn-sm" @click="ouvert = false">Annuler</button>
-                        </div>
-                    </form>
+                    <div class="text-secondary small">Client</div>
+                    <div class="fw-medium">
+                        @if ($vente->client)
+                            <a href="{{ route('clients.show', $vente->client) }}">{{ $vente->client->nom }}</a>
+                        @else
+                            Vente comptant
+                        @endif
+                    </div>
                 </div>
             </div>
-        @endcan
-
-        @can('vente.annuler')
-            <div class="card mx-auto mb-3 d-print-none border-danger" style="max-width: 420px;" x-data="{ ouvert: false }">
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 bg-info-subtle border-0">
                 <div class="card-body">
-                    <button type="button" class="btn btn-outline-danger btn-sm w-100" @click="ouvert = !ouvert" x-show="!ouvert">
-                        <i class="bi bi-x-circle me-1"></i>Annuler cette vente
-                    </button>
-
-                    <form id="formAnnulerVente" method="POST" action="{{ route('ventes.annuler', $vente) }}" x-show="ouvert" x-cloak>
-                        @csrf
-                        <label for="motif-annulation" class="form-label small mt-2">
-                            Motif de l'annulation (obligatoire) — le stock sera remis à jour automatiquement
-                        </label>
-                        <textarea name="motif" id="motif-annulation" class="form-control form-control-sm mb-2" rows="2" required></textarea>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-danger btn-sm flex-fill"
-                                    data-bs-toggle="modal" data-bs-target="#confirmActionModal"
-                                    data-form-id="formAnnulerVente"
-                                    data-message="Annuler cette vente ? Le stock sera remis à jour. Cette action est irréversible."
-                                    data-button-label="Annuler la vente" data-button-class="btn-danger">
-                                Annuler la vente
-                            </button>
-                            <button type="button" class="btn btn-link btn-sm" @click="ouvert = false">Fermer</button>
-                        </div>
-                    </form>
+                    <div class="text-secondary small">Magasin / Caisse</div>
+                    <div class="fw-medium">{{ $vente->magasin->nom }} — {{ $vente->sessionCaisse->caisse->nom }}</div>
                 </div>
             </div>
-        @endcan
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 bg-warning-subtle border-0">
+                <div class="card-body">
+                    <div class="text-secondary small">Créé le</div>
+                    <div class="fw-medium">{{ $vente->created_at->format('d/m/Y à H:i') }} par {{ $vente->caissier->name }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if ($afficheReglerClient || $afficheSignaler || $afficheAnnulerVente)
+        <div class="row g-3 mb-3 d-print-none">
+            @if ($afficheReglerClient)
+                <div class="{{ $colActionVente }}">
+                    <div class="card h-100 shadow-sm bg-reglement-subtle border-0" x-data="{ ouvert: false, paiements: [{ moyen_paiement_id: '', montant: {{ $vente->soldeDu() }} }],
+                            get totalPaiements() { return this.paiements.reduce((total, p) => total + (Number(p.montant) || 0), 0); },
+                            ajouterPaiement() { this.paiements.push({ moyen_paiement_id: '', montant: '' }); },
+                            retirerPaiement(index) { this.paiements.splice(index, 1); } }">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 text-reglement fw-semibold">
+                                        <i class="bi bi-cash-coin fs-5"></i>Règlement client
+                                    </div>
+                                    <div class="small text-secondary mt-1">
+                                        Reste dû sur cette facture : <strong>{{ number_format($vente->soldeDu(), 0, ',', ' ') }} F</strong>
+                                    </div>
+                                </div>
+                                @if ($sessionOuverte)
+                                    <button type="button" class="btn btn-reglement btn-sm flex-shrink-0" @click="ouvert = !ouvert" x-show="!ouvert">
+                                        <i class="bi bi-plus-lg me-1"></i>Régler
+                                    </button>
+                                @endif
+                            </div>
+
+                            @if ($sessionOuverte)
+                                <form id="formReglerClient" method="POST" action="{{ route('reglements.store', $sessionOuverte) }}" x-show="ouvert" x-cloak class="mt-2">
+                                    @csrf
+                                    <input type="hidden" name="client_id" value="{{ $vente->client_id }}">
+                                    <input type="hidden" name="vente_id" value="{{ $vente->id }}">
+                                    <p class="small text-secondary mb-2">
+                                        Solde total du client (toutes factures confondues) : {{ number_format($vente->client->solde(), 0, ',', ' ') }} F
+                                    </p>
+                                    <template x-for="(paiement, index) in paiements" :key="index">
+                                        <div class="row g-1 align-items-center mb-2">
+                                            <div class="col-6 col-md-5">
+                                                <select :name="'paiements['+index+'][moyen_paiement_id]'" x-model="paiement.moyen_paiement_id" class="form-select form-select-sm" required>
+                                                    <option value="">Moyen…</option>
+                                                    @foreach ($moyensPaiement as $moyen)
+                                                        <option value="{{ $moyen->id }}">{{ $moyen->nom }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div class="col-4">
+                                                <input type="number" :name="'paiements['+index+'][montant]'" x-model.number="paiement.montant" min="1" class="form-control form-control-sm" placeholder="Montant" required>
+                                            </div>
+                                            <div class="col-2">
+                                                <button type="button" class="btn btn-sm btn-icon btn-outline-danger" @click="retirerPaiement(index)" x-show="paiements.length > 1">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <button type="button" class="btn btn-sm btn-outline-reglement mb-2" @click="ajouterPaiement()">
+                                        <i class="bi bi-plus-lg"></i> Ajouter un paiement
+                                    </button>
+                                    <div class="d-flex gap-2">
+                                        <button type="submit" class="btn btn-reglement btn-sm flex-fill" :disabled="totalPaiements <= 0">
+                                            Enregistrer le règlement
+                                        </button>
+                                        <button type="button" class="btn btn-link btn-sm" @click="ouvert = false">Fermer</button>
+                                    </div>
+                                </form>
+                            @else
+                                <a href="{{ route('sessions.index') }}" class="btn btn-outline-secondary btn-sm">Ouvrir une caisse pour régler</a>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if ($afficheSignaler)
+                <div class="{{ $colActionVente }}">
+                    <div class="card h-100 shadow-sm bg-warning-subtle border-0" x-data="{ ouvert: false }">
+                        <div class="card-body">
+                            @forelse ($signalements as $signalement)
+                                <div class="alert alert-warning small mb-2">
+                                    <i class="bi bi-flag-fill me-1"></i>
+                                    Signalée par {{ $signalement->causer?->name ?? 'un utilisateur supprimé' }}
+                                    le {{ $signalement->created_at->format('d/m/Y H:i') }} :
+                                    {{ $signalement->properties['motif'] ?? '' }}
+                                </div>
+                            @empty
+                            @endforelse
+
+                            <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 text-warning-emphasis fw-semibold">
+                                        <i class="bi bi-flag fs-5"></i>Signaler un problème
+                                    </div>
+                                    <div class="small text-secondary mt-1">Ex. vente enregistrée deux fois par erreur.</div>
+                                </div>
+                                <button type="button" class="btn btn-warning btn-sm flex-shrink-0" @click="ouvert = !ouvert" x-show="!ouvert">
+                                    <i class="bi bi-flag me-1"></i>Signaler
+                                </button>
+                            </div>
+
+                            <form method="POST" action="{{ route('ventes.signaler', $vente) }}" x-show="ouvert" x-cloak class="mt-2">
+                                @csrf
+                                <label for="motif" class="form-label small">Motif</label>
+                                <textarea name="motif" id="motif" class="form-control form-control-sm mb-2" rows="2" required></textarea>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-warning btn-sm flex-fill">Envoyer le signalement</button>
+                                    <button type="button" class="btn btn-link btn-sm" @click="ouvert = false">Fermer</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if ($afficheAnnulerVente)
+                <div class="{{ $colActionVente }}">
+                    <div class="card h-100 shadow-sm bg-danger-subtle border-0" x-data="{ ouvert: false }">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 text-danger fw-semibold">
+                                        <i class="bi bi-x-circle fs-5"></i>Annuler la vente
+                                    </div>
+                                    <div class="small text-secondary mt-1">Le stock sera remis à jour automatiquement.</div>
+                                </div>
+                                <button type="button" class="btn btn-danger btn-sm flex-shrink-0" @click="ouvert = !ouvert" x-show="!ouvert">
+                                    <i class="bi bi-x-circle me-1"></i>Annuler
+                                </button>
+                            </div>
+
+                            <form id="formAnnulerVente" method="POST" action="{{ route('ventes.annuler', $vente) }}" x-show="ouvert" x-cloak class="mt-2">
+                                @csrf
+                                <label for="motif-annulation" class="form-label small">
+                                    Motif de l'annulation (obligatoire)
+                                </label>
+                                <textarea name="motif" id="motif-annulation" class="form-control form-control-sm mb-2" rows="2" required></textarea>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-danger btn-sm flex-fill"
+                                            data-bs-toggle="modal" data-bs-target="#confirmActionModal"
+                                            data-form-id="formAnnulerVente"
+                                            data-message="Annuler cette vente ? Le stock sera remis à jour. Cette action est irréversible."
+                                            data-button-label="Annuler la vente" data-button-class="btn-danger">
+                                        Confirmer l'annulation
+                                    </button>
+                                    <button type="button" class="btn btn-link btn-sm" @click="ouvert = false">Fermer</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </div>
     @endif
 
-    <div class="card recu-pos mx-auto" style="max-width: 420px;">
+    <div class="card mb-3 d-print-none bg-white">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Désignation</th>
+                        <th>Qté</th>
+                        <th class="text-end">Prix unitaire</th>
+                        <th class="text-end">Remise</th>
+                        <th class="text-end">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($vente->lignes as $ligne)
+                        <tr>
+                            <td>
+                                {{ $ligne->produit->libelle_affichage }}
+                                <span class="text-secondary small">({{ $ligne->uniteVente?->libelle ?? $ligne->produit->unite_base_libelle }})</span>
+                            </td>
+                            <td>{{ $ligne->quantite }}</td>
+                            <td class="text-end">{{ number_format($ligne->prix_unitaire_applique, 0, ',', ' ') }} F</td>
+                            <td class="text-end text-danger">{{ $ligne->remise_ligne_montant > 0 ? '− '.number_format($ligne->remise_ligne_montant, 0, ',', ' ').' F' : '—' }}</td>
+                            <td class="text-end fw-medium">{{ number_format($ligne->total_ligne, 0, ',', ' ') }} F</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+                <tfoot>
+                    @if ($vente->remise_totale_montant > 0)
+                        <tr>
+                            <th colspan="4" class="text-end">Sous-total</th>
+                            <th class="text-end">{{ number_format($vente->sous_total, 0, ',', ' ') }} F</th>
+                        </tr>
+                        <tr>
+                            <th colspan="4" class="text-end">Remise</th>
+                            <th class="text-end text-danger">− {{ number_format($vente->remise_totale_montant, 0, ',', ' ') }} F</th>
+                        </tr>
+                    @endif
+                    <tr class="fw-bold fs-5">
+                        <th colspan="4" class="text-end">Net à payer</th>
+                        <th class="text-end">{{ number_format($vente->total_net, 0, ',', ' ') }} F</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <div class="card mb-3 d-print-none bg-light border-0">
+        <div class="card-body">
+            <h3 class="h6">Règlement</h3>
+            @forelse ($vente->paiements as $paiement)
+                <div class="d-flex justify-content-between small border-bottom py-1">
+                    <span>{{ $paiement->moyenPaiement->nom }}</span>
+                    <span>{{ number_format($paiement->montant, 0, ',', ' ') }} F</span>
+                </div>
+            @empty
+                <p class="text-secondary small mb-0">Aucun paiement encaissé à la vente.</p>
+            @endforelse
+            @foreach ($vente->reglementsClient as $reglement)
+                <div class="small border-bottom py-1 text-success">
+                    <div class="d-flex justify-content-between">
+                        <span>
+                            <i class="bi bi-cash-coin me-1"></i>Règlement du {{ $reglement->created_at->format('d/m/Y') }}
+                            par {{ $reglement->caissier?->name ?? 'utilisateur supprimé' }}
+                        </span>
+                        <span class="fw-medium">{{ number_format($reglement->montant, 0, ',', ' ') }} F</span>
+                    </div>
+                    @foreach ($reglement->paiements as $paiementReglement)
+                        <div class="d-flex justify-content-between text-secondary ps-4">
+                            <span>{{ $paiementReglement->moyenPaiement->nom }}</span>
+                            <span>{{ number_format($paiementReglement->montant, 0, ',', ' ') }} F</span>
+                        </div>
+                    @endforeach
+                </div>
+            @endforeach
+            <div class="d-flex justify-content-between fw-medium mt-2">
+                <span>Total réglé</span>
+                <span>{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</span>
+            </div>
+            <div class="d-flex justify-content-between fw-semibold {{ $vente->soldeDu() > 0 ? 'text-danger' : '' }}">
+                <span>Reste dû</span>
+                <span>{{ number_format($vente->soldeDu(), 0, ',', ' ') }} F</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card recu-pos mx-auto d-none d-print-block" style="max-width: 420px;">
         <div class="card-body">
             @if ($vente->trashed())
                 <div class="text-center mb-2">
@@ -173,8 +392,12 @@
                     </tr>
                 @endif
                 @if ($vente->soldeDu() > 0)
+                    <tr class="fw-medium">
+                        <td>Montant payé</td>
+                        <td class="text-end">{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</td>
+                    </tr>
                     <tr class="fw-bold text-danger">
-                        <td>Solde à crédit</td>
+                        <td>Reste à payer</td>
                         <td class="text-end">{{ number_format($vente->soldeDu(), 0, ',', ' ') }} F</td>
                     </tr>
                 @endif
@@ -182,7 +405,6 @@
 
             <div class="text-center text-secondary small mt-3">
                 Merci de votre visite !
-                @php($parametre = \App\Models\Parametre::actuel())
                 @if ($parametre->numero || $parametre->adresse || $parametre->slogan)
                     <hr>
                 @endif
@@ -198,4 +420,128 @@
             </div>
         </div>
     </div>
+
+    {{-- Contenu au format facture, masqué à l'écran : le bouton "Facture"
+         imprime ce bloc en place (voir imprimerFacture() ci-dessous), sans
+         redirection ni nouvel onglet — même geste que "Ticket caisse". --}}
+    <div id="factureImprimable" class="d-none">
+        @if ($vente->trashed())
+            <div class="badge-annulee">VENTE ANNULÉE</div>
+        @endif
+
+        <table class="entete">
+            <tr>
+                <td style="width: 55%;">
+                    @if ($logoDataUri)
+                        <img src="{{ $logoDataUri }}" class="logo" alt="Logo">
+                        <br>
+                    @endif
+                    <span class="entreprise-nom">{{ $parametre->nom }}</span><br>
+                    @if ($parametre->adresse) {{ $parametre->adresse }}<br> @endif
+                    @if ($parametre->numero) Tél : {{ $parametre->numero }} @endif
+                </td>
+                <td style="width: 45%;">
+                    <div class="facture-titre">FACTURE</div>
+                    <div class="facture-meta">
+                        N° {{ $vente->numero }}<br>
+                        Date : {{ $vente->created_at->format('d/m/Y à H:i') }}<br>
+                        Magasin : {{ $vente->magasin->nom }}<br>
+                        Caisse : {{ $vente->sessionCaisse->caisse->nom }}<br>
+                        Caissier : {{ $vente->caissier->name }}
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="bloc-client">
+            <div class="label">Client</div>
+            <strong>{{ $vente->client->nom ?? 'Client comptant' }}</strong><br>
+            @if ($vente->client?->telephone) Tél : {{ $vente->client->telephone }}<br> @endif
+            @if ($vente->client?->adresse) {{ $vente->client->adresse }} @endif
+        </div>
+
+        <table class="lignes">
+            <thead>
+                <tr>
+                    <th>Désignation</th>
+                    <th>Unité</th>
+                    <th class="text-end">Qté</th>
+                    <th class="text-end">Prix unitaire</th>
+                    <th class="text-end">Remise</th>
+                    <th class="text-end">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($vente->lignes as $ligne)
+                    <tr>
+                        <td>{{ $ligne->produit->libelle_affichage }}</td>
+                        <td>{{ $ligne->uniteVente->libelle ?? $ligne->produit->unite_base_libelle }}</td>
+                        <td class="text-end">{{ $ligne->quantite }}</td>
+                        <td class="text-end">{{ number_format($ligne->prix_unitaire_applique, 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ $ligne->remise_ligne_montant > 0 ? '− '.number_format($ligne->remise_ligne_montant, 0, ',', ' ').' F' : '—' }}</td>
+                        <td class="text-end">{{ number_format($ligne->total_ligne, 0, ',', ' ') }} F</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        <table class="totaux">
+            <tr>
+                <td>Sous-total</td>
+                <td class="text-end">{{ number_format($vente->sous_total, 0, ',', ' ') }} F</td>
+            </tr>
+            @if ($vente->remise_totale_montant > 0)
+                <tr>
+                    <td>Remise</td>
+                    <td class="text-end">− {{ number_format($vente->remise_totale_montant, 0, ',', ' ') }} F</td>
+                </tr>
+            @endif
+            <tr class="net">
+                <td>Net à payer</td>
+                <td class="text-end">{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
+            </tr>
+            @foreach ($vente->paiements as $paiement)
+                <tr>
+                    <td>{{ $paiement->moyenPaiement->nom }}</td>
+                    <td class="text-end">{{ number_format($paiement->montant, 0, ',', ' ') }} F</td>
+                </tr>
+            @endforeach
+            @if ($vente->monnaie_rendue > 0)
+                <tr>
+                    <td>Monnaie rendue</td>
+                    <td class="text-end">{{ number_format($vente->monnaie_rendue, 0, ',', ' ') }} F</td>
+                </tr>
+            @endif
+            @if ($vente->soldeDu() > 0)
+                <tr>
+                    <td>Montant payé</td>
+                    <td class="text-end">{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</td>
+                </tr>
+                <tr class="credit">
+                    <td>Reste à payer</td>
+                    <td class="text-end">{{ number_format($vente->soldeDu(), 0, ',', ' ') }} F</td>
+                </tr>
+            @endif
+        </table>
+
+        <div class="mention">
+            Merci de votre confiance.
+            @if ($parametre->slogan) {{ $parametre->slogan }} @endif
+        </div>
+    </div>
 @endsection
+
+@push('scripts')
+    <script>
+        // Bascule d'impression : affiche #factureImprimable et masque le
+        // reçu compact .recu-pos le temps de l'impression, puis revient à
+        // l'état par défaut (voir resources/sass/app.scss, .impression-facture).
+        function imprimerFacture() {
+            document.body.classList.add('impression-facture');
+            window.print();
+        }
+        window.addEventListener('afterprint', () => {
+            document.body.classList.remove('impression-facture');
+        });
+    </script>
+@endpush

@@ -1,16 +1,35 @@
 @extends('layouts.app')
 
-@section('title', "Nouvelle commande d'achat")
+@section('title', 'Nouveau bon de commande')
 
 @section('content')
-    <h2 class="h4 mb-3">Nouvelle commande d'achat</h2>
+    <h2 class="h4 mb-3">Nouveau bon de commande</h2>
 
     <div class="row">
         <div class="col-12 col-xl-10">
             <div class="card">
                 <div class="card-body">
                     <form id="formCommandeAchat" method="POST" action="{{ route('commande-achats.store') }}" x-data="{
-                            lignes: {{ Js::from(old('lignes', [['produit_id' => '', 'unite_vente_id' => '', 'taxe_id' => '', 'magasin_destination_id' => '', 'quantite' => '', 'prix_achat' => '']])) }},
+                            // _cle : identifiant stable par ligne (jamais l'index du
+                            // tableau) pour le :key du x-for — avec l'index, retirer
+                            // une ligne du milieu fait réutiliser le mauvais <select>
+                            // du DOM pour une autre ligne (valeur affichée désynchronisée
+                            // de la donnée réelle, d'où un unite_vente_id incohérent
+                            // envoyé au serveur).
+                            // Le middleware global ConvertEmptyStringsToNull convertit
+                            // tout champ vide soumis en null AVANT que la requête
+                            // n'atteigne le contrôleur — donc un select laissé sur son
+                            // option vide revient en null dans old() après un échec de
+                            // validation. Mais ce composant utilise '' partout comme
+                            // valeur « rien choisi » — cf. la ligne par défaut ci-dessous,
+                            // unitesDisponibles, les comparaisons plus bas) : un null
+                            // ne correspond à aucune option, x-model ne peut rien
+                            // sélectionner, et re-choisir manuellement était le seul
+                            // moyen de repartir d'un état propre. On reconvertit donc
+                            // systématiquement null en '' à la relecture.
+                            lignes: {{ Js::from(collect(old('lignes', [['produit_id' => '', 'unite_vente_id' => '', 'taxe_id' => '', 'magasin_destination_id' => '', 'quantite' => '', 'prix_achat' => '']]))->map(
+                                fn (array $l) => collect($l)->map(fn ($valeur) => $valeur ?? '')->all()
+                            )) }}.map((l, i) => ({ ...l, _cle: 'l' + i + '-' + Date.now() })),
                             unitesParProduit: {{ Js::from($unitesParProduit) }},
                             taxes: {{ Js::from($taxes->map(fn ($t) => ['id' => $t->id, 'libelle' => $t->nom, 'taux' => $t->taux])) }},
                             erreurs: {{ Js::from($errors->getMessages()) }},
@@ -62,9 +81,9 @@
                                 return this.totalTtc - this.totalHt;
                             },
                             ajouterLigne() {
-                                this.lignes.push({ produit_id: '', unite_vente_id: '', taxe_id: '', magasin_destination_id: '', quantite: '', prix_achat: '' });
+                                this.lignes.push({ produit_id: '', unite_vente_id: '', taxe_id: '', magasin_destination_id: '', quantite: '', prix_achat: '', _cle: 'l' + this.lignes.length + '-' + Date.now() + '-' + Math.random() });
                             },
-                            paiements: {{ Js::from(old('paiements', [])) }},
+                            paiements: {{ Js::from(old('paiements', [])) }}.map((p, i) => ({ ...p, _cle: 'p' + i + '-' + Date.now() })),
                             get totalPaiements() {
                                 return this.paiements.reduce((total, p) => total + (Number(p.montant) || 0), 0);
                             },
@@ -72,7 +91,7 @@
                                 return Math.max(this.totalTtc - this.totalPaiements, 0);
                             },
                             ajouterPaiement() {
-                                this.paiements.push({ moyen_paiement_id: '', montant: '' });
+                                this.paiements.push({ moyen_paiement_id: '', montant: '', _cle: 'p' + this.paiements.length + '-' + Date.now() + '-' + Math.random() });
                             },
                             retirerPaiement(index) {
                                 this.paiements.splice(index, 1);
@@ -128,14 +147,14 @@
                             </button>
                         </div>
 
-                        <template x-for="(ligne, index) in lignes" :key="index">
+                        <template x-for="(ligne, index) in lignes" :key="ligne._cle">
                             <div class="border rounded p-2 mb-2">
                                 <div class="row g-2 align-items-end mb-2">
                                     <div class="col-12 col-md-6">
                                         <label class="form-label small">Produit<span class="required-marker">*</span></label>
                                         <select :name="'lignes['+index+'][produit_id]'" x-model="ligne.produit_id" @change="ligne.unite_vente_id = ''"
                                                 class="form-select form-select-sm produit-ligne-select" :class="{ 'is-invalid': estDoublon(index) }"
-                                                x-init="window.initSelect2($el, { width: '100%' })" required>
+                                                x-init="$nextTick(() => window.initSelect2($el, { width: '100%' }))" required>
                                             <option value="">— Choisir —</option>
                                             @foreach ($produits as $produit)
                                                 <option value="{{ $produit->id }}">{{ $produit->sku }} — {{ $produit->libelle_affichage }}</option>
@@ -237,7 +256,7 @@
                                         Sans effet si vous enregistrez en brouillon.
                                     </p>
 
-                                    <template x-for="(paiement, index) in paiements" :key="index">
+                                    <template x-for="(paiement, index) in paiements" :key="paiement._cle">
                                         <div class="row g-1 align-items-center mb-2">
                                             <div class="col-6 col-md-4">
                                                 <select :name="'paiements['+index+'][moyen_paiement_id]'" x-model="paiement.moyen_paiement_id" class="form-select form-select-sm">
@@ -276,9 +295,9 @@
                             <button type="button" class="btn btn-success" :disabled="aUnDoublon"
                                     @click="declencherValidation($event)"
                                     data-form-id="formCommandeAchat"
-                                    data-message="Valider cet achat maintenant ? Le stock sera mis à jour immédiatement et cette action est irréversible."
-                                    data-button-label="Valider l'achat" data-button-class="btn-success">
-                                <i class="bi bi-check-circle me-1"></i>Valider l'achat
+                                    data-message="Valider ce bon de commande maintenant ? Le stock sera mis à jour immédiatement et cette action est irréversible."
+                                    data-button-label="Valider le bon de commande" data-button-class="btn-success">
+                                <i class="bi bi-check-circle me-1"></i>Valider le bon de commande
                             </button>
                         @endif
                         <a href="{{ route('commande-achats.index') }}" class="btn btn-link">Annuler</a>

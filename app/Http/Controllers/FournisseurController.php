@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\TrieListe;
+use App\Models\CommandeAchat;
 use App\Models\EcritureCompteFournisseur;
 use App\Models\Fournisseur;
+use App\Models\MoyenPaiement;
+use App\Models\ReglementFournisseur;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -43,14 +46,24 @@ class FournisseurController extends Controller
     {
         $fournisseur->loadCount('commandeAchats');
 
+        // Colonne "Référence" : une écriture achat_credit référence directement
+        // une CommandeAchat ; une écriture reglement référence un
+        // ReglementFournisseur, dont on a besoin de la commande éventuellement
+        // imputée pour l'afficher (voir CommandeAchat::resteDu() pour le
+        // premier cas — évite un N+1).
         $ecritures = $fournisseur->ecritures()
-            ->with('auteur')
+            ->with(['auteur', 'reference' => function ($morphTo) {
+                $morphTo->morphWith([
+                    CommandeAchat::class => ['lignes', 'paiements', 'reglementsFournisseur'],
+                    ReglementFournisseur::class => ['commandeAchat'],
+                ]);
+            }])
             ->latest('created_at')
             ->paginate(15, ['*'], 'ecritures_page');
 
         $commandes = $fournisseur->commandeAchats()
             ->withTrashed()
-            ->with(['lignes.taxe', 'lignes.magasinDestination'])
+            ->with(['lignes.taxe', 'lignes.magasinDestination', 'paiements', 'reglementsFournisseur'])
             ->latest('created_at')
             ->paginate(10, ['*'], 'commandes_page');
 
@@ -59,6 +72,7 @@ class FournisseurController extends Controller
             'solde' => $fournisseur->solde(),
             'ecritures' => $ecritures,
             'commandes' => $commandes,
+            'moyensPaiement' => MoyenPaiement::actifs(),
         ]);
     }
 

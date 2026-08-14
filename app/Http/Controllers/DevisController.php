@@ -7,12 +7,12 @@ use App\Http\Controllers\Concerns\TrieListe;
 use App\Http\Controllers\Concerns\ValideRemises;
 use App\Models\Client;
 use App\Models\Devis;
-use App\Models\Magasin;
 use App\Models\Parametre;
 use App\Models\Produit;
 use App\Models\SessionCaisse;
 use App\Models\TypeClient;
 use App\Services\DevisService;
+use App\Services\StockService;
 use App\Support\Remise;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -30,7 +30,7 @@ class DevisController extends Controller
     public function index(Request $request): View
     {
         $query = Devis::query()
-            ->with(['client', 'magasin'])
+            ->with(['client'])
             ->when($request->filled('recherche'), function ($q) use ($request) {
                 $recherche = $request->string('recherche');
                 $q->where(function ($sub) use ($recherche) {
@@ -38,8 +38,6 @@ class DevisController extends Controller
                         ->orWhereHas('client', fn ($c) => $c->where('nom', 'like', "%{$recherche}%"));
                 });
             })
-            ->when($request->user()->magasin_id, fn ($q, $magasinId) => $q->where('magasin_id', $magasinId))
-            ->when(! $request->user()->magasin_id && $request->filled('magasin_id'), fn ($q) => $q->where('magasin_id', $request->integer('magasin_id')))
             ->when($request->filled('statut'), fn ($q) => $q->where('statut', $request->string('statut')));
 
         $devis = $this->appliquerTri($query, $request, ['numero', 'statut', 'date_validite', 'created_at'], 'created_at')
@@ -48,7 +46,6 @@ class DevisController extends Controller
 
         return view('devis.index', [
             'devis' => $devis,
-            'magasins' => Magasin::orderBy('nom')->get(),
         ]);
     }
 
@@ -57,7 +54,6 @@ class DevisController extends Controller
         return view('devis.create', [
             'produits' => Produit::catalogueVente(),
             'clients' => Client::where('actif', true)->orderBy('nom')->get(['id', 'nom', 'telephone']),
-            'magasins' => Magasin::where('actif', true)->orderBy('nom')->get(),
             'panierInitial' => collect(),
             'typesClient' => TypeClient::where('actif', true)->orderBy('nom')->get(),
         ]);
@@ -69,7 +65,6 @@ class DevisController extends Controller
         $this->bloquerRemiseSansPermission($request);
 
         $donnees = $request->validate([
-            'magasin_id' => ['required', 'exists:magasins,id'],
             'client_id' => ['required', 'exists:clients,id'],
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
@@ -80,7 +75,6 @@ class DevisController extends Controller
         ]);
 
         $devis = $devisService->creer(
-            Magasin::findOrFail($donnees['magasin_id']),
             Client::findOrFail($donnees['client_id']),
             $request->user(),
             $donnees['lignes'],
@@ -89,9 +83,9 @@ class DevisController extends Controller
         return redirect()->route('devis.show', $devis)->with('succes', "Devis « {$devis->numero} » créé.");
     }
 
-    public function show(Devis $devis): View
+    public function show(Devis $devis, StockService $stockService): View
     {
-        $devis->load(['client', 'magasin', 'auteur', 'lignes.produit', 'lignes.uniteVente', 'vente']);
+        $devis->load(['client', 'auteur', 'lignes.produit', 'lignes.uniteVente', 'vente']);
 
         $sessionOuverte = SessionCaisse::where('caissier_id', request()->user()->id)
             ->whereNull('date_fermeture')
@@ -99,11 +93,18 @@ class DevisController extends Controller
             ->with('caisse')
             ->first();
 
+        // Stock par lieu, purement informatif à côté de chaque ligne — un
+        // devis ne réserve rien (règle 15), donc jamais stocké, toujours
+        // recalculé à l'affichage.
+        $stocksParProduit = $devis->lignes->pluck('produit')->unique('id')
+            ->mapWithKeys(fn ($produit) => [$produit->id => $stockService->disponibiliteParMagasin($produit)]);
+
         return view('devis.show', [
             'devis' => $devis,
             'montants' => $devis->calculerMontants(),
             'sessionOuverte' => $sessionOuverte,
             'lignesEnRupture' => $devis->peutEtreTransforme() ? $devis->lignesEnRuptureDeStock() : collect(),
+            'stocksParProduit' => $stocksParProduit,
         ]);
     }
 
@@ -185,7 +186,7 @@ class DevisController extends Controller
 
     public function excel(Devis $devis): StreamedResponse
     {
-        $devis->load(['client', 'magasin', 'lignes.produit', 'lignes.uniteVente']);
+        $devis->load(['client', 'lignes.produit', 'lignes.uniteVente']);
         $montants = $devis->calculerMontants();
 
         $spreadsheet = new Spreadsheet();
@@ -201,7 +202,6 @@ class DevisController extends Controller
         $feuille->setCellValue('D2', 'N° '.$devis->numero);
         $feuille->setCellValue('D3', 'Date : '.$devis->created_at->format('d/m/Y'));
         $feuille->setCellValue('D4', "Valide jusqu'au : ".$devis->date_validite->format('d/m/Y'));
-        $feuille->setCellValue('D5', 'Magasin : '.$devis->magasin->nom);
 
         $feuille->setCellValue('A6', 'Client');
         $feuille->setCellValue('A7', $devis->client->nom);
@@ -251,7 +251,7 @@ class DevisController extends Controller
      */
     private function chargerDonneesFacture(Devis $devis): array
     {
-        $devis->load(['client', 'magasin', 'lignes.produit', 'lignes.uniteVente']);
+        $devis->load(['client', 'lignes.produit', 'lignes.uniteVente']);
 
         $parametre = Parametre::actuel();
         $logo = $parametre->getFirstMedia('logo');

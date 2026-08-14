@@ -15,7 +15,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * vente. Toujours rattaché à une session de caisse ouverte au moment de
  * l'encaissement (règle 14).
  */
-#[Fillable(['client_id', 'session_caisse_id', 'caissier_id', 'montant'])]
+#[Fillable(['client_id', 'vente_id', 'session_caisse_id', 'caissier_id', 'montant'])]
 class ReglementClient extends Model
 {
     use HasFactory, LogsActivity;
@@ -37,6 +37,15 @@ class ReglementClient extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    /**
+     * Nullable : un règlement saisi via le bouton général de la fiche client
+     * n'est imputé à aucune vente précise.
+     */
+    public function vente(): BelongsTo
+    {
+        return $this->belongsTo(Vente::class)->withTrashed();
     }
 
     public function sessionCaisse(): BelongsTo

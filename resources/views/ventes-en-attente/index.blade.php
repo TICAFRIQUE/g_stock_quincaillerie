@@ -22,6 +22,11 @@
                         @if ($venteEnAttente->libelle)
                             <p class="small text-secondary fst-italic">{{ $venteEnAttente->libelle }}</p>
                         @endif
+                        @if ($venteEnAttente->client)
+                            <p class="small mb-1">
+                                <i class="bi bi-person-fill me-1"></i>{{ $venteEnAttente->client->nom }}
+                            </p>
+                        @endif
                         <ul class="list-unstyled small mb-3">
                             @foreach ($venteEnAttente->lignes as $ligne)
                                 <li>

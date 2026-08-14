@@ -63,7 +63,7 @@ class VenteService
             $caisse->increment('sequence_ventes');
             $numero = sprintf('M%d-C%02d-%06d', $magasin->id, $caisse->id, $caisse->sequence_ventes);
 
-            [$lignesResolues, $sousTotal] = $this->resoudreLignes($lignes, $magasin);
+            [$lignesResolues, $sousTotal] = $this->resoudreLignes($lignes);
 
             $remiseTotaleMontant = $this->resoudreRemise($remiseTotaleType, $remiseTotaleValeur, $sousTotal);
             $totalNet = $sousTotal - $remiseTotaleMontant;
@@ -159,22 +159,21 @@ class VenteService
      *
      * @param  array<int, array{produit_id:int, unite_vente_id?:?int, quantite:int, remise_type?:?string, remise_valeur?:?int}>  $lignes
      */
-    public function calculerTotalNet(array $lignes, ?string $remiseTotaleType, ?int $remiseTotaleValeur, Magasin $magasin): int
+    public function calculerTotalNet(array $lignes, ?string $remiseTotaleType, ?int $remiseTotaleValeur): int
     {
-        [, $sousTotal] = $this->resoudreLignes($lignes, $magasin);
+        [, $sousTotal] = $this->resoudreLignes($lignes);
 
         return $sousTotal - $this->resoudreRemise($remiseTotaleType, $remiseTotaleValeur, $sousTotal);
     }
 
     /**
-     * $magasinParDefaut : magasin de la vente (caisse), utilisé pour toute
-     * ligne qui ne précise pas explicitement sa propre source (magasin ou
-     * dépôt de prélèvement — un produit peut être vendu depuis un lieu
-     * différent du magasin de la vente, voir CLAUDE.md).
+     * Le choix du lieu de prélèvement (magasin ou dépôt) est obligatoire par
+     * ligne — pas de repli implicite sur le magasin de la vente (voir
+     * CLAUDE.md) : chaque ligne doit porter un magasin_source_id valide.
      *
      * @return array{0: array<int, array<string, mixed>>, 1: int}
      */
-    private function resoudreLignes(array $lignes, Magasin $magasinParDefaut): array
+    private function resoudreLignes(array $lignes): array
     {
         $magasinSourceIds = collect($lignes)->pluck('magasin_source_id')->filter()->unique();
         $magasinsParId = $magasinSourceIds->isNotEmpty()
@@ -190,12 +189,9 @@ class VenteService
                 ? UniteVente::findOrFail($ligne['unite_vente_id'])
                 : null;
 
-            $magasinSource = $magasinParDefaut;
-            if (! empty($ligne['magasin_source_id'])) {
-                $magasinSource = $magasinsParId->get($ligne['magasin_source_id']);
-                if ($magasinSource === null) {
-                    throw new InvalidArgumentException('Magasin source introuvable pour une ligne de vente.');
-                }
+            $magasinSource = $magasinsParId->get($ligne['magasin_source_id'] ?? null);
+            if ($magasinSource === null) {
+                throw new InvalidArgumentException('Magasin source introuvable pour une ligne de vente.');
             }
 
             $quantite = $ligne['quantite'];

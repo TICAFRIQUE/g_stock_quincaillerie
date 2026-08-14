@@ -18,7 +18,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * (règle 15). Montants toujours indicatifs (jamais figés), transformable en
  * Vente tant qu'il n'est pas expiré/refusé/déjà transformé.
  */
-#[Fillable(['numero', 'magasin_id', 'client_id', 'created_by', 'statut', 'date_validite', 'vente_id', 'transforme_at'])]
+#[Fillable(['numero', 'client_id', 'created_by', 'statut', 'date_validite', 'vente_id', 'transforme_at'])]
 class Devis extends Model
 {
     use HasFactory, LogsActivity;
@@ -35,11 +35,6 @@ class Devis extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()->logFillable()->logOnlyDirty();
-    }
-
-    public function magasin(): BelongsTo
-    {
-        return $this->belongsTo(Magasin::class)->withTrashed();
     }
 
     public function client(): BelongsTo
@@ -118,26 +113,26 @@ class Devis extends Model
     }
 
     /**
-     * Un devis ne réserve jamais de stock (règle 15) : le stock disponible
-     * au magasin du devis peut donc être devenu insuffisant entre sa
-     * création et une tentative de transformation. Vérifié ici pour
-     * avertir en amont plutôt que de laisser échouer la vente après coup
-     * (même logique que le grisage sur l'écran de vente, voir CLAUDE.md) —
-     * suppose lignes.produit et lignes.uniteVente chargées.
+     * Un devis ne réserve jamais de stock (règle 15) et n'est plus rattaché
+     * à un magasin : le stock est donc totalisé toutes localisations
+     * confondues (magasins + dépôts), pour avertir en amont si un produit
+     * est insuffisant partout, plutôt que de laisser échouer la vente après
+     * coup — suppose lignes.produit et lignes.uniteVente chargées.
      *
      * @return Collection<int, array{ligne: LigneDevis, demande: int, disponible: int}>
      */
     public function lignesEnRuptureDeStock(): Collection
     {
         $stocksParProduit = Stock::query()
-            ->where('magasin_id', $this->magasin_id)
             ->whereIn('produit_id', $this->lignes->pluck('produit_id'))
-            ->pluck('quantite', 'produit_id');
+            ->selectRaw('produit_id, SUM(quantite) as total')
+            ->groupBy('produit_id')
+            ->pluck('total', 'produit_id');
 
         return $this->lignes
             ->map(function (LigneDevis $ligne) use ($stocksParProduit) {
                 $demande = $ligne->quantite * ($ligne->uniteVente->facteur ?? 1);
-                $disponible = $stocksParProduit[$ligne->produit_id] ?? 0;
+                $disponible = (int) ($stocksParProduit[$ligne->produit_id] ?? 0);
 
                 return ['ligne' => $ligne, 'demande' => $demande, 'disponible' => $disponible];
             })

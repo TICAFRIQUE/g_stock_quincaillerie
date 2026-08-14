@@ -15,7 +15,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * ReglementClient mais SANS lien avec une caisse : indépendant de toute
  * session, n'impacte jamais le tiroir (décision produit, voir CLAUDE.md).
  */
-#[Fillable(['fournisseur_id', 'created_by', 'montant'])]
+#[Fillable(['fournisseur_id', 'commande_achat_id', 'created_by', 'montant'])]
 class ReglementFournisseur extends Model
 {
     use HasFactory, LogsActivity;
@@ -37,6 +37,15 @@ class ReglementFournisseur extends Model
     public function fournisseur(): BelongsTo
     {
         return $this->belongsTo(Fournisseur::class);
+    }
+
+    /**
+     * Nullable : un règlement saisi via le bouton général de la fiche
+     * fournisseur n'est imputé à aucune commande précise.
+     */
+    public function commandeAchat(): BelongsTo
+    {
+        return $this->belongsTo(CommandeAchat::class)->withTrashed();
     }
 
     public function auteur(): BelongsTo

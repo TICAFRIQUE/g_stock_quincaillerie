@@ -87,11 +87,31 @@ class Vente extends Model
     }
 
     /**
-     * Reste dû par le client : net à payer moins les paiements réellement
-     * encaissés (0 pour une vente comptant). Suppose `paiements` chargée.
+     * Règlements ultérieurs explicitement imputés à cette vente (bouton
+     * "Régler" depuis son détail ou depuis une ligne de l'historique du
+     * compte client) — distincts des `paiements`, encaissés à la vente.
+     */
+    public function reglementsClient(): HasMany
+    {
+        return $this->hasMany(ReglementClient::class);
+    }
+
+    /**
+     * Total réglé au titre de cette vente : paiements encaissés à la vente +
+     * règlements ultérieurs imputés à cette vente. Suppose `paiements` et
+     * `reglementsClient` chargées.
+     */
+    public function montantRegle(): int
+    {
+        return $this->paiements->sum('montant') + $this->reglementsClient->sum('montant');
+    }
+
+    /**
+     * Reste dû par le client : net à payer moins le montant réglé (0 pour
+     * une vente comptant). Suppose `paiements` et `reglementsClient` chargées.
      */
     public function soldeDu(): int
     {
-        return $this->total_net - $this->paiements->sum('montant');
+        return $this->total_net - $this->montantRegle();
     }
 }

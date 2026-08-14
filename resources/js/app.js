@@ -84,13 +84,28 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
 
         // Lieu de prélèvement du stock, par ligne (voir CLAUDE.md — un
         // produit peut être vendu depuis un magasin ou un dépôt différent du
-        // magasin de la caisse). Par défaut chaque ligne prélève sur le
-        // magasin de la caisse (magasin_source_id null) ; le détail par lieu
-        // n'est chargé qu'à la demande, jamais préchargé pour tous les
-        // produits (voir chargerSources).
+        // magasin de la caisse). Choix obligatoire, aucun lieu par défaut :
+        // magasin_source_id === undefined tant que rien n'a été choisi (voir
+        // aUneSourceNonChoisie). Le détail par lieu n'est chargé qu'à la
+        // demande, jamais préchargé pour tous les produits (chargerSources).
         magasinCaisseId,
         magasinCaisseNom,
         sourcesParProduit: {},
+
+        // Une ligne peut arriver avec un lieu déjà choisi (reprise d'une
+        // vente en attente, ou panier restauré après une soumission en
+        // échec) : sans ce préchargement, sourcesDisponibles(ligne) reste
+        // vide tant que l'utilisateur n'a pas cliqué le select — l'option
+        // déjà sélectionnée n'existe alors pas encore dans le DOM et
+        // s'affiche comme "non choisie". chargerSources() ne fait rien si
+        // le produit est déjà en cache, donc sans coût pour les lignes vierges.
+        init() {
+            this.panier.forEach((ligne) => {
+                if (ligne.magasin_source_id !== undefined) {
+                    this.chargerSources(ligne);
+                }
+            });
+        },
 
         async chargerSources(ligne) {
             const produitId = ligne.produit_id;
@@ -103,52 +118,57 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
                 if (!response.ok) return;
                 this.sourcesParProduit[produitId] = await response.json();
             } catch {
-                // Silencieux : le sélecteur retombe sur le magasin de la caisse par défaut.
+                // Silencieux : la liste des lieux reste vide, le choix reste à faire.
             }
         },
 
-        autresSources(ligne) {
-            return (this.sourcesParProduit[ligne.produit_id] || []).filter((s) => s.id !== this.magasinCaisseId);
+        // Tous les lieux actifs pour ce produit, y compris le magasin de la
+        // caisse : le choix doit toujours être explicite, aucun lieu n'est
+        // pré-filtré/sous-entendu par défaut.
+        sourcesDisponibles(ligne) {
+            return this.sourcesParProduit[ligne.produit_id] || [];
         },
 
+        // Change juste le lieu affiché/soumis pour cette ligne — ne touche
+        // jamais à la quantité ni ne retire la ligne : le stock du nouveau
+        // lieu reste visible (voir "Stock : N" et stockDisponible ci-dessous)
+        // pour que le vendeur voie et décide, la vérification qui bloque
+        // réellement se fait côté serveur à l'enregistrement (atomique, voir
+        // VenteService::vendre()).
         choisirSource(ligne, valeur) {
             if (!valeur) {
-                ligne.magasin_source_id = null;
+                ligne.magasin_source_id = undefined;
                 ligne.magasinSourceNom = null;
             } else {
-                const source = (this.sourcesParProduit[ligne.produit_id] || []).find((s) => String(s.id) === String(valeur));
+                const source = this.sourcesDisponibles(ligne).find((s) => String(s.id) === String(valeur));
                 ligne.magasin_source_id = Number(valeur);
                 ligne.magasinSourceNom = source ? source.nom : null;
             }
-
-            // Le stock disponible change avec la source : si la quantité déjà
-            // saisie dépasse ce qui est dispo au nouveau lieu (en tenant compte
-            // des autres lignes qui prélèvent déjà sur ce même lieu), on la
-            // ramène au maximum possible — la ligne est retirée si le nouveau
-            // lieu n'a plus rien de disponible.
-            const facteur = ligne.facteur || 1;
-            const dispo = this.stockDisponible(ligne);
-            const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * facteur;
-            const maxQuantite = Math.floor(Math.max(dispo - autresPieces, 0) / facteur);
-
-            if (ligne.quantite > maxQuantite) {
-                if (maxQuantite < 1) {
-                    this.panier.splice(this.panier.indexOf(ligne), 1);
-                } else {
-                    ligne.quantite = maxQuantite;
-                }
-            }
         },
 
-        // Stock du lieu effectivement choisi pour cette ligne (magasin de la
-        // caisse par défaut, ou le lieu explicitement sélectionné).
+        // Stock du lieu choisi pour cette ligne — null tant qu'aucun lieu
+        // n'a été explicitement sélectionné (voir aUneSourceNonChoisie).
         stockDisponible(ligne) {
-            if (!ligne.magasin_source_id) {
-                return this.produitDe(ligne)?.stock ?? 0;
-            }
+            if (ligne.magasin_source_id === undefined) return null;
 
-            const source = (this.sourcesParProduit[ligne.produit_id] || []).find((s) => s.id === ligne.magasin_source_id);
+            const source = this.sourcesDisponibles(ligne).find((s) => s.id === ligne.magasin_source_id);
             return source ? source.quantite : 0;
+        },
+
+        // La ligne demande plus que ce qui est disponible au lieu choisi —
+        // n'a de sens qu'une fois un lieu explicitement sélectionné.
+        enRupture(ligne) {
+            if (ligne.magasin_source_id === undefined) return false;
+            const dispo = this.stockDisponible(ligne);
+            return ligne.quantite * (ligne.facteur || 1) > dispo;
+        },
+
+        get aUneSourceNonChoisie() {
+            return this.panier.some((l) => l.magasin_source_id === undefined);
+        },
+
+        get aUneLigneEnRupture() {
+            return this.panier.some((l) => this.enRupture(l));
         },
 
         // La barre du haut ajoute une ligne « vierge » (aucune variante choisie,
@@ -187,7 +207,7 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
                 prixUnitaire: null,
                 remise_type: '',
                 remise_valeur: null,
-                magasin_source_id: null,
+                magasin_source_id: undefined,
                 magasinSourceNom: null,
             });
         },
@@ -204,14 +224,14 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
                 prixUnitaire: null,
                 remise_type: '',
                 remise_valeur: null,
-                magasin_source_id: original.magasin_source_id ?? null,
+                magasin_source_id: original.magasin_source_id,
                 magasinSourceNom: original.magasinSourceNom ?? null,
             });
         },
 
-        // magasinSourceId : null = magasin de la caisse (défaut). Deux lignes
-        // du même produit prélevant sur des lieux différents ont des stocks
-        // indépendants, donc jamais cumulées entre elles.
+        // magasinSourceId : undefined tant qu'aucun lieu n'a été choisi. Deux
+        // lignes du même produit prélevant sur des lieux différents ont des
+        // stocks indépendants, donc jamais cumulées entre elles.
         piecesReservees(produitId, magasinSourceId = null) {
             return this.panier
                 .filter((l) => l.produit_id === produitId && (l.magasin_source_id || null) === (magasinSourceId || null))
@@ -260,8 +280,13 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
             const facteur = unite ? unite.facteur : 1;
             const prixUnitaire = unite ? unite.prix : produit.prix_piece;
 
-            const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * (ligne.facteur || 0);
-            if (autresPieces + ligne.quantite * facteur > this.stockDisponible(ligne)) return;
+            // Pas de lieu choisi : pas de plafond de stock à ce stade, la
+            // ligne devient juste incomplète (voir aUneSourceNonChoisie).
+            const dispo = this.stockDisponible(ligne);
+            if (dispo !== null) {
+                const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * (ligne.facteur || 0);
+                if (autresPieces + ligne.quantite * facteur > dispo) return;
+            }
 
             ligne.unite_vente_id = unite ? unite.id : null;
             ligne.uniteLibelle = unite ? unite.libelle : null;
@@ -275,9 +300,22 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
                 this.panier.splice(this.panier.indexOf(ligne), 1);
                 return;
             }
-            const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * (ligne.facteur || 0);
-            if (autresPieces + nouvelle * (ligne.facteur || 0) > this.stockDisponible(ligne)) return;
+            const dispo = this.stockDisponible(ligne);
+            if (dispo !== null) {
+                const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * (ligne.facteur || 0);
+                if (autresPieces + nouvelle * (ligne.facteur || 0) > dispo) return;
+            }
             ligne.quantite = nouvelle;
+        },
+
+        // Désactive le bouton "+" une fois le stock du lieu choisi atteint —
+        // pas de lieu choisi = pas de plafond à ce stade (voir changerQuantite).
+        atteintMaxStock(ligne) {
+            const dispo = this.stockDisponible(ligne);
+            if (dispo === null) return false;
+            const facteur = ligne.facteur || 1;
+            const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * facteur;
+            return autresPieces + (ligne.quantite + 1) * facteur > dispo;
         },
 
         retirerLigne(index) {
@@ -387,6 +425,26 @@ window.devisApp = function (produits, panierInitial = []) {
         produits,
         panier: panierInitial,
 
+        // Stock par lieu affiché à côté de chaque ligne — purement informatif
+        // (montrer au vendeur ce qui est disponible où), jamais un choix à
+        // enregistrer : un devis ne réserve rien (règle 15).
+        sourcesParProduit: {},
+
+        async chargerSources(ligne) {
+            const produitId = ligne.produit_id;
+            if (this.sourcesParProduit[produitId]) return;
+
+            try {
+                const response = await fetch(`/devis/produits/${produitId}/stock-magasins`, {
+                    headers: { Accept: 'application/json' },
+                });
+                if (!response.ok) return;
+                this.sourcesParProduit[produitId] = await response.json();
+            } catch {
+                // Silencieux : aucun badge ne s'affiche pour cette ligne.
+            }
+        },
+
         ajouterDepuisSelect(event) {
             const option = event.target.selectedOptions[0];
             if (!option || !option.value) return;
@@ -410,21 +468,6 @@ window.devisApp = function (produits, panierInitial = []) {
                 produit_id: produit.id,
                 unite_vente_id: undefined,
                 produitLibelle: produit.libelle_affichage,
-                uniteLibelle: null,
-                facteur: null,
-                quantite: 1,
-                prixUnitaire: null,
-                remise_type: '',
-                remise_valeur: null,
-            });
-        },
-
-        dupliquerLigne(index) {
-            const original = this.panier[index];
-            this.panier.splice(index + 1, 0, {
-                produit_id: original.produit_id,
-                unite_vente_id: undefined,
-                produitLibelle: original.produitLibelle,
                 uniteLibelle: null,
                 facteur: null,
                 quantite: 1,

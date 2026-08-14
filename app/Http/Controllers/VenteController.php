@@ -70,7 +70,6 @@ class VenteController extends Controller
     public function transformerDevisForm(SessionCaisse $session, Devis $devis): View
     {
         $this->assurerMagasin($session->caisse->magasin_id);
-        abort_if($devis->magasin_id !== $session->caisse->magasin_id, 403, 'Ce devis appartient à un autre magasin.');
         abort_if(! $devis->peutEtreTransforme(), 403, 'Ce devis ne peut plus être transformé en vente.');
 
         $devis->load(['client', 'lignes.produit', 'lignes.uniteVente']);
@@ -96,7 +95,38 @@ class VenteController extends Controller
             ])
             ->values();
 
+        // Un échec de soumission (validation ou exception métier, voir
+        // store()/transformerDevis()/reprendre()) redirige ici avec
+        // back()->withInput() : si un panier a été flashé, on reconstruit
+        // le panier affiché à partir de CETTE saisie plutôt que de repartir
+        // du devis/panier en attente d'origine — sinon chaque échec effaçait
+        // silencieusement tous les choix déjà faits (destination, quantités).
         $panierInitial = match (true) {
+            session()->hasOldInput('lignes') => collect(old('lignes'))->map(function (array $ligne) use ($produits) {
+                $produit = $produits->firstWhere('id', (int) $ligne['produit_id']);
+                $uniteVenteId = ($ligne['unite_vente_id'] ?? '') !== '' ? (int) $ligne['unite_vente_id'] : null;
+                $unite = $uniteVenteId ? collect($produit['unites'] ?? [])->firstWhere('id', $uniteVenteId) : null;
+
+                $donnees = [
+                    'produit_id' => (int) $ligne['produit_id'],
+                    'unite_vente_id' => $uniteVenteId,
+                    'produitLibelle' => $produit['libelle_affichage'] ?? '',
+                    'uniteLibelle' => $unite['libelle'] ?? null,
+                    'facteur' => $unite['facteur'] ?? 1,
+                    'quantite' => (int) $ligne['quantite'],
+                    'prixUnitaire' => $unite['prix'] ?? ($produit['prix_piece'] ?? 0),
+                    'remise_type' => $ligne['remise_type'] ?? '',
+                    'remise_valeur' => ($ligne['remise_valeur'] ?? '') !== '' ? (int) $ligne['remise_valeur'] : null,
+                ];
+
+                // Absent plutôt que null : côté JS, seule une clé manquante se
+                // lit comme "aucun lieu choisi" (voir posApp, magasin_source_id).
+                if (($ligne['magasin_source_id'] ?? '') !== '') {
+                    $donnees['magasin_source_id'] = (int) $ligne['magasin_source_id'];
+                }
+
+                return $donnees;
+            })->values(),
             $devisTransformation !== null => $devisTransformation->lignes->map(fn ($ligne) => [
                 'produit_id' => $ligne->produit_id,
                 'unite_vente_id' => $ligne->unite_vente_id,
@@ -110,22 +140,30 @@ class VenteController extends Controller
                 'remise_type' => $ligne->remise_type ?? '',
                 'remise_valeur' => $ligne->remise_valeur,
             ])->values(),
-            $venteEnAttente !== null => $venteEnAttente->lignes->map(fn ($ligne) => [
-                'produit_id' => $ligne->produit_id,
-                'unite_vente_id' => $ligne->unite_vente_id,
-                'produitLibelle' => $ligne->produit->libelle_affichage,
-                'uniteLibelle' => $ligne->uniteVente?->libelle,
-                'facteur' => $ligne->uniteVente?->facteur ?? 1,
-                'quantite' => $ligne->quantite,
-                'prixUnitaire' => $ligne->uniteVente?->prix ?? $ligne->produit->prix_piece,
-                'remise_type' => '',
-                'remise_valeur' => null,
-                // Lieu de prélèvement choisi avant la mise en attente, s'il
-                // différait du magasin de la caisse (voir CLAUDE.md) ; null =
-                // magasin de la caisse par défaut.
-                'magasin_source_id' => $ligne->magasin_source_id !== $magasinId ? $ligne->magasin_source_id : null,
-                'magasinSourceNom' => $ligne->magasin_source_id !== $magasinId ? $ligne->magasinSource?->nom : null,
-            ])->values(),
+            $venteEnAttente !== null => $venteEnAttente->lignes->map(function ($ligne) {
+                $donnees = [
+                    'produit_id' => $ligne->produit_id,
+                    'unite_vente_id' => $ligne->unite_vente_id,
+                    'produitLibelle' => $ligne->produit->libelle_affichage,
+                    'uniteLibelle' => $ligne->uniteVente?->libelle,
+                    'facteur' => $ligne->uniteVente?->facteur ?? 1,
+                    'quantite' => $ligne->quantite,
+                    'prixUnitaire' => $ligne->uniteVente?->prix ?? $ligne->produit->prix_piece,
+                    'remise_type' => '',
+                    'remise_valeur' => null,
+                ];
+
+                // Absent plutôt que null si aucun lieu n'a été choisi avant la
+                // mise en attente (choix optionnel à ce stade, voir
+                // VenteEnAttenteController) : côté JS, seule une clé absente
+                // se lit comme "non choisi" (voir posApp, magasin_source_id).
+                if ($ligne->magasin_source_id !== null) {
+                    $donnees['magasin_source_id'] = $ligne->magasin_source_id;
+                    $donnees['magasinSourceNom'] = $ligne->magasinSource?->nom;
+                }
+
+                return $donnees;
+            })->values(),
             default => collect(),
         };
 
@@ -162,7 +200,6 @@ class VenteController extends Controller
     public function transformerDevis(Request $request, SessionCaisse $session, Devis $devis, DevisService $devisService, VenteService $venteService): RedirectResponse
     {
         $this->assurerMagasin($session->caisse->magasin_id);
-        abort_if($devis->magasin_id !== $session->caisse->magasin_id, 403, 'Ce devis appartient à un autre magasin.');
         $this->nettoyerChampsOptionnels($request);
         $this->bloquerRemiseSansPermission($request);
 
@@ -170,7 +207,7 @@ class VenteController extends Controller
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
-            'lignes.*.magasin_source_id' => ['nullable', 'exists:magasins,id'],
+            'lignes.*.magasin_source_id' => ['required', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
@@ -187,7 +224,6 @@ class VenteController extends Controller
                 $donnees['lignes'],
                 $donnees['remise_totale_type'] ?? null,
                 $donnees['remise_totale_valeur'] ?? null,
-                $session->caisse->magasin,
             );
             $totalPaiements = array_sum(array_column($donnees['paiements'], 'montant'));
             abort_if($totalPaiements < $totalNet, 403, 'Vous n\'avez pas la permission de vendre à crédit.');
@@ -223,7 +259,7 @@ class VenteController extends Controller
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
-            'lignes.*.magasin_source_id' => ['nullable', 'exists:magasins,id'],
+            'lignes.*.magasin_source_id' => ['required', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
@@ -265,7 +301,11 @@ class VenteController extends Controller
     {
         $this->assurerMagasin($vente->magasin_id);
 
-        $vente->load(['lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement', 'magasin', 'caissier', 'sessionCaisse.caisse', 'annulateur', 'client']);
+        $vente->load([
+            'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement',
+            'reglementsClient.paiements.moyenPaiement', 'reglementsClient.caissier',
+            'magasin', 'caissier', 'sessionCaisse.caisse', 'annulateur', 'client',
+        ]);
 
         $signalements = $vente->activities()
             ->where('description', 'like', '%» signalée :%')
@@ -273,7 +313,32 @@ class VenteController extends Controller
             ->latest()
             ->get();
 
-        return view('ventes.ticket', ['vente' => $vente, 'signalements' => $signalements]);
+        // Un règlement client exige une session de caisse ouverte (règle 14)
+        // — celle de l'utilisateur courant, pas forcément celle de la vente.
+        $sessionOuverte = SessionCaisse::where('caissier_id', request()->user()->id)
+            ->whereNull('date_fermeture')
+            ->whereNull('date_cloture')
+            ->with('caisse')
+            ->first();
+
+        // Le bouton "Facture" imprime en place (voir ventes/ticket.blade.php,
+        // #factureImprimable) plutôt que de rediriger vers ventes.facture —
+        // mêmes données que chargerDonneesFacture() pour un rendu identique.
+        $parametre = Parametre::actuel();
+        $logo = $parametre->getFirstMedia('logo');
+        $logoDataUri = ($logo && is_file($logo->getPath()))
+            ? 'data:'.$logo->mime_type.';base64,'.base64_encode(file_get_contents($logo->getPath()))
+            : null;
+
+        return view('ventes.ticket', [
+            'vente' => $vente,
+            'signalements' => $signalements,
+            'sessionOuverte' => $sessionOuverte,
+            'peutRegler' => request()->user()->can('client.reglement'),
+            'moyensPaiement' => MoyenPaiement::actifs(),
+            'parametre' => $parametre,
+            'logoDataUri' => $logoDataUri,
+        ]);
     }
 
     public function facture(Vente $vente): View
@@ -296,7 +361,7 @@ class VenteController extends Controller
     {
         $this->assurerMagasin($vente->magasin_id);
 
-        $vente->load(['client', 'magasin', 'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement']);
+        $vente->load(['client', 'magasin', 'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement', 'reglementsClient']);
 
         $spreadsheet = new Spreadsheet();
         $feuille = $spreadsheet->getActiveSheet();
@@ -365,7 +430,7 @@ class VenteController extends Controller
      */
     private function chargerDonneesFacture(Vente $vente): array
     {
-        $vente->load(['client', 'magasin', 'caissier', 'sessionCaisse.caisse', 'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement']);
+        $vente->load(['client', 'magasin', 'caissier', 'sessionCaisse.caisse', 'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement', 'reglementsClient']);
 
         $parametre = Parametre::actuel();
         $logo = $parametre->getFirstMedia('logo');
@@ -467,10 +532,10 @@ class VenteController extends Controller
     private function nettoyerChampsOptionnels(Request $request): void
     {
         $lignes = collect($request->input('lignes', []))->map(function (array $ligne) {
-            $ligne['unite_vente_id'] = $ligne['unite_vente_id'] ?: null;
+            $ligne['unite_vente_id'] = ($ligne['unite_vente_id'] ?? null) ?: null;
             $ligne['magasin_source_id'] = ($ligne['magasin_source_id'] ?? null) ?: null;
-            $ligne['remise_type'] = $ligne['remise_type'] ?: null;
-            $ligne['remise_valeur'] = $ligne['remise_valeur'] ?: null;
+            $ligne['remise_type'] = ($ligne['remise_type'] ?? null) ?: null;
+            $ligne['remise_valeur'] = ($ligne['remise_valeur'] ?? null) ?: null;
 
             return $ligne;
         })->all();
@@ -479,23 +544,12 @@ class VenteController extends Controller
             'lignes' => $lignes,
             'remise_totale_type' => $request->input('remise_totale_type') ?: null,
             'remise_totale_valeur' => $request->input('remise_totale_valeur') ?: null,
+            // Une vente entièrement à crédit (aucun paiement saisi) ne génère
+            // aucun champ paiements[...] côté JS (boucle vide) : la clé
+            // n'existe alors pas du tout dans la requête, ce qui échoue la
+            // règle "present" — normalisée ici en tableau vide, autorisé
+            // (règle 13 : paiement partiel ou nul si un client est identifié).
+            'paiements' => $request->input('paiements', []),
         ]);
-    }
-
-    /**
-     * Sans la permission vente.credit, aucune vente ne doit jamais être
-     * rattachée à un client (donc jamais à crédit) — même logique que
-     * bloquerRemiseSansPermission pour les remises : on efface le champ
-     * avant validation plutôt que de faire confiance à l'écran (qui masque
-     * déjà le sélecteur client), au cas où une requête serait construite à
-     * la main. Le superadmin passe toujours (bypass Gate::before).
-     */
-    private function bloquerCreditSansPermission(Request $request): void
-    {
-        if ($request->user()->can('vente.credit')) {
-            return;
-        }
-
-        $request->merge(['client_id' => null]);
     }
 }

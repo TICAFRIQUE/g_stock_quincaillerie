@@ -146,6 +146,71 @@ $input-bg: #ffffff;
     color: #fff !important;
 }
 
+// --- Bouton d'action "règlement" (paiement d'une dette fournisseur) ---
+// Le jaune $warning plat manque de contraste et se lit mal avec du texte
+// blanc ; les actions financières (régler) utilisent un dégradé violet
+// dédié, visuellement distinct de l'orange primaire, du vert succès et du
+// rouge danger déjà utilisés pour valider/annuler à côté de ces boutons.
+$reglement-start: #7c3aed;
+$reglement-end: #4c1d95;
+$reglement-start-hover: #8b5cf6;
+$reglement-end-hover: #5b21b6;
+
+.btn-reglement {
+    color: #fff;
+    background: linear-gradient(135deg, $reglement-start 0%, $reglement-end 100%);
+    border: 1px solid $reglement-end;
+
+    &:hover,
+    &:focus {
+        color: #fff;
+        background: linear-gradient(135deg, $reglement-start-hover 0%, $reglement-end-hover 100%);
+        border-color: $reglement-end-hover;
+    }
+
+    &:focus {
+        box-shadow: 0 0 0 0.25rem rgba($reglement-start, 0.35);
+    }
+
+    &:active {
+        color: #fff;
+        background: $reglement-end;
+        border-color: $reglement-end;
+    }
+
+    &:disabled,
+    &.disabled {
+        color: #fff;
+        background: linear-gradient(135deg, $reglement-start 0%, $reglement-end 100%);
+        opacity: 0.55;
+    }
+}
+
+.btn-outline-reglement {
+    color: $reglement-end;
+    background-color: transparent;
+    border: 1px solid $reglement-start;
+
+    &:hover,
+    &:focus {
+        color: #fff;
+        background: linear-gradient(135deg, $reglement-start 0%, $reglement-end 100%);
+        border-color: $reglement-end;
+    }
+
+    &:focus {
+        box-shadow: 0 0 0 0.25rem rgba($reglement-start, 0.35);
+    }
+}
+
+.text-reglement {
+    color: $reglement-end;
+}
+
+.bg-reglement-subtle {
+    background-color: rgba($reglement-start, 0.12);
+}
+
 // --- Boutons d'action icône (tableaux) ---
 
 .btn-icon {
@@ -284,5 +349,137 @@ $input-bg: #ffffff;
 
     @page {
         margin: 5mm;
+    }
+
+    // Bascule d'impression sur ventes/ticket.blade.php : le bouton "Facture"
+    // imprime en place (pas de nouvel onglet) en affichant #factureImprimable
+    // à la place du reçu compact .recu-pos, via une classe posée sur <body>
+    // juste avant window.print() puis retirée à "afterprint".
+    body.impression-facture .recu-pos {
+        display: none !important;
+    }
+
+    body.impression-facture #factureImprimable {
+        display: block !important;
+    }
+}
+
+// --- Contenu "facture" imprimable en place (voir ventes/ticket.blade.php) ---
+// Feuille volontairement autonome (pas de Bootstrap) : reprend le gabarit de
+// ventes/facture.blade.php pour un rendu identique, sans dépendre d'un
+// nouvel onglet/document.
+#factureImprimable {
+    font-family: 'DejaVu Sans', Arial, sans-serif;
+    font-size: 13px;
+    color: #241e19;
+
+    table {
+        border-collapse: collapse;
+    }
+
+    .text-end {
+        text-align: right;
+    }
+
+    .entete {
+        width: 100%;
+        margin-bottom: 24px;
+    }
+
+    .entete td {
+        vertical-align: top;
+    }
+
+    .logo {
+        max-height: 70px;
+        max-width: 220px;
+    }
+
+    .entreprise-nom {
+        font-size: 16px;
+        font-weight: bold;
+    }
+
+    .facture-titre {
+        font-size: 22px;
+        font-weight: bold;
+        text-align: right;
+        color: $primary;
+        letter-spacing: 1px;
+    }
+
+    .facture-meta {
+        text-align: right;
+        font-size: 12px;
+        color: #555;
+        line-height: 1.6;
+    }
+
+    .bloc-client {
+        margin: 16px 0 24px;
+        padding: 12px 14px;
+        background: #f6f3ef;
+        border: 1px solid #ddd3c8;
+    }
+
+    .bloc-client .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        color: #888;
+        margin-bottom: 4px;
+    }
+
+    table.lignes {
+        width: 100%;
+        margin-top: 8px;
+    }
+
+    table.lignes th,
+    table.lignes td {
+        border: 1px solid #ccc;
+        padding: 6px 8px;
+        font-size: 12px;
+    }
+
+    table.lignes th {
+        background: #f0ece6;
+        text-align: left;
+    }
+
+    table.totaux {
+        width: 45%;
+        margin-left: 55%;
+        margin-top: 12px;
+    }
+
+    table.totaux td {
+        padding: 5px 8px;
+    }
+
+    table.totaux .net td {
+        font-weight: bold;
+        font-size: 15px;
+        border-top: 2px solid #241e19;
+    }
+
+    table.totaux .credit td {
+        color: #b02a37;
+        font-weight: bold;
+    }
+
+    .badge-annulee {
+        display: inline-block;
+        padding: 4px 10px;
+        border: 1px solid #b02a37;
+        color: #b02a37;
+        font-weight: bold;
+        margin-bottom: 12px;
+    }
+
+    .mention {
+        margin-top: 30px;
+        font-size: 11px;
+        color: #888;
+        text-align: center;
     }
 }

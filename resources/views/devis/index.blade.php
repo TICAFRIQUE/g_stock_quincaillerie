@@ -11,7 +11,7 @@
     </div>
 
     <x-recherche-form :action="route('devis.index')" placeholder="Numéro ou client…"
-        :autres-params="['statut', 'magasin_id']">
+        :autres-params="['statut']">
         <div>
             <label for="statut" class="form-label small mb-1">Statut</label>
             <select name="statut" id="statut" class="form-select" onchange="this.form.submit()">
@@ -21,17 +21,6 @@
                 <option value="transforme" @selected(request('statut') === 'transforme')>Transformé en vente</option>
             </select>
         </div>
-        @unless (auth()->user()->magasin_id)
-            <div>
-                <label for="magasin_id" class="form-label small mb-1">Magasin</label>
-                <select name="magasin_id" id="magasin_id" class="form-select" onchange="this.form.submit()">
-                    <option value="">Tous les magasins</option>
-                    @foreach ($magasins as $magasin)
-                        <option value="{{ $magasin->id }}" @selected(request('magasin_id') == $magasin->id)>{{ $magasin->nom }}</option>
-                    @endforeach
-                </select>
-            </div>
-        @endunless
     </x-recherche-form>
 
     <div class="card">
@@ -41,7 +30,6 @@
                     <tr>
                         <x-th-tri champ="numero" label="Numéro" />
                         <th>Client</th>
-                        <th>Magasin</th>
                         <x-th-tri champ="statut" label="Statut" />
                         <x-th-tri champ="date_validite" label="Valide jusqu'au" />
                         <th class="text-end">Actions</th>
@@ -52,7 +40,6 @@
                         <tr>
                             <td><code>{{ $unDevis->numero }}</code></td>
                             <td>{{ $unDevis->client->nom }}</td>
-                            <td>{{ $unDevis->magasin->nom }}</td>
                             <td><span class="badge {{ $unDevis->statutEffectif()->classeBadge() }}">{{ $unDevis->statutEffectif()->libelle() }}</span></td>
                             <td>{{ $unDevis->date_validite->format('d/m/Y') }}</td>
                             <td class="text-end">
@@ -64,7 +51,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center text-secondary py-4">Aucun devis pour l'instant.</td>
+                            <td colspan="5" class="text-center text-secondary py-4">Aucun devis pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>

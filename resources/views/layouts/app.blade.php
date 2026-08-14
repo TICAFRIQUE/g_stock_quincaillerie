@@ -54,6 +54,22 @@
                 </div>
             @endif
 
+            @if ($errors->any())
+                {{-- Échec de validation "brut" (règles required/exists/...), distinct
+                     des exceptions métier attrapées ci-dessus (session('erreur')) —
+                     sans ce bloc, un formulaire refusé se réaffichait sans aucune
+                     explication visible. --}}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <div class="fw-medium mb-1">Le formulaire contient des erreurs :</div>
+                    <ul class="mb-0 ps-3">
+                        @foreach ($errors->all() as $erreurValidation)
+                            <li>{{ $erreurValidation }}</li>
+                        @endforeach
+                    </ul>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+                </div>
+            @endif
+
             @yield('content')
         </main>
     </div>

@@ -7,7 +7,7 @@
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
                 <h2 class="h4 mb-1">Modifier le devis {{ $devis->numero }}</h2>
-                <p class="text-secondary small mb-0">Client : {{ $devis->client->nom }} — Magasin : {{ $devis->magasin->nom }}</p>
+                <p class="text-secondary small mb-0">Client : {{ $devis->client->nom }}</p>
             </div>
             <a href="{{ route('devis.show', $devis) }}" class="btn btn-link">
                 <i class="bi bi-arrow-left me-1"></i>Retour au devis

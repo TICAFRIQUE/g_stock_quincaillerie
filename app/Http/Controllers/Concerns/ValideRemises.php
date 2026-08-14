@@ -50,4 +50,21 @@ trait ValideRemises
             'remise_totale_valeur' => null,
         ]);
     }
+
+    /**
+     * Sans la permission vente.credit, aucune vente (ni aucun panier en
+     * attente qui en découle) ne doit jamais être rattachée à un client —
+     * on efface le champ avant validation plutôt que de faire confiance à
+     * l'écran (qui masque déjà le sélecteur client), au cas où une requête
+     * serait construite à la main. Le superadmin passe toujours (bypass
+     * Gate::before).
+     */
+    protected function bloquerCreditSansPermission(Request $request): void
+    {
+        if ($request->user()->can('vente.credit')) {
+            return;
+        }
+
+        $request->merge(['client_id' => null]);
+    }
 }

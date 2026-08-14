@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\SessionNonOuverteException;
+use App\Models\Client;
 use App\Models\SessionCaisse;
 use App\Models\User;
 use App\Models\Vente;
@@ -29,6 +30,7 @@ class VenteEnAttenteService
         array $lignes,
         ?string $libelle = null,
         ?VenteEnAttente $existant = null,
+        ?Client $client = null,
     ): VenteEnAttente {
         if (empty($lignes)) {
             throw new InvalidArgumentException('Une vente en attente doit comporter au moins une ligne.');
@@ -39,7 +41,7 @@ class VenteEnAttenteService
             throw new SessionNonOuverteException();
         }
 
-        return DB::transaction(function () use ($session, $caissier, $lignes, $libelle, $existant) {
+        return DB::transaction(function () use ($session, $caissier, $lignes, $libelle, $existant, $client) {
             $venteEnAttente = $existant ?? new VenteEnAttente([
                 'magasin_id' => $session->caisse->magasin_id,
                 'caisse_id' => $session->caisse_id,
@@ -47,6 +49,7 @@ class VenteEnAttenteService
                 'caissier_id' => $caissier->id,
             ]);
             $venteEnAttente->libelle = $libelle;
+            $venteEnAttente->client_id = $client?->id;
             $venteEnAttente->save();
 
             // « Remettre en attente » un panier déjà repris est une mise à jour
@@ -80,10 +83,12 @@ class VenteEnAttenteService
         ?string $remiseTotaleType = null,
         ?int $remiseTotaleValeur = null,
         ?int $montantRecu = null,
+        ?Client $client = null,
+        bool $autoriserDepassementLimite = false,
     ): Vente {
         $venteEnAttente->loadMissing(['sessionCaisse', 'caissier']);
 
-        return DB::transaction(function () use ($venteEnAttente, $lignes, $paiements, $remiseTotaleType, $remiseTotaleValeur, $montantRecu) {
+        return DB::transaction(function () use ($venteEnAttente, $lignes, $paiements, $remiseTotaleType, $remiseTotaleValeur, $montantRecu, $client, $autoriserDepassementLimite) {
             $vente = $this->venteService->vendre(
                 session: $venteEnAttente->sessionCaisse,
                 caissier: $venteEnAttente->caissier,
@@ -92,6 +97,8 @@ class VenteEnAttenteService
                 remiseTotaleType: $remiseTotaleType,
                 remiseTotaleValeur: $remiseTotaleValeur,
                 montantRecu: $montantRecu,
+                client: $client,
+                autoriserDepassementLimite: $autoriserDepassementLimite,
             );
 
             $venteEnAttente->delete();
