@@ -11,6 +11,10 @@
                 <div class="card-body">
                     @if ($produit->getFirstMediaUrl('image'))
                         <img src="{{ $produit->getFirstMediaUrl('image') }}" alt="" class="rounded mb-3" style="max-height: 160px;">
+                    @else
+                        <div class="bg-light rounded mb-3 d-flex align-items-center justify-content-center text-secondary" style="width:160px;height:160px;font-size:2.5rem;">
+                            <i class="bi bi-tools"></i>
+                        </div>
                     @endif
 
                     <form method="POST" action="{{ route('produits.update', $produit) }}" enctype="multipart/form-data">

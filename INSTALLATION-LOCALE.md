@@ -1,0 +1,124 @@
+# Installation locale chez un client
+
+Guide d'installation **sur site**, chez un client (Laragon, poste Windows,
+sans hébergement distant). Différent du déploiement cPanel décrit dans
+`DEPLOIEMENT.md` — ne pas confondre les deux.
+
+Une fois installée, l'application fonctionne **sans connexion internet au
+quotidien** : tout tourne en local (Apache/MySQL/PHP via Laragon), aucune vue
+ne charge de ressource externe (pas de CDN, pas d'envoi d'e-mail). Internet
+n'est nécessaire qu'**une seule fois**, à l'installation, pour télécharger les
+dépendances (`composer install`, `npm install`) — sauf si elles ont été
+préparées à l'avance (voir §5).
+
+---
+
+## 1. Prérequis
+
+- **Poste Windows 10/11**, avec droits administrateur (nécessaire pour que
+  Laragon puisse écrire dans le fichier `hosts` et créer les virtual hosts).
+- **Connexion internet**, au moins le temps de l'installation (voir §5 pour
+  s'en passer complètement).
+- Si plusieurs caisses doivent utiliser l'application simultanément : les
+  postes doivent être sur le **même réseau local** (Wi-Fi/câble du magasin) —
+  pas besoin d'internet, juste un réseau local entre les postes.
+
+## 2. Logiciel à installer sur le poste client
+
+- **Laragon** (édition *Full*, qui inclut déjà PHP 8.3+, MySQL, Apache,
+  Node.js et Composer) : https://laragon.org/download/
+- Lancer Laragon **en tant qu'administrateur** au moins la toute première
+  fois (clic droit → Exécuter en tant qu'administrateur) : sans ça, Laragon
+  ne peut pas écrire l'entrée nécessaire dans `C:\Windows\System32\drivers\etc\hosts`
+  et le virtual host ne sera jamais accessible par son nom.
+- Dans **Laragon → Préférences → Général**, vérifier que ces deux options
+  sont cochées (cochées par défaut normalement) :
+  - **Créer automatiquement des hôtes virtuels**
+  - **Tout démarrer automatiquement**
+
+## 3. Copier le projet
+
+Copier tout le dossier du projet **directement** dans `C:\laragon\www\` :
+
+```
+C:\laragon\www\g_stock_quincaillerie\
+```
+
+⚠️ **Le dossier doit être directement sous `www\`, jamais imbriqué dans un
+sous-dossier** (ex. `C:\laragon\www\clients\g_stock_quincaillerie` ne
+fonctionnera pas) — Laragon ne détecte automatiquement que les dossiers de
+premier niveau pour générer leur virtual host.
+
+## 4. Scripts à exécuter
+
+Tout se passe dans le **Terminal Laragon** (clic droit sur l'icône Laragon →
+Terminal) — jamais l'invite de commandes Windows classique, qui ne connaît
+pas `php`/`composer`/`npm`/`mysql`.
+
+```
+cd C:\laragon\www\g_stock_quincaillerie
+scripts\installer.bat
+```
+
+`installer.bat` demande 4 informations (URL souhaitée, nom de la base,
+utilisateur/mot de passe MySQL — Entrée pour garder les valeurs par défaut si
+MySQL local sans mot de passe), puis exécute automatiquement, dans l'ordre :
+
+1. `composer install --no-dev` (dépendances PHP)
+2. Configuration du `.env` (via `scripts\configurer-env.ps1`)
+3. Création de la base de données MySQL
+4. `php artisan migrate --force`
+5. `php artisan db:seed --force` (référentiel : rôles, permissions, unités,
+   taxes, moyens de paiement — pas de données de démo en production)
+6. `npm install` + `npm run build` (assets front)
+7. `php artisan storage:link`
+8. Mise en cache config/routes/vues
+9. Tâche planifiée Windows (`scripts\creer-tache-planifiee.ps1`), qui exécute
+   `php artisan schedule:run` chaque minute **sans fenêtre visible**, pour les
+   alertes horaires (stock sous seuil, sessions de caisse restées ouvertes)
+10. Création du compte **superadmin** (nom, identifiant, code PIN — saisi
+    deux fois, en aveugle) : le script **boucle tant que ce compte n'est pas
+    réellement créé**, il ne peut plus se terminer en silence sur un échec
+
+À la fin, redémarrer Apache dans Laragon (**Stop All** puis **Start All**)
+pour qu'il détecte le nouveau dossier et génère son virtual host.
+
+### Au quotidien
+
+Mettre un raccourci de `scripts\demarrer.bat` sur le bureau du client :
+double-clic le matin pour démarrer Laragon (si pas déjà lancé au boot) et
+ouvrir l'application dans le navigateur.
+
+## 5. Installer sans connexion internet du tout
+
+Si le poste client n'a pas internet, ou pour ne pas en dépendre le jour de
+l'installation : préparer `vendor/`, `node_modules/` et `public/build/` **à
+l'avance**, sur une machine connectée avec la même version de PHP/Node
+(`composer install`, puis `npm install && npm run build`), et copier ces
+dossiers avec le reste du projet. `installer.bat` s'exécute alors sans jamais
+solliciter internet.
+
+## 6. Vérifications post-installation
+
+- [ ] Laragon : pastilles **Apache** et **MySQL** vertes.
+- [ ] Virtual host généré :
+      `dir C:\laragon\etc\apache2\sites-enabled\auto.g_stock_quincaillerie.test.conf`
+      → doit exister, `DocumentRoot` doit pointer vers `...\public`.
+- [ ] Entrée dans le fichier hosts :
+      `findstr /i "g_stock_quincaillerie" C:\Windows\System32\drivers\etc\hosts`
+- [ ] `.env` → `APP_URL` correspond **exactement** au nom du dossier + `.test`
+      (`findstr APP_URL C:\laragon\www\g_stock_quincaillerie\.env`).
+- [ ] Page accessible dans le navigateur, connexion avec le compte superadmin
+      réussie.
+- [ ] Tâche planifiée active sans fenêtre qui clignote :
+      `Get-ScheduledTaskInfo -TaskName "GStockQuincaillerie_Schedule"`
+      (`LastTaskResult : 0` après une exécution).
+
+## 7. Dépannage — problèmes déjà rencontrés
+
+| Symptôme | Cause probable | Solution |
+|---|---|---|
+| `ERROR 2003 Can't connect to MySQL server ... (10061)` pendant l'install | MySQL de Laragon pas démarré, souvent un autre MySQL (WampServer, XAMPP...) qui occupe déjà le port 3306 | `netstat -ano \| findstr :3306` pour identifier le conflit ; changer le port MySQL dans Laragon (Préférences → Services & Ports) si besoin |
+| Navigateur : "site inaccessible" | Dossier du projet imbriqué (pas directement sous `www\`), OU Apache pas redémarré après la copie, OU entrée `hosts` jamais écrite (Laragon pas lancé en admin) | Vérifier la structure du dossier, faire Stop All/Start All, relancer Laragon en administrateur si l'entrée hosts manque |
+| Le compte superadmin ne se retrouve pas en base après l'install | Les deux saisies du code PIN (masquées) ne correspondaient pas, ou identifiant déjà pris — `installer.bat` continuait avant sans le signaler (corrigé : il boucle maintenant jusqu'au succès) | Rejouer uniquement : `php artisan app:creer-superadmin` |
+| Une fenêtre noire s'ouvre et se referme chaque minute | Ancienne version de la tâche planifiée (avant le fix du wrapper `.vbs` silencieux) | `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\creer-tache-planifiee.ps1 -PhpExe (Get-Command php).Source -ArtisanPath "C:\laragon\www\g_stock_quincaillerie\artisan"` |

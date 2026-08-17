@@ -17,12 +17,12 @@
 
             <div class="d-flex align-items-center justify-content-between">
                 <div>
-                    <div class="fw-medium">Mot de passe</div>
-                    <div class="text-secondary small">Génère un nouveau mot de passe et l'envoie par e-mail à l'utilisateur.</div>
+                    <div class="fw-medium">Code de connexion</div>
+                    <div class="text-secondary small">Génère un nouveau code à 4 chiffres, affiché à l'écran une seule fois.</div>
                 </div>
-                <x-confirm-button :action="route('utilisateurs.reinitialiser-mot-de-passe', $utilisateur)"
-                    message="Réinitialiser le mot de passe de « {{ $utilisateur->name }} » ? Un nouveau mot de passe sera généré et envoyé à {{ $utilisateur->email }}."
-                    button-label="Réinitialiser le mot de passe" button-class="btn-outline-danger" icon="bi-key" />
+                <x-confirm-button :action="route('utilisateurs.reinitialiser-code', $utilisateur)"
+                    message="Réinitialiser le code de « {{ $utilisateur->name }} » ? Un nouveau code à 4 chiffres sera généré."
+                    button-label="Réinitialiser le code" button-class="btn-outline-danger" icon="bi-key" />
             </div>
         </div>
     </div>

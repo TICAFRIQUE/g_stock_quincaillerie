@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('titre', 'Erreur') — {{ $parametre->nom }}</title>
-    <link rel="icon" type="image/jpeg" href="{{ $parametre->logoUrl() }}">
+    <link rel="icon" href="{{ $parametre->logoUrl() }}">
     @vite(['resources/sass/app.scss', 'resources/js/app.js'])
 </head>
 <body class="d-flex align-items-center" style="min-height: 100vh; background-color: var(--erp-sidebar-bg);">

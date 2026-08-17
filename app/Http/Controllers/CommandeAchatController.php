@@ -75,7 +75,7 @@ class CommandeAchatController extends Controller
             // montré à la saisie.
             'unitesParProduit' => $produits->mapWithKeys(fn (Produit $p) => [
                 $p->id => [
-                    'basePiece' => $p->unite_base_libelle,
+                    'basePiece' => $p->uniteBase?->nom_avec_abbreviation ?? 'pièce',
                     'variantes' => $p->uniteVentes->map(fn (UniteVente $uv) => [
                         'id' => $uv->id,
                         'libelle' => $uv->unite->nom_avec_abbreviation,

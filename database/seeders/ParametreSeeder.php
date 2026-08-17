@@ -7,17 +7,17 @@ use Illuminate\Database\Seeder;
 
 class ParametreSeeder extends Seeder
 {
+    /**
+     * Aucun logo n'est attaché ici : tant que rien n'est configuré, l'app
+     * retombe sur le logo par défaut généré (voir Parametre::logoUrl() et
+     * public/images/logo-defaut.svg) — un logo personnalisé se dépose depuis
+     * Paramètres, jamais en dur dans le seeder.
+     */
     public function run(): void
     {
-        $parametre = Parametre::query()->firstOrCreate(['id' => 1], [
-            'nom' => "Plaisir d'Offrir, Joie de Recevoir",
+        Parametre::query()->firstOrCreate(['id' => 1], [
+            'nom' => 'Gérer Mon Stock',
         ]);
-
-        $logoSource = public_path('images/logo.jpeg');
-
-        if (! $parametre->getFirstMedia('logo') && file_exists($logoSource)) {
-            $parametre->addMedia($logoSource)->preservingOriginal()->toMediaCollection('logo');
-        }
 
         Parametre::invaliderCache();
     }

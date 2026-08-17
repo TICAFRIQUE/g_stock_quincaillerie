@@ -5,9 +5,15 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="h4 mb-0">Valeur du stock</h2>
-        <button type="button" class="btn btn-outline-secondary d-print-none" onclick="window.print()">
-            <i class="bi bi-printer me-1"></i>Imprimer
-        </button>
+        <div class="d-flex gap-2 flex-wrap">
+            <x-bouton-imprimer />
+            <a href="{{ route('rapports.stock.pdf', request()->query()) }}" class="btn btn-outline-secondary d-print-none">
+                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+            </a>
+            <a href="{{ route('rapports.stock.excel', request()->query()) }}" class="btn btn-outline-secondary d-print-none">
+                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+            </a>
+        </div>
     </div>
 
     <div class="card mb-3" style="max-width: 320px;">

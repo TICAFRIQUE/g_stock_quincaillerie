@@ -5,7 +5,15 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-1">
         <h2 class="h4 mb-0">Écarts de caisse</h2>
-        <x-bouton-imprimer tout />
+        <div class="d-flex gap-2 flex-wrap">
+            <x-bouton-imprimer tout />
+            <a href="{{ route('rapports.ecarts-caisse.pdf', request()->query()) }}" class="btn btn-outline-secondary d-print-none">
+                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+            </a>
+            <a href="{{ route('rapports.ecarts-caisse.excel', request()->query()) }}" class="btn btn-outline-secondary d-print-none">
+                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+            </a>
+        </div>
     </div>
     @php
         $magasinIdActif = auth()->user()->magasin_id ?: request('magasin_id');

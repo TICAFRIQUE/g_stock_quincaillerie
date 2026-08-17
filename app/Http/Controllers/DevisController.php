@@ -99,12 +99,23 @@ class DevisController extends Controller
         $stocksParProduit = $devis->lignes->pluck('produit')->unique('id')
             ->mapWithKeys(fn ($produit) => [$produit->id => $stockService->disponibiliteParMagasin($produit)]);
 
+        // Le bouton "Imprimer" imprime en place (voir devis/show.blade.php,
+        // #factureImprimable) plutôt que de rediriger vers devis.facture —
+        // mêmes données que chargerDonneesFacture() pour un rendu identique.
+        $parametre = Parametre::actuel();
+        $logo = $parametre->getFirstMedia('logo');
+        $logoDataUri = ($logo && is_file($logo->getPath()))
+            ? 'data:'.$logo->mime_type.';base64,'.base64_encode(file_get_contents($logo->getPath()))
+            : null;
+
         return view('devis.show', [
             'devis' => $devis,
             'montants' => $devis->calculerMontants(),
             'sessionOuverte' => $sessionOuverte,
             'lignesEnRupture' => $devis->peutEtreTransforme() ? $devis->lignesEnRuptureDeStock() : collect(),
             'stocksParProduit' => $stocksParProduit,
+            'parametre' => $parametre,
+            'logoDataUri' => $logoDataUri,
         ]);
     }
 

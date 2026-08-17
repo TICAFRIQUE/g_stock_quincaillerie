@@ -18,7 +18,7 @@ use Illuminate\Http\Request;
  */
 trait TrieListe
 {
-    protected function appliquerTri(Builder $query, Request $request, array $colonnesTriables, string $colonneDefaut = 'created_at'): Builder
+    protected function appliquerTri(Builder $query, Request $request, array $colonnesTriables, string $colonneDefaut = 'created_at', string $directionDefaut = 'desc'): Builder
     {
         $tri = $request->string('tri')->toString();
         $direction = $request->string('direction')->toString() === 'asc' ? 'asc' : 'desc';
@@ -29,6 +29,6 @@ trait TrieListe
             return $query->orderBy($colonneReelle, $direction);
         }
 
-        return $query->orderByDesc($colonneDefaut);
+        return $query->orderBy($colonneDefaut, $directionDefaut);
     }
 }

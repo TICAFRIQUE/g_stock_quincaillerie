@@ -292,10 +292,12 @@ client, réglé plus tard.
 
 ## Interface (ERP type Odoo)
 
-- **Layout à menu horizontal** (pas de sidebar) : une seule barre en haut de page,
-  repliable en mode burger sur mobile ; sections regroupées en menus déroulants (Ventes,
-  Stock, Catalogue, Rapports, Administration) — mêmes regroupements et permissions
-  qu'auparavant, seule la disposition change.
+- **Layout à menu horizontal sur desktop** : une seule barre en haut de page ; sections
+  regroupées en menus déroulants (Ventes, Stock, Catalogue, Rapports, Administration).
+  Sur mobile/tablette (< lg), le même menu s'ouvre en **sidebar coulissante** (offcanvas)
+  plutôt que replié en ligne sous la barre — plus confortable à parcourir sur petit
+  écran ; mêmes regroupements/permissions, seule la présentation change selon la taille
+  d'écran.
 - **Dashboard adapté au rôle** : caissier → sa session ; gérant → son magasin (CA, panier
   moyen, top produits, stock sous seuil, écarts de caisse, **total des créances clients**,
   clients en dépassement de limite) ; superadmin → consolidé multi-magasin. Graphiques

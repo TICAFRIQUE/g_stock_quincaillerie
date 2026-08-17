@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ExporteListe;
 use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\CommandeAchat;
 use App\Models\EcritureCompteFournisseur;
@@ -10,11 +11,13 @@ use App\Models\MoyenPaiement;
 use App\Models\ReglementFournisseur;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FournisseurController extends Controller
 {
-    use TrieListe;
+    use TrieListe, ExporteListe;
 
     public function index(Request $request): View
     {
@@ -28,9 +31,11 @@ class FournisseurController extends Controller
                 });
             });
 
-        $fournisseurs = $this->appliquerTri($query, $request, ['nom', 'actif', 'created_at'])
-            ->paginate(20)
-            ->withQueryString();
+        $query = $this->appliquerTri($query, $request, ['nom', 'actif', 'created_at']);
+
+        // L'impression (voir x-bouton-imprimer) couvre tout le résultat
+        // filtré, pas seulement la page affichée à l'écran.
+        $fournisseurs = $request->boolean('tout') ? $query->get() : $query->paginate(20)->withQueryString();
 
         // Le solde est dérivé (mirroring ClientController::index()) : calculé
         // en une seule requête groupée plutôt qu'une somme par ligne.
@@ -40,6 +45,54 @@ class FournisseurController extends Controller
             ->pluck('solde', 'fournisseur_id');
 
         return view('fournisseurs.index', ['fournisseurs' => $fournisseurs, 'soldes' => $soldes]);
+    }
+
+    public function pdf(Request $request): Response
+    {
+        return $this->pdfDepuisListe(
+            'Fournisseurs',
+            ['Nom', 'Téléphone', 'E-mail', 'Solde dû', 'Statut'],
+            $this->lignesExport($request),
+            'fournisseurs.pdf',
+        );
+    }
+
+    public function excel(Request $request): StreamedResponse
+    {
+        return $this->excelDepuisListe(
+            'Fournisseurs',
+            ['Nom', 'Téléphone', 'E-mail', 'Solde dû', 'Statut'],
+            $this->lignesExport($request),
+            'fournisseurs.xlsx',
+        );
+    }
+
+    private function lignesExport(Request $request): \Illuminate\Support\Collection
+    {
+        $query = Fournisseur::query()
+            ->when($request->filled('recherche'), function ($q) use ($request) {
+                $recherche = $request->string('recherche');
+                $q->where(function ($sub) use ($recherche) {
+                    $sub->where('nom', 'like', "%{$recherche}%")
+                        ->orWhere('telephone', 'like', "%{$recherche}%")
+                        ->orWhere('email', 'like', "%{$recherche}%");
+                });
+            });
+
+        $fournisseurs = $this->appliquerTri($query, $request, ['nom', 'actif', 'created_at'], 'nom', 'asc')->get();
+
+        $soldes = EcritureCompteFournisseur::whereIn('fournisseur_id', $fournisseurs->pluck('id'))
+            ->selectRaw('fournisseur_id, SUM(montant) as solde')
+            ->groupBy('fournisseur_id')
+            ->pluck('solde', 'fournisseur_id');
+
+        return $fournisseurs->map(fn (Fournisseur $f) => [
+            $f->nom,
+            $f->telephone ?? '—',
+            $f->email ?? '—',
+            number_format($soldes[$f->id] ?? 0, 0, ',', ' ').' F',
+            $f->actif ? 'Actif' : 'Inactif',
+        ]);
     }
 
     public function show(Fournisseur $fournisseur): View

@@ -156,6 +156,11 @@ class Produit extends Model implements HasMedia
                     'libelle_affichage' => $p->libelle_affichage,
                     'prix_piece' => $p->prix_piece,
                     'unite_base_libelle' => $p->unite_base_libelle,
+                    // Nom complet + abréviation (ex. « Kilogramme (kg) ») pour
+                    // le select d'unité à la vente/au devis — unite_base_libelle
+                    // reste l'abréviation seule, utilisée ailleurs pour un
+                    // affichage compact (ticket, quantités, prix/unité…).
+                    'unite_base_libelle_complet' => $p->uniteBase?->nom_avec_abbreviation ?? 'pièce',
                     'unites' => $p->uniteVentes->map(fn (UniteVente $u) => [
                         'id' => $u->id,
                         'libelle' => $u->libelle,

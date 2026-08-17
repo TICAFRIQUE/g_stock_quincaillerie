@@ -25,10 +25,11 @@ class DatabaseSeeder extends Seeder
 
         if (app()->environment('local')) {
             $superadmin = User::firstOrCreate(
-                ['email' => 'alexkouamelan96@gmail.com'],
+                ['username' => 'superadmin'],
                 [
                     'name' => 'Superadmin',
-                    'password' => env('SUPERADMIN_PASSWORD', 'password'),
+                    'email' => 'alexkouamelan96@gmail.com',
+                    'password' => env('SUPERADMIN_PASSWORD', '1234'),
                     'actif' => true,
                 ]
             );

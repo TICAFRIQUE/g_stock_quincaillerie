@@ -47,14 +47,29 @@
                             get aUnDoublon() {
                                 return this.lignes.some((l, i) => this.estDoublon(i));
                             },
+                            // Séparé de l'unité de base (voir baseLibelle) : une option
+                            // liée par :value à une chaîne vide ne pose jamais
+                            // l'attribut value côté Alpine — l'option retombe alors
+                            // silencieusement sur son texte affiché comme valeur
+                            // soumise (ex. « Pièce (pc) » envoyé au lieu d'une chaîne
+                            // vide), d'où l'erreur « valeur sélectionnée invalide »
+                            // côté serveur. L'option de l'unité de base reste donc une
+                            // option statique à valeur vide, jamais générée par x-for.
                             unitesDisponibles(produitId) {
                                 const infos = this.unitesParProduit[produitId];
-                                if (!infos) return [];
-                                return [{ id: '', libelle: infos.basePiece, facteur: 1 }, ...infos.variantes];
+                                return infos ? infos.variantes : [];
+                            },
+                            baseLibelle(produitId) {
+                                const infos = this.unitesParProduit[produitId];
+                                return infos ? infos.basePiece : 'pièce';
                             },
                             uniteChoisie(ligne) {
+                                if (!ligne.unite_vente_id) {
+                                    return { libelle: this.baseLibelle(ligne.produit_id), facteur: 1 };
+                                }
                                 const options = this.unitesDisponibles(ligne.produit_id);
-                                return options.find((o) => String(o.id) === String(ligne.unite_vente_id || '')) || options[0] || { libelle: 'pièce', facteur: 1 };
+                                return options.find((o) => String(o.id) === String(ligne.unite_vente_id))
+                                    || { libelle: this.baseLibelle(ligne.produit_id), facteur: 1 };
                             },
                             quantitePieces(ligne) {
                                 const quantite = Number(ligne.quantite) || 0;
@@ -166,8 +181,9 @@
                                     <div class="col-6 col-md-5">
                                         <label class="form-label small">Unité d'achat<span class="required-marker">*</span></label>
                                         <select :name="'lignes['+index+'][unite_vente_id]'" x-model="ligne.unite_vente_id" class="form-select form-select-sm">
+                                            <option value="" :selected="!ligne.unite_vente_id" x-text="baseLibelle(ligne.produit_id)"></option>
                                             <template x-for="option in unitesDisponibles(ligne.produit_id)" :key="option.id">
-                                                <option :value="option.id" x-text="option.libelle"></option>
+                                                <option :value="option.id" :selected="String(option.id) === String(ligne.unite_vente_id)" x-text="option.libelle"></option>
                                             </template>
                                         </select>
                                         <div class="text-danger small mt-1" x-show="erreurs['lignes.'+index+'.unite_vente_id']" x-text="(erreurs['lignes.'+index+'.unite_vente_id'] || [])[0]"></div>
@@ -207,9 +223,9 @@
                                     <div class="col-6 col-md-3">
                                         <label class="form-label small">Taxe</label>
                                         <select :name="'lignes['+index+'][taxe_id]'" x-model="ligne.taxe_id" class="form-select form-select-sm">
-                                            <option value="">Aucune</option>
+                                            <option value="" :selected="!ligne.taxe_id">Aucune</option>
                                             <template x-for="taxe in taxes" :key="taxe.id">
-                                                <option :value="taxe.id" x-text="taxe.libelle + ' (' + taxe.taux + '%)'"></option>
+                                                <option :value="taxe.id" :selected="String(taxe.id) === String(ligne.taxe_id)" x-text="taxe.libelle + ' (' + taxe.taux + '%)'"></option>
                                             </template>
                                         </select>
                                     </div>

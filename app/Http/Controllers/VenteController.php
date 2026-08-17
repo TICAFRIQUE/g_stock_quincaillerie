@@ -82,8 +82,16 @@ class VenteController extends Controller
         $this->assurerMagasin($session->caisse->magasin_id);
         abort_if($session->date_cloture || $session->date_fermeture, 403, 'Cette session n\'est plus ouverte.');
 
-        $magasinId = $session->caisse->magasin_id;
-        $stocksParProduit = Stock::where('magasin_id', $magasinId)->pluck('quantite', 'produit_id');
+        // Le sélecteur de produit (en haut du panier) est une pré-vérification
+        // rapide, pas la vérification qui bloque réellement la vente : la
+        // source de prélèvement est choisie plus tard, par ligne, parmi
+        // n'importe quel magasin ou dépôt (voir choix obligatoire de la
+        // source). Un stock nul dans le SEUL magasin de la caisse ne doit
+        // donc pas y griser un produit encore disponible ailleurs — on
+        // additionne le stock de toutes les sources confondues.
+        $stocksParProduit = Stock::selectRaw('produit_id, SUM(quantite) as total')
+            ->groupBy('produit_id')
+            ->pluck('total', 'produit_id');
 
         // Le catalogue (données de référence) est mis en cache ; le stock,
         // dérivé des mouvements et donc jamais figé, est toujours recalculé

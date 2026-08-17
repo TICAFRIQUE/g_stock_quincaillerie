@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Connexion — {{ $parametre->nom }}</title>
-    <link rel="icon" type="image/jpeg" href="{{ $parametre->logoUrl() }}">
+    <link rel="icon" href="{{ $parametre->logoUrl() }}">
     @vite(['resources/sass/app.scss', 'resources/js/app.js'])
 </head>
 <body>
@@ -72,16 +72,17 @@
                     @csrf
 
                     <div class="mb-3">
-                        <label for="email" class="form-label">Adresse e-mail</label>
-                        <input type="email" name="email" id="email" class="form-control" value="{{ old('email') }}" required autofocus>
+                        <label for="username" class="form-label">Nom d'utilisateur</label>
+                        <input type="text" name="username" id="username" class="form-control" value="{{ old('username') }}" required autofocus>
                     </div>
 
                     <div class="mb-4" x-data="{ visible: false }">
-                        <label for="password" class="form-label">Mot de passe</label>
+                        <label for="code" class="form-label">Mot de passe</label>
                         <div class="input-group">
-                            <input :type="visible ? 'text' : 'password'" name="password" id="password" class="form-control" required>
+                            <input :type="visible ? 'text' : 'password'" name="code" id="code" class="form-control"
+                                   inputmode="numeric" pattern="[0-9]*" maxlength="4" required>
                             <button type="button" class="btn btn-outline-secondary" @click="visible = !visible"
-                                    :title="visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'">
+                                    :title="visible ? 'Masquer le code' : 'Afficher le code'">
                                 <i class="bi" :class="visible ? 'bi-eye-slash' : 'bi-eye'"></i>
                             </button>
                         </div>

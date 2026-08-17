@@ -1,8 +1,14 @@
-# Déploiement — G-Stock Vaisselle
+# Déploiement — G-Stock
 
 Guide de mise en production sur le sous-domaine `g-stock.maxisujets.net`
 (hébergement mutualisé cPanel), build et déploiement automatisés via GitHub
 Actions + rsync sur SSH.
+
+> Ce guide couvre le déploiement **distant** (hébergement mutualisé,
+> accessible depuis internet). Pour une installation **locale chez un
+> client** (Laragon, sur site, sans hébergement distant), voir
+> `INSTALLATION-LOCALE.md` — une procédure différente, sans lien avec ce
+> guide.
 
 ---
 

@@ -3,14 +3,21 @@
 @section('title', 'Clients')
 
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
         <h2 class="h4 mb-0">Clients</h2>
-        @can('client.gerer')
-            <a href="{{ route('clients.create') }}" class="btn btn-primary">Nouveau client</a>
-        @endcan
+        <div class="d-flex gap-2 flex-wrap">
+            <x-export-buttons :pdf-route="route('clients.pdf', request()->query())" :excel-route="route('clients.excel', request()->query())" :tout="true" />
+            @can('client.gerer')
+                <a href="{{ route('clients.create') }}" class="btn btn-primary">Nouveau client</a>
+            @endcan
+        </div>
     </div>
 
-    <x-recherche-form :action="route('clients.index')" placeholder="Nom ou téléphone…" />
+    <h2 class="h4 mb-3 d-none d-print-block">Clients</h2>
+
+    <div class="d-print-none">
+        <x-recherche-form :action="route('clients.index')" placeholder="Nom ou téléphone…" />
+    </div>
 
     <div class="card">
         <div class="table-responsive">
@@ -23,7 +30,7 @@
                         <th>Solde dû</th>
                         <th>Limite de crédit</th>
                         <x-th-tri champ="actif" label="Statut" />
-                        <th class="text-end">Actions</th>
+                        <th class="text-end d-print-none">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -42,7 +49,7 @@
                                     <span class="badge text-bg-secondary">Inactif</span>
                                 @endif
                             </td>
-                            <td class="text-end">
+                            <td class="text-end d-print-none">
                                 @can('client.gerer')
                                     <x-edit-button :href="route('clients.edit', $client)" />
                                     <x-delete-button :action="route('clients.destroy', $client)" :label="'le client « '.$client->nom.' »'" />
@@ -59,7 +66,9 @@
         </div>
     </div>
 
-    <div class="mt-3">
-        {{ $clients->links() }}
-    </div>
+    @if ($clients instanceof \Illuminate\Pagination\LengthAwarePaginator)
+        <div class="mt-3 d-print-none">
+            {{ $clients->links() }}
+        </div>
+    @endif
 @endsection

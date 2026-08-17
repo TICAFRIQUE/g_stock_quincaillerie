@@ -45,7 +45,7 @@ class Parametre extends Model implements HasMedia
     {
         $attributs = Cache::rememberForever(self::CACHE_KEY, function () {
             return self::query()->firstOrCreate(['id' => 1], [
-                'nom' => 'GStockQuincaillerie',
+                'nom' => 'Gérer Mon Stock',
             ])->getAttributes();
         });
 
@@ -57,9 +57,13 @@ class Parametre extends Model implements HasMedia
         Cache::forget(self::CACHE_KEY);
     }
 
+    /**
+     * Logo par défaut (SVG généré, voir public/images/logo-defaut.svg) tant
+     * qu'aucun logo personnalisé n'est configuré — jamais de lien mort.
+     */
     public function logoUrl(): string
     {
-        return $this->getFirstMediaUrl('logo') ?: asset('images/logo.jpeg');
+        return $this->getFirstMediaUrl('logo') ?: asset('images/logo-defaut.svg');
     }
 
     protected static function booted(): void

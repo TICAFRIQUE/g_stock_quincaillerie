@@ -3,14 +3,21 @@
 @section('title', 'Fournisseurs')
 
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
         <h2 class="h4 mb-0">Fournisseurs</h2>
-        @can('fournisseur.gerer')
-            <a href="{{ route('fournisseurs.create') }}" class="btn btn-primary">Nouveau fournisseur</a>
-        @endcan
+        <div class="d-flex gap-2 flex-wrap">
+            <x-export-buttons :pdf-route="route('fournisseurs.pdf', request()->query())" :excel-route="route('fournisseurs.excel', request()->query())" :tout="true" />
+            @can('fournisseur.gerer')
+                <a href="{{ route('fournisseurs.create') }}" class="btn btn-primary">Nouveau fournisseur</a>
+            @endcan
+        </div>
     </div>
 
-    <x-recherche-form :action="route('fournisseurs.index')" placeholder="Nom, téléphone ou e-mail…" />
+    <h2 class="h4 mb-3 d-none d-print-block">Fournisseurs</h2>
+
+    <div class="d-print-none">
+        <x-recherche-form :action="route('fournisseurs.index')" placeholder="Nom, téléphone ou e-mail…" />
+    </div>
 
     <div class="card">
         <div class="table-responsive">
@@ -22,7 +29,7 @@
                         <th>E-mail</th>
                         <th>Solde dû</th>
                         <x-th-tri champ="actif" label="Statut" />
-                        <th class="text-end">Actions</th>
+                        <th class="text-end d-print-none">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -40,7 +47,7 @@
                                     <span class="badge text-bg-secondary">Inactif</span>
                                 @endif
                             </td>
-                            <td class="text-end">
+                            <td class="text-end d-print-none">
                                 @can('fournisseur.gerer')
                                     <x-edit-button :href="route('fournisseurs.edit', $fournisseur)" />
                                     <x-delete-button :action="route('fournisseurs.destroy', $fournisseur)" :label="'le fournisseur « '.$fournisseur->nom.' »'" />
@@ -57,7 +64,9 @@
         </div>
     </div>
 
-    <div class="mt-3">
-        {{ $fournisseurs->links() }}
-    </div>
+    @if ($fournisseurs instanceof \Illuminate\Pagination\LengthAwarePaginator)
+        <div class="mt-3 d-print-none">
+            {{ $fournisseurs->links() }}
+        </div>
+    @endif
 @endsection

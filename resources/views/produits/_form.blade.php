@@ -58,9 +58,9 @@
         <label for="categorie_parent_id" class="form-label">Catégorie<span class="required-marker">*</span></label>
         <select name="categorie_parent_id" id="categorie_parent_id" class="form-select @error('categorie_id') is-invalid @enderror"
                 x-model="parentId" @change="categorieId = aDesEnfants ? '' : parentId" required>
-            <option value="">— Choisir —</option>
+            <option value="" :selected="!parentId">— Choisir —</option>
             <template x-for="parente in parentes" :key="parente.id">
-                <option :value="parente.id" x-text="parente.nom"></option>
+                <option :value="parente.id" :selected="String(parente.id) === String(parentId)" x-text="parente.nom"></option>
             </template>
         </select>
         @error('categorie_id') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
@@ -69,9 +69,9 @@
     <div class="col-md-3 mb-3" x-show="aDesEnfants" x-cloak>
         <label for="categorie_sous_id" class="form-label">Sous-catégorie<span class="required-marker">*</span></label>
         <select id="categorie_sous_id" class="form-select" x-model="categorieId" :required="aDesEnfants">
-            <option value="">— Choisir —</option>
+            <option value="" :selected="!categorieId">— Choisir —</option>
             <template x-for="enfant in enfants" :key="enfant.id">
-                <option :value="enfant.id" x-text="enfant.nom"></option>
+                <option :value="enfant.id" :selected="String(enfant.id) === String(categorieId)" x-text="enfant.nom"></option>
             </template>
         </select>
     </div>

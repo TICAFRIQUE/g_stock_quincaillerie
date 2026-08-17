@@ -8,23 +8,23 @@
         <a href="{{ route('utilisateurs.create') }}" class="btn btn-primary">Nouvel utilisateur</a>
     </div>
 
-    @if (session('motDePasseGenere'))
+    @if (session('codeGenere'))
         <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2"
-             x-data="{ copied: false, motDePasse: {{ Js::from(session('motDePasseGenere')) }} }">
+             x-data="{ copied: false, code: {{ Js::from(session('codeGenere')) }} }">
             <div>
-                <strong><i class="bi bi-key-fill me-1"></i>Mot de passe généré pour {{ session('utilisateurGenere') }} :</strong>
-                <code class="fs-5 ms-2">{{ session('motDePasseGenere') }}</code>
-                <div class="small text-secondary mt-1">Il ne sera plus affiché ensuite — copiez-le si besoin. Il a aussi été envoyé par e-mail à l'utilisateur.</div>
+                <strong><i class="bi bi-key-fill me-1"></i>Code généré pour {{ session('utilisateurGenere') }} :</strong>
+                <code class="fs-5 ms-2">{{ session('codeGenere') }}</code>
+                <div class="small text-secondary mt-1">Il ne sera plus affiché ensuite — notez-le ou copiez-le maintenant.</div>
             </div>
             <button type="button" class="btn btn-sm btn-outline-dark"
-                    @click="navigator.clipboard.writeText(motDePasse); copied = true; setTimeout(() => copied = false, 2000)">
+                    @click="navigator.clipboard.writeText(code); copied = true; setTimeout(() => copied = false, 2000)">
                 <i class="bi" :class="copied ? 'bi-check-lg' : 'bi-clipboard'"></i>
                 <span x-text="copied ? 'Copié !' : 'Copier'"></span>
             </button>
         </div>
     @endif
 
-    <x-recherche-form :action="route('utilisateurs.index')" placeholder="Nom ou e-mail…" />
+    <x-recherche-form :action="route('utilisateurs.index')" placeholder="Nom ou nom d'utilisateur…" />
 
     <div class="card">
         <div class="table-responsive">
@@ -32,7 +32,7 @@
                 <thead>
                     <tr>
                         <x-th-tri champ="name" label="Nom" />
-                        <x-th-tri champ="email" label="E-mail" />
+                        <x-th-tri champ="username" label="Nom d'utilisateur" />
                         <th>Rôle</th>
                         <th>Magasin</th>
                         <x-th-tri champ="actif" label="Statut" />
@@ -43,7 +43,7 @@
                     @forelse ($utilisateurs as $utilisateur)
                         <tr>
                             <td>{{ $utilisateur->name }}</td>
-                            <td>{{ $utilisateur->email }}</td>
+                            <td>{{ $utilisateur->username }}</td>
                             <td>
                                 @foreach ($utilisateur->roles as $role)
                                     <span class="badge text-bg-primary">{{ $role->name }}</span>
@@ -58,12 +58,14 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                @unless ($utilisateur->hasRole('Superadmin'))
+                                {{-- Un superadmin ne se gère pas depuis cet écran, sauf par
+                                     lui-même (voir UtilisateurController::edit()). --}}
+                                @if (! $utilisateur->hasRole('Superadmin') || $utilisateur->id === auth()->id())
                                     <x-edit-button :href="route('utilisateurs.edit', $utilisateur)" />
-                                    @unless ($utilisateur->id === auth()->id())
+                                    @unless ($utilisateur->hasRole('Superadmin') || $utilisateur->id === auth()->id())
                                         <x-delete-button :action="route('utilisateurs.destroy', $utilisateur)" :label="'l\'utilisateur « '.$utilisateur->name.' »'" />
                                     @endunless
-                                @endunless
+                                @endif
                             </td>
                         </tr>
                     @empty

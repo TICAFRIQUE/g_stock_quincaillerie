@@ -117,12 +117,12 @@
                                                         :class="{ 'is-invalid': estDoublon(index) || ligne.unite_vente_id === undefined }"
                                                         @change="changerVarianteDepuisSelect(ligne, $event.target.value)" required>
                                                     <option value="" :selected="ligne.unite_vente_id === undefined">— Choisir —</option>
-                                                    <option value="piece" :selected="ligne.unite_vente_id === null" x-text="produitDe(ligne).unite_base_libelle + ' — ' + produitDe(ligne).prix_piece + ' F'"></option>
+                                                    <option value="piece" :selected="ligne.unite_vente_id === null" x-text="produitDe(ligne).unite_base_libelle_complet + ' — ' + produitDe(ligne).prix_piece + ' F'"></option>
                                                     <template x-for="unite in produitDe(ligne).unites" :key="unite.id">
                                                         <option :value="unite.id" :selected="unite.id === ligne.unite_vente_id" x-text="unite.libelle + ' — ' + unite.prix + ' F'"></option>
                                                     </template>
                                                 </select>
-                                                <div class="text-danger small mt-1" x-show="estDoublon(index)" x-cloak>Déjà dans le panier avec la même variante.</div>
+                                                <div class="text-danger small mt-1" x-show="estDoublon(index)" x-cloak>Déjà dans le panier avec la même unité et la même source.</div>
                                             </td>
                                             @can('vente.remise')
                                                 <td>
@@ -303,7 +303,7 @@
                         <i class="bi bi-exclamation-triangle-fill me-1"></i>Stock insuffisant pour au moins une ligne au lieu choisi : corrigez avant d'enregistrer.
                     </div>
                     <div class="text-danger small mb-2" x-show="aUnDoublon" x-cloak>
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i>Un même produit ne peut pas apparaître deux fois avec la même unité : corrigez avant d'enregistrer.
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>Un même produit ne peut pas apparaître deux fois avec la même unité et la même source : corrigez avant d'enregistrer.
                     </div>
 
                     <div class="d-flex gap-2">

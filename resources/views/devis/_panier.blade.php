@@ -60,7 +60,7 @@
                                         :class="{ 'is-invalid': estDoublon(index) || ligne.unite_vente_id === undefined }"
                                         @change="changerVarianteDepuisSelect(ligne, $event.target.value)" required>
                                     <option value="" :selected="ligne.unite_vente_id === undefined">— Choisir —</option>
-                                    <option value="piece" :selected="ligne.unite_vente_id === null" x-text="produitDe(ligne).unite_base_libelle + ' — ' + produitDe(ligne).prix_piece + ' F'"></option>
+                                    <option value="piece" :selected="ligne.unite_vente_id === null" x-text="produitDe(ligne).unite_base_libelle_complet + ' — ' + produitDe(ligne).prix_piece + ' F'"></option>
                                     <template x-for="unite in produitDe(ligne).unites" :key="unite.id">
                                         <option :value="unite.id" :selected="unite.id === ligne.unite_vente_id" x-text="unite.libelle + ' — ' + unite.prix + ' F'"></option>
                                     </template>

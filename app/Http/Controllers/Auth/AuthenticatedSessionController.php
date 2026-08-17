@@ -18,14 +18,16 @@ class AuthenticatedSessionController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
+        $donnees = $request->validate([
+            'username' => ['required', 'string'],
+            'code' => ['required', 'string'],
         ]);
 
-        if (! Auth::attempt($credentials)) {
+        // Le code à 4 chiffres est stocké comme n'importe quel mot de passe
+        // (colonne password, hashé) : seul le champ de connexion change.
+        if (! Auth::attempt(['username' => $donnees['username'], 'password' => $donnees['code']])) {
             throw ValidationException::withMessages([
-                'email' => 'Identifiants incorrects.',
+                'username' => 'Identifiants incorrects.',
             ]);
         }
 
@@ -33,7 +35,7 @@ class AuthenticatedSessionController extends Controller
             Auth::logout();
 
             throw ValidationException::withMessages([
-                'email' => 'Ce compte est désactivé.',
+                'username' => 'Ce compte est désactivé.',
             ]);
         }
 

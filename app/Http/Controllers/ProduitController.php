@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ExporteListe;
 use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\Categorie;
 use App\Models\Produit;
@@ -10,13 +11,15 @@ use App\Services\StockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProduitController extends Controller
 {
-    use TrieListe;
+    use TrieListe, ExporteListe;
 
     /**
      * Disponibilité d'un produit par magasin/dépôt — alimente le sélecteur
@@ -41,11 +44,61 @@ class ProduitController extends Controller
                 });
             });
 
-        $produits = $this->appliquerTri($query, $request, ['nom', 'sku', 'prix_piece', 'actif', 'created_at'])
-            ->paginate(20)
-            ->withQueryString();
+        $query = $this->appliquerTri($query, $request, ['nom', 'sku', 'prix_piece', 'actif', 'created_at']);
+
+        // L'impression (voir x-bouton-imprimer) couvre tout le résultat
+        // filtré, pas seulement la page affichée à l'écran.
+        $produits = $request->boolean('tout') ? $query->get() : $query->paginate(20)->withQueryString();
 
         return view('produits.index', ['produits' => $produits]);
+    }
+
+    public function pdf(Request $request): Response
+    {
+        return $this->pdfDepuisListe(
+            'Produits',
+            ['SKU', 'Produit', 'Catégorie', 'Prix pièce', 'Statut'],
+            $this->lignesExport($request),
+            'produits.pdf',
+        );
+    }
+
+    public function excel(Request $request): StreamedResponse
+    {
+        return $this->excelDepuisListe(
+            'Produits',
+            ['SKU', 'Produit', 'Catégorie', 'Prix pièce', 'Statut'],
+            $this->lignesExport($request),
+            'produits.xlsx',
+        );
+    }
+
+    /**
+     * Même filtre de recherche que l'écran, sans pagination (voir CLAUDE.md
+     * — les exports réutilisent la requête filtrée de l'écran).
+     */
+    private function lignesExport(Request $request): \Illuminate\Support\Collection
+    {
+        $query = Produit::query()
+            ->with('categorie')
+            ->when($request->filled('recherche'), function ($q) use ($request) {
+                $recherche = $request->string('recherche');
+                $q->where(function ($sub) use ($recherche) {
+                    $sub->where('sku', 'like', "%{$recherche}%")
+                        ->orWhere('nom', 'like', "%{$recherche}%")
+                        ->orWhere('code_barre', 'like', "%{$recherche}%");
+                });
+            });
+
+        return $this->appliquerTri($query, $request, ['nom', 'sku', 'prix_piece', 'actif', 'created_at'], 'nom', 'asc')
+            ->get()
+            ->map(fn (Produit $p) => [
+                $p->sku,
+                $p->libelle_affichage,
+                $p->categorie->nom,
+                number_format($p->prix_piece, 0, ',', ' ').' F',
+                $p->actif ? 'Actif' : 'Inactif',
+            ]);
     }
 
     public function create(): View

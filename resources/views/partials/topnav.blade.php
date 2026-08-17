@@ -1,4 +1,4 @@
-<ul class="navbar-nav flex-row flex-wrap column-gap-1 row-gap-1">
+<ul class="navbar-nav flex-column flex-lg-row flex-lg-wrap column-gap-1 row-gap-1">
     <li class="nav-item">
         <a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
             <i class="bi bi-speedometer2 me-1"></i>Tableau de bord
@@ -47,7 +47,7 @@
                 @can('stock.voir')
                     <li>
                         <a href="{{ route('stock.index') }}" class="dropdown-item {{ request()->routeIs('stock.*', 'transferts.*') ? 'active' : '' }}">
-                            <i class="bi bi-boxes me-2"></i>Stock
+                            <i class="bi bi-boxes me-2"></i>État de stock
                         </a>
                     </li>
                 @endcan

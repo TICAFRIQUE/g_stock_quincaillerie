@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Tableau de bord') — {{ $parametre->nom }}</title>
-    <link rel="icon" type="image/jpeg" href="{{ $parametre->logoUrl() }}">
+    <link rel="icon" href="{{ $parametre->logoUrl() }}">
     @vite(['resources/sass/app.scss', 'resources/js/app.js'])
 </head>
 <body>
@@ -24,20 +24,38 @@
                     </span>
                 </a>
 
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menuPrincipal"
-                        aria-controls="menuPrincipal" aria-expanded="false" aria-label="Ouvrir le menu">
+                <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menuPrincipal"
+                        aria-controls="menuPrincipal" aria-label="Ouvrir le menu">
                     <span class="navbar-toggler-icon"></span>
                 </button>
 
-                <div class="collapse navbar-collapse" id="menuPrincipal">
+                {{-- Desktop (≥ lg) : barre horizontale classique, jamais de sidebar. --}}
+                <div class="d-none d-lg-flex align-items-center flex-grow-1">
                     @include('partials.topnav')
 
-                    <div class="d-flex mt-3 mt-lg-0 ms-lg-auto">
+                    <div class="d-flex ms-lg-auto">
                         @include('partials.topbar')
                     </div>
                 </div>
             </div>
         </nav>
+
+        {{-- Mobile/tablette (< lg) : même menu, ouvert en sidebar coulissante
+             plutôt que replié en ligne — plus confortable à parcourir sur un
+             petit écran qu'un empilement sous la barre. --}}
+        <div class="offcanvas offcanvas-start erp-sidebar d-lg-none" tabindex="-1" id="menuPrincipal" aria-labelledby="menuPrincipalLabel">
+            <div class="offcanvas-header">
+                <span id="menuPrincipalLabel" class="fw-semibold text-white">Menu</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
+            </div>
+            <div class="offcanvas-body d-flex flex-column">
+                @include('partials.topnav')
+
+                <hr class="border-secondary-subtle">
+
+                @include('partials.topbar')
+            </div>
+        </div>
 
         <main class="flex-grow-1 p-3 p-lg-4 erp-main">
             @if (session('succes'))

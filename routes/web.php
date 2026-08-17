@@ -59,6 +59,8 @@ Route::middleware('auth')->group(function () {
     // Lecture ouverte à produit.voir ; les actions de mutation sont vérifiées
     // finement dans ProduitController (produit.creer/modifier/supprimer).
     Route::middleware('can:produit.voir')->group(function () {
+        Route::get('produits/pdf', [ProduitController::class, 'pdf'])->name('produits.pdf');
+        Route::get('produits/excel', [ProduitController::class, 'excel'])->name('produits.excel');
         Route::resource('produits', ProduitController::class)->except(['show']);
 
         Route::post('produits/{produit}/unite-ventes', [UniteVenteController::class, 'store'])->name('produits.unite-ventes.store');
@@ -88,6 +90,8 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('can:fournisseur.voir')->group(function () {
         Route::get('fournisseurs', [FournisseurController::class, 'index'])->name('fournisseurs.index');
+        Route::get('fournisseurs/pdf', [FournisseurController::class, 'pdf'])->name('fournisseurs.pdf');
+        Route::get('fournisseurs/excel', [FournisseurController::class, 'excel'])->name('fournisseurs.excel');
     });
 
     // /fournisseurs/creer avant /fournisseurs/{fournisseur} : sinon "creer"
@@ -117,10 +121,13 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('can:client.voir')->group(function () {
         Route::get('clients', [ClientController::class, 'index'])->name('clients.index');
+        Route::get('clients/pdf', [ClientController::class, 'pdf'])->name('clients.pdf');
+        Route::get('clients/excel', [ClientController::class, 'excel'])->name('clients.excel');
     });
 
-    // /clients/creer avant /clients/{client} : sinon "creer" serait capturé
-    // comme un {client} par la route de consultation ci-dessous.
+    // /clients/creer, /clients/pdf, /clients/excel avant /clients/{client} :
+    // sinon ce segment serait capturé comme un {client} par la route de
+    // consultation ci-dessous.
     Route::middleware('can:client.gerer')->group(function () {
         Route::get('clients/creer', [ClientController::class, 'create'])->name('clients.create');
         Route::post('clients', [ClientController::class, 'store'])->name('clients.store');
@@ -154,6 +161,8 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('can:stock.voir')->group(function () {
         Route::get('stock', [StockController::class, 'index'])->name('stock.index');
+        Route::get('stock/pdf', [StockController::class, 'pdf'])->name('stock.pdf');
+        Route::get('stock/excel', [StockController::class, 'excel'])->name('stock.excel');
         Route::get('stock/mouvements', [StockMouvementController::class, 'index'])->name('stock.mouvements.index');
     });
 
@@ -167,6 +176,10 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('can:inventaire.voir')->group(function () {
+        // pdf/excel avant le resource() ci-dessous : sinon "pdf"/"excel"
+        // serait capturé comme un {inventaire} par la route de consultation.
+        Route::get('inventaires/pdf', [InventaireController::class, 'pdf'])->name('inventaires.pdf');
+        Route::get('inventaires/excel', [InventaireController::class, 'excel'])->name('inventaires.excel');
         Route::resource('inventaires', InventaireController::class)->only(['index', 'create', 'store', 'show']);
         Route::post('inventaires/{inventaire}/saisir', [InventaireController::class, 'saisir'])->name('inventaires.saisir');
         Route::post('inventaires/{inventaire}/valider', [InventaireController::class, 'valider'])->name('inventaires.valider');
@@ -269,8 +282,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('utilisateurs', UtilisateurController::class)
             ->except(['show'])
             ->parameters(['utilisateurs' => 'utilisateur']);
-        Route::post('utilisateurs/{utilisateur}/reinitialiser-mot-de-passe', [UtilisateurController::class, 'reinitialiserMotDePasse'])
-            ->name('utilisateurs.reinitialiser-mot-de-passe');
+        Route::post('utilisateurs/{utilisateur}/reinitialiser-code', [UtilisateurController::class, 'reinitialiserCode'])
+            ->name('utilisateurs.reinitialiser-code');
     });
 
     Route::middleware('can:role.gerer')->group(function () {
@@ -279,12 +292,31 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('can:rapport.voir')->group(function () {
         Route::get('rapports', [RapportController::class, 'index'])->name('rapports.index');
+
         Route::get('rapports/ventes', [RapportController::class, 'ventes'])->name('rapports.ventes');
+        Route::get('rapports/ventes/pdf', [RapportController::class, 'ventesPdf'])->name('rapports.ventes.pdf');
+        Route::get('rapports/ventes/excel', [RapportController::class, 'ventesExcel'])->name('rapports.ventes.excel');
+
         Route::get('rapports/marge', [RapportController::class, 'marge'])->name('rapports.marge');
+        Route::get('rapports/marge/pdf', [RapportController::class, 'margePdf'])->name('rapports.marge.pdf');
+        Route::get('rapports/marge/excel', [RapportController::class, 'margeExcel'])->name('rapports.marge.excel');
+
         Route::get('rapports/stock', [RapportController::class, 'stock'])->name('rapports.stock');
+        Route::get('rapports/stock/pdf', [RapportController::class, 'stockPdf'])->name('rapports.stock.pdf');
+        Route::get('rapports/stock/excel', [RapportController::class, 'stockExcel'])->name('rapports.stock.excel');
+
         Route::get('rapports/ecarts-caisse', [RapportController::class, 'ecartsCaisse'])->name('rapports.ecarts-caisse');
+        Route::get('rapports/ecarts-caisse/pdf', [RapportController::class, 'ecartsCaissePdf'])->name('rapports.ecarts-caisse.pdf');
+        Route::get('rapports/ecarts-caisse/excel', [RapportController::class, 'ecartsCaisseExcel'])->name('rapports.ecarts-caisse.excel');
+
         Route::get('rapports/casse', [RapportController::class, 'casse'])->name('rapports.casse');
+        Route::get('rapports/casse/pdf', [RapportController::class, 'cassePdf'])->name('rapports.casse.pdf');
+        Route::get('rapports/casse/excel', [RapportController::class, 'casseExcel'])->name('rapports.casse.excel');
+
         Route::get('rapports/inventaires', [RapportController::class, 'inventaires'])->name('rapports.inventaires');
+        Route::get('rapports/inventaires/pdf', [RapportController::class, 'inventairesPdf'])->name('rapports.inventaires.pdf');
+        Route::get('rapports/inventaires/excel', [RapportController::class, 'inventairesExcel'])->name('rapports.inventaires.excel');
+
         Route::get('journal', [JournalActiviteController::class, 'index'])->name('journal.index');
     });
 });

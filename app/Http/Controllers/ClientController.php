@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ExporteListe;
 use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\Client;
 use App\Models\EcritureCompteClient;
@@ -12,6 +13,7 @@ use App\Models\Vente;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -21,7 +23,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ClientController extends Controller
 {
-    use TrieListe;
+    use TrieListe, ExporteListe;
 
     public function index(Request $request): View
     {
@@ -35,9 +37,11 @@ class ClientController extends Controller
                 });
             });
 
-        $clients = $this->appliquerTri($query, $request, ['nom', 'actif', 'created_at'])
-            ->paginate(20)
-            ->withQueryString();
+        $query = $this->appliquerTri($query, $request, ['nom', 'actif', 'created_at']);
+
+        // L'impression (voir x-bouton-imprimer) couvre tout le résultat
+        // filtré, pas seulement la page affichée à l'écran.
+        $clients = $request->boolean('tout') ? $query->get() : $query->paginate(20)->withQueryString();
 
         // Le solde est dérivé (règle 12) : calculé en une seule requête
         // groupée plutôt qu'une somme par ligne (évite un N+1 sur la page).
@@ -47,6 +51,55 @@ class ClientController extends Controller
             ->pluck('solde', 'client_id');
 
         return view('clients.index', ['clients' => $clients, 'soldes' => $soldes]);
+    }
+
+    public function pdf(Request $request): Response
+    {
+        return $this->pdfDepuisListe(
+            'Clients',
+            ['Nom', 'Type', 'Téléphone', 'Solde dû', 'Limite de crédit', 'Statut'],
+            $this->lignesExport($request),
+            'clients.pdf',
+        );
+    }
+
+    public function excel(Request $request): StreamedResponse
+    {
+        return $this->excelDepuisListe(
+            'Clients',
+            ['Nom', 'Type', 'Téléphone', 'Solde dû', 'Limite de crédit', 'Statut'],
+            $this->lignesExport($request),
+            'clients.xlsx',
+        );
+    }
+
+    private function lignesExport(Request $request): \Illuminate\Support\Collection
+    {
+        $query = Client::query()
+            ->with('typeClient')
+            ->when($request->filled('recherche'), function ($q) use ($request) {
+                $recherche = $request->string('recherche');
+                $q->where(function ($sub) use ($recherche) {
+                    $sub->where('nom', 'like', "%{$recherche}%")
+                        ->orWhere('telephone', 'like', "%{$recherche}%");
+                });
+            });
+
+        $clients = $this->appliquerTri($query, $request, ['nom', 'actif', 'created_at'], 'nom', 'asc')->get();
+
+        $soldes = EcritureCompteClient::whereIn('client_id', $clients->pluck('id'))
+            ->selectRaw('client_id, SUM(montant) as solde')
+            ->groupBy('client_id')
+            ->pluck('solde', 'client_id');
+
+        return $clients->map(fn (Client $c) => [
+            $c->nom,
+            $c->typeClient->nom ?? '—',
+            $c->telephone ?? '—',
+            number_format($soldes[$c->id] ?? 0, 0, ',', ' ').' F',
+            $c->limite_credit !== null ? number_format($c->limite_credit, 0, ',', ' ').' F' : 'Illimitée',
+            $c->actif ? 'Actif' : 'Inactif',
+        ]);
     }
 
     public function create(): View

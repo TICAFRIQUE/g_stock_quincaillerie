@@ -10,9 +10,9 @@
         </div>
 
         <div class="d-flex flex-wrap gap-2">
-            <a href="{{ route('devis.facture', $devis) }}" class="btn btn-outline-secondary" target="_blank" rel="noopener">
-                <i class="bi bi-printer me-1"></i>Voir / Imprimer
-            </a>
+            <button type="button" class="btn btn-outline-secondary" onclick="imprimerDevis()">
+                <i class="bi bi-printer me-1"></i>Imprimer
+            </button>
             <a href="{{ route('devis.pdf', $devis) }}" class="btn btn-outline-secondary">
                 <i class="bi bi-file-earmark-pdf me-1"></i>PDF
             </a>
@@ -84,7 +84,7 @@
         </div>
     @endif
 
-    <div class="row g-3 mb-3">
+    <div class="row g-3 mb-3 d-print-none">
         <div class="col-md-4">
             <div class="card h-100">
                 <div class="card-body">
@@ -111,7 +111,7 @@
         </div>
     </div>
 
-    <div class="card">
+    <div class="card d-print-none">
         <div class="card-body">
             <p class="text-secondary small mb-0">Montants indicatifs — ceci est un devis, pas une facture.</p>
         </div>
@@ -170,4 +170,95 @@
             </table>
         </div>
     </div>
+
+    {{-- Contenu au format devis, masqué à l'écran : le bouton "Imprimer"
+         imprime ce bloc en place (voir imprimerDevis() ci-dessous), sans
+         redirection ni nouvel onglet — même geste que le ticket de vente. --}}
+    <div id="factureImprimable" class="d-none">
+        <table class="entete">
+            <tr>
+                <td style="width: 55%;">
+                    @if ($logoDataUri)
+                        <img src="{{ $logoDataUri }}" class="logo" alt="Logo">
+                        <br>
+                    @endif
+                    <span class="entreprise-nom">{{ $parametre->nom }}</span><br>
+                    @if ($parametre->adresse) {{ $parametre->adresse }}<br> @endif
+                    @if ($parametre->numero) Tél : {{ $parametre->numero }} @endif
+                </td>
+                <td style="width: 45%;">
+                    <div class="facture-titre">DEVIS</div>
+                    <div class="facture-meta">
+                        N° {{ $devis->numero }}<br>
+                        Date : {{ $devis->created_at->format('d/m/Y') }}<br>
+                        Valide jusqu'au : {{ $devis->date_validite->format('d/m/Y') }}
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="bloc-client">
+            <div class="label">Client</div>
+            <strong>{{ $devis->client->nom }}</strong><br>
+            @if ($devis->client->telephone) Tél : {{ $devis->client->telephone }}<br> @endif
+            @if ($devis->client->adresse) {{ $devis->client->adresse }} @endif
+        </div>
+
+        <table class="lignes">
+            <thead>
+                <tr>
+                    <th>Désignation</th>
+                    <th>Unité</th>
+                    <th class="text-end">Qté</th>
+                    <th class="text-end">Prix unitaire</th>
+                    <th class="text-end">Remise</th>
+                    <th class="text-end">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($devis->lignes as $ligne)
+                    @php
+                        $prixUnitaire = $ligne->uniteVente->prix ?? $ligne->produit->prix_piece;
+                        $sousTotalLigne = $prixUnitaire * $ligne->quantite;
+                        $remiseLigne = \App\Support\Remise::resoudre($ligne->remise_type, $ligne->remise_valeur, $sousTotalLigne);
+                    @endphp
+                    <tr>
+                        <td>{{ $ligne->produit->libelle_affichage }}</td>
+                        <td>{{ $ligne->uniteVente->libelle ?? $ligne->produit->unite_base_libelle }}</td>
+                        <td class="text-end">{{ $ligne->quantite }}</td>
+                        <td class="text-end">{{ number_format($prixUnitaire, 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ $remiseLigne > 0 ? '− '.number_format($remiseLigne, 0, ',', ' ').' F' : '—' }}</td>
+                        <td class="text-end">{{ number_format($sousTotalLigne - $remiseLigne, 0, ',', ' ') }} F</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        <table class="totaux">
+            <tr class="net">
+                <td>Total net</td>
+                <td class="text-end">{{ number_format($montants['total_net'], 0, ',', ' ') }} F</td>
+            </tr>
+        </table>
+
+        <div class="mention">
+            Ce document est un devis, pas une facture — montants indicatifs, valables jusqu'au {{ $devis->date_validite->format('d/m/Y') }}.
+        </div>
+    </div>
 @endsection
+
+@push('scripts')
+    <script>
+        // Bascule d'impression : affiche #factureImprimable le temps de
+        // l'impression, puis revient à l'état par défaut (voir
+        // resources/sass/app.scss, .impression-facture — même mécanisme que
+        // le ticket de vente).
+        function imprimerDevis() {
+            document.body.classList.add('impression-facture');
+            window.print();
+        }
+        window.addEventListener('afterprint', () => {
+            document.body.classList.remove('impression-facture');
+        });
+    </script>
+@endpush

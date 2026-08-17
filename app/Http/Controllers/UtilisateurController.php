@@ -3,14 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\TrieListe;
-use App\Mail\IdentifiantsUtilisateurMail;
 use App\Models\Magasin;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Role;
 
@@ -26,11 +23,11 @@ class UtilisateurController extends Controller
                 $recherche = $request->string('recherche');
                 $q->where(function ($sub) use ($recherche) {
                     $sub->where('name', 'like', "%{$recherche}%")
-                        ->orWhere('email', 'like', "%{$recherche}%");
+                        ->orWhere('username', 'like', "%{$recherche}%");
                 });
             });
 
-        $utilisateurs = $this->appliquerTri($query, $request, ['name', 'email', 'actif', 'created_at'])
+        $utilisateurs = $this->appliquerTri($query, $request, ['name', 'username', 'actif', 'created_at'])
             ->paginate(20)
             ->withQueryString();
 
@@ -49,29 +46,31 @@ class UtilisateurController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $donnees = $this->valider($request);
-        $motDePasse = $this->genererMotDePasseProvisoire();
+        $code = $this->genererCode();
 
         $utilisateur = User::create([
             'name' => $donnees['name'],
-            'email' => $donnees['email'],
-            'password' => $motDePasse,
+            'username' => $donnees['username'],
+            'email' => $donnees['email'] ?? null,
+            'password' => $code,
             'magasin_id' => $donnees['magasin_id'] ?? null,
             'actif' => $donnees['actif'],
         ]);
 
         $utilisateur->assignRole($donnees['role']);
 
-        Mail::to($utilisateur->email)->queue(new IdentifiantsUtilisateurMail($utilisateur, $motDePasse, nouveauCompte: true));
-
         return redirect()->route('utilisateurs.index')
-            ->with('succes', "Utilisateur créé. Les identifiants ont été envoyés à {$utilisateur->email}.")
-            ->with('motDePasseGenere', $motDePasse)
-            ->with('utilisateurGenere', $utilisateur->email);
+            ->with('succes', "Utilisateur créé.")
+            ->with('codeGenere', $code)
+            ->with('utilisateurGenere', $utilisateur->username);
     }
 
     public function edit(User $utilisateur): View
     {
-        abort_if($utilisateur->hasRole('Superadmin'), 403, 'Le compte Superadmin ne se gère pas depuis cet écran.');
+        // Un superadmin ne se gère pas depuis cet écran — sauf par lui-même :
+        // il doit pouvoir changer son propre identifiant/code sans dépendre
+        // d'un accès direct à la base (voir aussi update()/reinitialiserCode()).
+        abort_if($utilisateur->hasRole('Superadmin') && $utilisateur->isNot(auth()->user()), 403, 'Le compte Superadmin ne se gère pas depuis cet écran.');
 
         return view('utilisateurs.edit', [
             'utilisateur' => $utilisateur,
@@ -82,35 +81,43 @@ class UtilisateurController extends Controller
 
     public function update(Request $request, User $utilisateur): RedirectResponse
     {
-        abort_if($utilisateur->hasRole('Superadmin'), 403);
+        $estSoiMemeSuperadmin = $utilisateur->hasRole('Superadmin') && $utilisateur->is(auth()->user());
+        abort_if($utilisateur->hasRole('Superadmin') && ! $estSoiMemeSuperadmin, 403);
 
-        $donnees = $this->valider($request, $utilisateur);
+        $donnees = $this->valider($request, $utilisateur, ignorerRoleEtStatut: $estSoiMemeSuperadmin);
 
         $utilisateur->update([
             'name' => $donnees['name'],
-            'email' => $donnees['email'],
-            'magasin_id' => $donnees['magasin_id'] ?? null,
-            'actif' => $donnees['actif'],
+            'username' => $donnees['username'],
+            'email' => $donnees['email'] ?? null,
+            // Un superadmin qui modifie son propre compte garde son magasin/
+            // statut actif tels quels : le formulaire ne les expose pas dans
+            // ce cas (voir _form.blade.php), pas de risque de se désactiver
+            // ou de se retirer un rattachement par erreur.
+            'magasin_id' => $estSoiMemeSuperadmin ? $utilisateur->magasin_id : ($donnees['magasin_id'] ?? null),
+            'actif' => $estSoiMemeSuperadmin ? $utilisateur->actif : $donnees['actif'],
         ]);
 
-        $utilisateur->syncRoles([$donnees['role']]);
+        // Le rôle Superadmin n'est jamais modifiable depuis ce formulaire (le
+        // select ne le propose même pas) : on ne touche pas aux rôles ici.
+        if (! $estSoiMemeSuperadmin) {
+            $utilisateur->syncRoles([$donnees['role']]);
+        }
 
         return redirect()->route('utilisateurs.index')->with('succes', 'Utilisateur mis à jour.');
     }
 
-    public function reinitialiserMotDePasse(User $utilisateur): RedirectResponse
+    public function reinitialiserCode(User $utilisateur): RedirectResponse
     {
-        abort_if($utilisateur->hasRole('Superadmin'), 403);
+        abort_if($utilisateur->hasRole('Superadmin') && $utilisateur->isNot(auth()->user()), 403);
 
-        $motDePasse = $this->genererMotDePasseProvisoire();
-        $utilisateur->update(['password' => $motDePasse]);
-
-        Mail::to($utilisateur->email)->queue(new IdentifiantsUtilisateurMail($utilisateur, $motDePasse, nouveauCompte: false));
+        $code = $this->genererCode();
+        $utilisateur->update(['password' => $code]);
 
         return redirect()->route('utilisateurs.index')
-            ->with('succes', "Mot de passe réinitialisé. Les nouveaux identifiants ont été envoyés à {$utilisateur->email}.")
-            ->with('motDePasseGenere', $motDePasse)
-            ->with('utilisateurGenere', $utilisateur->email);
+            ->with('succes', 'Code réinitialisé.')
+            ->with('codeGenere', $code)
+            ->with('utilisateurGenere', $utilisateur->username);
     }
 
     public function destroy(User $utilisateur): RedirectResponse
@@ -127,13 +134,20 @@ class UtilisateurController extends Controller
         return redirect()->route('utilisateurs.index')->with('succes', 'Utilisateur supprimé.');
     }
 
-    private function valider(Request $request, ?User $utilisateur = null): array
+    /**
+     * $ignorerRoleEtStatut : un superadmin qui modifie son propre compte n'a
+     * ni sélecteur de rôle ni sélecteur de magasin/statut dans le formulaire
+     * (voir _form.blade.php) — inutile, et dangereux, d'exiger/valider ces
+     * champs dans ce cas précis.
+     */
+    private function valider(Request $request, ?User $utilisateur = null, bool $ignorerRoleEtStatut = false): array
     {
         $donnees = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email,'.($utilisateur?->id)],
+            'username' => ['required', 'string', 'max:50', 'unique:users,username,'.($utilisateur?->id)],
+            'email' => ['nullable', 'email', 'max:255', 'unique:users,email,'.($utilisateur?->id)],
             'magasin_id' => ['nullable', 'exists:magasins,id'],
-            'role' => ['required', 'exists:roles,name', 'not_in:Superadmin'],
+            'role' => [$ignorerRoleEtStatut ? 'sometimes' : 'required', 'nullable', 'exists:roles,name', 'not_in:Superadmin'],
             'actif' => ['boolean'],
         ]);
 
@@ -143,12 +157,13 @@ class UtilisateurController extends Controller
     }
 
     /**
-     * Alphanumérique en majuscules uniquement (pas de symboles, pas de
-     * minuscules) : mot de passe provisoire plus simple à lire/retaper pour
-     * un utilisateur non technique qui le reçoit par e-mail.
+     * Code de connexion à 4 chiffres (remplace le mot de passe pour un
+     * utilisateur non technique) : jamais saisi, toujours généré et affiché
+     * une seule fois à l'écran (voir store()/reinitialiserCode()) — plus
+     * d'envoi par e-mail.
      */
-    private function genererMotDePasseProvisoire(): string
+    private function genererCode(): string
     {
-        return Str::upper(Str::random(8));
+        return str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
     }
 }

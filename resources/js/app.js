@@ -155,12 +155,16 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
             return source ? source.quantite : 0;
         },
 
-        // La ligne demande plus que ce qui est disponible au lieu choisi —
-        // n'a de sens qu'une fois un lieu explicitement sélectionné.
+        // La ligne (cumulée avec les autres lignes du même produit prélevant
+        // à la même source, voir piecesReservees) demande plus que ce qui
+        // est disponible au lieu choisi — n'a de sens qu'une fois un lieu
+        // explicitement sélectionné.
         enRupture(ligne) {
             if (ligne.magasin_source_id === undefined) return false;
             const dispo = this.stockDisponible(ligne);
-            return ligne.quantite * (ligne.facteur || 1) > dispo;
+            const facteur = ligne.facteur || 1;
+            const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * facteur;
+            return autresPieces + ligne.quantite * facteur > dispo;
         },
 
         get aUneSourceNonChoisie() {
@@ -238,17 +242,24 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
                 .reduce((somme, l) => somme + l.quantite * (l.facteur || 0), 0);
         },
 
-        // Deux lignes ne doivent jamais partager le même produit ET la même
-        // unité (pièce ou un lot précis) une fois choisie — ça peut arriver en
-        // dupliquant une ligne puis en reprenant la même variante. Tant qu'une
-        // ligne n'a pas encore de variante choisie, elle n'est jamais comptée
-        // comme doublon (rien à comparer). On bloque l'enregistrement tant que
-        // ce n'est pas corrigé (voir aUnDoublon / aUneLigneNonChoisie).
+        // Deux lignes ne doivent jamais partager le même produit, la même
+        // unité (pièce ou un lot précis) ET la même source de prélèvement à
+        // la fois — ça peut arriver en dupliquant une ligne puis en
+        // reprenant la même variante. Deux lignes du même produit/unité mais
+        // prélevées sur des lieux différents restent légitimes (voir
+        // piecesReservees, qui traite déjà ces stocks comme indépendants).
+        // Tant qu'une ligne n'a pas encore de variante ou de source choisie,
+        // elle n'est jamais comptée comme doublon (rien à comparer). On
+        // bloque l'enregistrement tant que ce n'est pas corrigé (voir
+        // aUnDoublon / aUneLigneNonChoisie).
         estDoublon(index) {
             const ligne = this.panier[index];
-            if (ligne.unite_vente_id === undefined) return false;
+            if (ligne.unite_vente_id === undefined || ligne.magasin_source_id === undefined) return false;
             return this.panier.some(
-                (l, i) => i !== index && l.produit_id === ligne.produit_id && l.unite_vente_id === ligne.unite_vente_id
+                (l, i) => i !== index
+                    && l.produit_id === ligne.produit_id
+                    && l.unite_vente_id === ligne.unite_vente_id
+                    && l.magasin_source_id === ligne.magasin_source_id
             );
         },
 
@@ -276,22 +287,18 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
                 return;
             }
 
+            // Toujours appliqué, même si ça dépasse le stock à la source
+            // choisie : le choix ne doit jamais être silencieusement rejeté
+            // (le <select> resterait visuellement sur la nouvelle option
+            // sans que l'état ne suive, ce qui bloquait à tort avec le
+            // message générique « Choisissez une unité pour chaque ligne »).
+            // Le dépassement est signalé clairement par enRupture ci-dessus,
+            // qui bloque la finalisation via aUneLigneEnRupture.
             const unite = valeur === 'piece' ? null : produit.unites.find((u) => u.id === Number(valeur));
-            const facteur = unite ? unite.facteur : 1;
-            const prixUnitaire = unite ? unite.prix : produit.prix_piece;
-
-            // Pas de lieu choisi : pas de plafond de stock à ce stade, la
-            // ligne devient juste incomplète (voir aUneSourceNonChoisie).
-            const dispo = this.stockDisponible(ligne);
-            if (dispo !== null) {
-                const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * (ligne.facteur || 0);
-                if (autresPieces + ligne.quantite * facteur > dispo) return;
-            }
-
             ligne.unite_vente_id = unite ? unite.id : null;
             ligne.uniteLibelle = unite ? unite.libelle : null;
-            ligne.facteur = facteur;
-            ligne.prixUnitaire = prixUnitaire;
+            ligne.facteur = unite ? unite.facteur : 1;
+            ligne.prixUnitaire = unite ? unite.prix : produit.prix_piece;
         },
 
         changerQuantite(ligne, delta) {

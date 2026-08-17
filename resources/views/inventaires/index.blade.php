@@ -3,14 +3,19 @@
 @section('title', 'Inventaires')
 
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
         <h2 class="h4 mb-0">Inventaires</h2>
-        @can('inventaire.realiser')
-            <a href="{{ route('inventaires.create') }}" class="btn btn-primary">Nouvel inventaire</a>
-        @endcan
+        <div class="d-flex gap-2 flex-wrap">
+            <x-export-buttons :pdf-route="route('inventaires.pdf', request()->query())" :excel-route="route('inventaires.excel', request()->query())" :tout="true" />
+            @can('inventaire.realiser')
+                <a href="{{ route('inventaires.create') }}" class="btn btn-primary">Nouvel inventaire</a>
+            @endcan
+        </div>
     </div>
 
-    <form method="GET" action="{{ route('inventaires.index') }}" class="row g-2 mb-3 align-items-end">
+    <h2 class="h4 mb-3 d-none d-print-block">Inventaires</h2>
+
+    <form method="GET" action="{{ route('inventaires.index') }}" class="row g-2 mb-3 align-items-end d-print-none">
         <div class="col-auto">
             <label for="date_debut" class="form-label small mb-1">Du</label>
             <input type="date" name="date_debut" id="date_debut" class="form-control" value="{{ $dateDebut }}" onchange="this.form.submit()">
@@ -53,7 +58,7 @@
                         <x-th-tri champ="date" label="Date" />
                         <th>Destination</th>
                         <x-th-tri champ="statut" label="Statut" />
-                        <th class="text-end">Actions</th>
+                        <th class="text-end d-print-none">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -68,7 +73,7 @@
                                     <span class="badge text-bg-secondary">Brouillon</span>
                                 @endif
                             </td>
-                            <td class="text-end">
+                            <td class="text-end d-print-none">
                                 <a href="{{ route('inventaires.show', $inventaire) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Voir">
                                     <i class="bi bi-eye"></i>
                                     <span class="visually-hidden">Voir</span>
@@ -85,7 +90,9 @@
         </div>
     </div>
 
-    <div class="mt-3">
-        {{ $inventaires->links() }}
-    </div>
+    @if ($inventaires instanceof \Illuminate\Pagination\LengthAwarePaginator)
+        <div class="mt-3 d-print-none">
+            {{ $inventaires->links() }}
+        </div>
+    @endif
 @endsection

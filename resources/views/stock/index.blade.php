@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Stock')
+@section('title', 'État de stock')
 
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="h4 mb-0">Stock</h2>
-        <div class="d-flex gap-2">
+    <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
+        <h2 class="h4 mb-0">État de stock</h2>
+        <div class="d-flex gap-2 flex-wrap">
             <a href="{{ route('stock.mouvements.index') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-clock-history me-1"></i>Historique des mouvements
             </a>
@@ -19,10 +19,13 @@
                     <i class="bi bi-sliders me-1"></i>Casse / ajustement
                 </a>
             @endcan
+            <x-export-buttons :pdf-route="route('stock.pdf', request()->query())" :excel-route="route('stock.excel', request()->query())" :tout="true" />
         </div>
     </div>
 
-    <div class="row g-3 mb-3">
+    <h2 class="h4 mb-3 d-none d-print-block">État de stock</h2>
+
+    <div class="row g-3 mb-3 d-print-none">
         <div class="col-6 col-md-3">
             <div class="card h-100">
                 <div class="card-body">
@@ -57,12 +60,20 @@
         </div>
     </div>
 
-    <form method="GET" action="{{ route('stock.index') }}" class="row g-2 mb-3">
+    <form method="GET" action="{{ route('stock.index') }}" class="row g-2 mb-3 d-print-none">
         <div class="col-auto">
             <select name="magasin_id" class="form-select" onchange="this.form.submit()">
                 <option value="">Tous les magasins</option>
                 @foreach ($magasins as $magasin)
                     <option value="{{ $magasin->id }}" @selected(request('magasin_id') == $magasin->id)>{{ $magasin->nom }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="col-auto" style="min-width: 260px;">
+            <select name="produit_id" id="produit_id_filtre" class="form-select" onchange="this.form.submit()">
+                <option value="">Tous les produits</option>
+                @foreach ($produits as $produit)
+                    <option value="{{ $produit->id }}" @selected(request('produit_id') == $produit->id)>{{ $produit->libelle_affichage }}</option>
                 @endforeach
             </select>
         </div>
@@ -72,7 +83,7 @@
                 <label for="sous_seuil" class="form-check-label">Sous le seuil d'alerte uniquement</label>
             </div>
         </div>
-        @if (request()->hasAny(['magasin_id', 'sous_seuil', 'tri', 'direction']))
+        @if (request()->hasAny(['magasin_id', 'produit_id', 'sous_seuil', 'tri', 'direction']))
             <div class="col-auto">
                 <a href="{{ route('stock.index') }}" class="btn btn-outline-danger">
                     <i class="bi bi-x-circle me-1"></i>Réinitialiser
@@ -118,7 +129,21 @@
         </div>
     </div>
 
-    <div class="mt-3">
-        {{ $stocks->links() }}
+    @if ($stocks instanceof \Illuminate\Pagination\LengthAwarePaginator)
+        <div class="mt-3 d-print-none">
+            {{ $stocks->links() }}
+        </div>
+    @endif
+
+    <div class="text-secondary small mt-3 d-none d-print-block">
+        Édité le {{ now()->format('d/m/Y à H:i') }}
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.initSelect2('#produit_id_filtre', { placeholder: 'Tous les produits' });
+        });
+    </script>
+@endpush

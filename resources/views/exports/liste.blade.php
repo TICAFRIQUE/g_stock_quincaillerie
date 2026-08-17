@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>{{ $titre }}</title>
+    <style>
+        /* Feuille de style volontairement autonome (pas de Bootstrap) : dompdf,
+           dont le support CSS est limité — tables et boîtes simples uniquement. */
+        body {
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+            font-size: 12px;
+            color: #241e19;
+            margin: 0;
+            padding: 28px;
+        }
+        table { border-collapse: collapse; width: 100%; }
+        .text-end { text-align: right; }
+        .titre { font-size: 20px; font-weight: bold; color: #e8590c; letter-spacing: 1px; margin-bottom: 4px; }
+        .meta { font-size: 11px; color: #555; margin-bottom: 16px; }
+        table.lignes th, table.lignes td { border: 1px solid #ccc; padding: 5px 7px; font-size: 11px; }
+        table.lignes th { background: #f0ece6; text-align: left; }
+    </style>
+</head>
+<body>
+    <div class="titre">{{ $titre }}</div>
+    <div class="meta">
+        Édité le {{ now()->format('d/m/Y à H:i') }}
+        @if ($sousTitre) — {{ $sousTitre }} @endif
+    </div>
+
+    <table class="lignes">
+        <thead>
+            <tr>
+                @foreach ($entetes as $entete)
+                    <th>{{ $entete }}</th>
+                @endforeach
+            </tr>
+        </thead>
+        <tbody>
+            @forelse ($lignes as $ligne)
+                <tr>
+                    @foreach ($ligne as $valeur)
+                        <td>{{ $valeur }}</td>
+                    @endforeach
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="{{ count($entetes) }}" class="text-end">Aucune donnée.</td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
+</body>
+</html>
