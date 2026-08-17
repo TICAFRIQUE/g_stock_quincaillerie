@@ -85,9 +85,15 @@ pour qu'il détecte le nouveau dossier et génère son virtual host.
 
 ### Au quotidien
 
-Mettre un raccourci de `scripts\demarrer.bat` sur le bureau du client :
-double-clic le matin pour démarrer Laragon (si pas déjà lancé au boot) et
-ouvrir l'application dans le navigateur.
+Mettre un raccourci de **`scripts\demarrer-silencieux.vbs`** sur le bureau du
+client (clic droit sur le fichier → Envoyer vers → Bureau, créer un
+raccourci) : double-clic le matin, aucune fenêtre visible (ni Laragon, ni
+invite de commande) — Apache démarre en tâche de fond si besoin, puis le
+navigateur s'ouvre directement sur l'application.
+
+`scripts\demarrer.bat` reste disponible en mode visible (fenêtre + messages)
+pour déboguer depuis le Terminal Laragon si jamais ça ne s'ouvre pas — c'est
+la version que `demarrer-silencieux.vbs` exécute en coulisses.
 
 ## 5. Installer sans connexion internet du tout
 

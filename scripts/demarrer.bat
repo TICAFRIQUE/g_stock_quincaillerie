@@ -12,24 +12,29 @@ echo ============================================
 echo  Demarrage - G-Stock Quincaillerie
 echo ============================================
 
-if exist "C:\laragon\laragon.exe" (
-    tasklist /fi "imagename eq httpd.exe" 2>nul | find /i "httpd.exe" >nul
-    if errorlevel 1 (
-        echo Lancement de Laragon...
-        start "" "C:\laragon\laragon.exe"
-        echo Si Apache/MySQL ne demarrent pas tout seuls, cliquez sur "Start All" dans Laragon.
-        timeout /t 5 >nul
+tasklist /fi "imagename eq httpd.exe" 2>nul | find /i "httpd.exe" >nul
+if errorlevel 1 (
+    if exist "C:\laragon\laragon.exe" (
+        echo Lancement de Laragon ^(minimise^)...
+        start /min "" "C:\laragon\laragon.exe"
+        call :attendre_apache
     ) else (
-        echo Laragon deja demarre.
+        echo [ATTENTION] Laragon introuvable a l'emplacement par defaut C:\laragon.
+        echo Demarrez Apache et MySQL manuellement.
     )
 ) else (
-    echo [ATTENTION] Laragon introuvable a l'emplacement par defaut C:\laragon.
-    echo Demarrez Apache et MySQL manuellement avant de continuer.
+    echo Apache deja demarre.
 )
 
 echo Ouverture de l'application : %APP_URL%
 start "" "%APP_URL%"
+goto :eof
 
-echo.
-echo Vous pouvez fermer cette fenetre.
-pause
+:attendre_apache
+set COMPTEUR=0
+:boucle_attente_apache
+ping -n 2 127.0.0.1 >nul
+set /a COMPTEUR+=1
+tasklist /fi "imagename eq httpd.exe" 2>nul | find /i "httpd.exe" >nul
+if errorlevel 1 if %COMPTEUR% lss 20 goto :boucle_attente_apache
+goto :eof
