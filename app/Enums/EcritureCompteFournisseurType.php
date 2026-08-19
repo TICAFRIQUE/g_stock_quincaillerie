@@ -6,12 +6,18 @@ enum EcritureCompteFournisseurType: string
 {
     case AchatCredit = 'achat_credit';
     case Reglement = 'reglement';
+    case RetourFournisseur = 'retour_fournisseur';
+    case AnnulationAchat = 'annulation_achat';
+    case RemboursementAvoir = 'remboursement_avoir';
 
     public function libelle(): string
     {
         return match ($this) {
             self::AchatCredit => 'Achat à crédit',
             self::Reglement => 'Règlement',
+            self::RetourFournisseur => 'Retour fournisseur',
+            self::AnnulationAchat => 'Annulation d\'achat',
+            self::RemboursementAvoir => 'Remboursement d\'avoir',
         };
     }
 
@@ -20,6 +26,9 @@ enum EcritureCompteFournisseurType: string
         return match ($this) {
             self::AchatCredit => 'text-bg-warning',
             self::Reglement => 'text-bg-success',
+            self::RetourFournisseur => 'text-bg-info',
+            self::AnnulationAchat => 'text-bg-dark',
+            self::RemboursementAvoir => 'text-bg-primary',
         };
     }
 
@@ -32,6 +41,9 @@ enum EcritureCompteFournisseurType: string
         return match ($this) {
             self::AchatCredit => 'table-warning',
             self::Reglement => 'table-success',
+            self::RetourFournisseur => 'table-info',
+            self::AnnulationAchat => 'table-secondary',
+            self::RemboursementAvoir => 'table-primary',
         };
     }
 }

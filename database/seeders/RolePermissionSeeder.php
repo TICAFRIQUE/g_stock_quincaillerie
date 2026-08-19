@@ -29,6 +29,7 @@ class RolePermissionSeeder extends Seeder
             'vente.creer',
             'vente.credit',
             'vente.signaler',
+            'vente.retour',
             'ventenattente.gerer',
             'client.voir',
             'client.gerer',
@@ -38,6 +39,7 @@ class RolePermissionSeeder extends Seeder
             'devis.transformer',
             'caisse.ouvrir',
             'caisse.cloturer',
+            'caisse.mouvement',
         ]);
     }
 }

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\SoldeCaisseInsuffisantException;
 use App\Exceptions\SoldeFournisseurInsuffisantException;
 use App\Models\CommandeAchat;
 use App\Models\Fournisseur;
+use App\Models\SessionCaisse;
 use App\Services\ReglementFournisseurService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,10 +14,13 @@ use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 
 /**
- * Contrairement à ReglementClientController, pas de rattachement à une
- * session de caisse : le règlement fournisseur est indépendant du tiroir
- * (voir CLAUDE.md, décision produit). Saisi via une modale directement
- * depuis la fiche fournisseur (pas d'écran dédié).
+ * Contrairement à ReglementClientController, pas de rattachement obligatoire
+ * à une session de caisse : le règlement fournisseur reste indépendant du
+ * tiroir pour tout paiement non-espèces (règle 17). Une session n'est
+ * exigée que si une partie du règlement est en espèces (voir
+ * ReglementFournisseurService — une sortie de caisse liée est alors générée
+ * automatiquement). Saisi via une modale directement depuis la fiche
+ * fournisseur ou le détail d'un achat (pas d'écran dédié).
  */
 class ReglementFournisseurController extends Controller
 {
@@ -23,6 +28,7 @@ class ReglementFournisseurController extends Controller
     {
         $donnees = $request->validate([
             'commande_achat_id' => ['nullable', Rule::exists('commande_achats', 'id')->where('fournisseur_id', $fournisseur->id)],
+            'session_caisse_id' => ['nullable', Rule::exists('session_caisses', 'id')->whereNull('date_cloture')->whereNull('date_fermeture')],
             'paiements' => ['required', 'array', 'min:1'],
             'paiements.*.moyen_paiement_id' => ['required', 'exists:moyen_paiements,id'],
             'paiements.*.montant' => ['required', 'integer', 'min:1'],
@@ -30,6 +36,10 @@ class ReglementFournisseurController extends Controller
 
         $commandeAchat = $donnees['commande_achat_id'] ?? null
             ? CommandeAchat::withTrashed()->find($donnees['commande_achat_id'])
+            : null;
+
+        $session = $donnees['session_caisse_id'] ?? null
+            ? SessionCaisse::find($donnees['session_caisse_id'])
             : null;
 
         // Un règlement imputé à un achat précis ne peut pas dépasser le
@@ -48,8 +58,9 @@ class ReglementFournisseurController extends Controller
                 auteur: $request->user(),
                 paiements: $donnees['paiements'],
                 commandeAchat: $commandeAchat,
+                session: $session,
             );
-        } catch (SoldeFournisseurInsuffisantException|InvalidArgumentException $e) {
+        } catch (SoldeFournisseurInsuffisantException|SoldeCaisseInsuffisantException|InvalidArgumentException $e) {
             return back()->withInput()->with('erreur', $e->getMessage());
         }
 

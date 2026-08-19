@@ -37,6 +37,14 @@
         </li>
     @endcanany
 
+    @can('caisse.mouvement')
+        <li class="nav-item">
+            <a href="{{ route('caisse.index') }}" class="nav-link {{ request()->routeIs('caisse.*') ? 'active' : '' }}">
+                <i class="bi bi-wallet2 me-1"></i>Caisse
+            </a>
+        </li>
+    @endcan
+
     @canany(['stock.voir', 'inventaire.voir', 'achat.voir', 'fournisseur.voir'])
         <li class="nav-item dropdown">
             <a href="#" class="nav-link dropdown-toggle {{ request()->routeIs('stock.*', 'transferts.*', 'inventaires.*', 'fournisseurs.*', 'reglements-fournisseur.*', 'commande-achats.*') ? 'active' : '' }}"
@@ -68,7 +76,7 @@
                 @can('achat.voir')
                     <li>
                         <a href="{{ route('commande-achats.index') }}" class="dropdown-item {{ request()->routeIs('commande-achats.*') ? 'active' : '' }}">
-                            <i class="bi bi-truck me-2"></i>Bons de commande
+                            <i class="bi bi-truck me-2"></i>Bons d'achat
                         </a>
                     </li>
                 @endcan

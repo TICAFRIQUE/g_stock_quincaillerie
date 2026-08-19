@@ -79,7 +79,7 @@
                             <td>{{ $session->caisse->magasin->nom }}</td>
                             <td>{{ $session->caissier->name }}</td>
                             <td>{{ $session->date_cloture->format('d/m/Y H:i') }}</td>
-                            <td>{{ number_format($session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes, 0, ',', ' ') }} F</td>
+                            <td>{{ number_format($session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes + $session->total_entrees_especes - $session->total_sorties_especes, 0, ',', ' ') }} F</td>
                             <td>{{ number_format($session->montant_compte, 0, ',', ' ') }} F</td>
                             <td class="{{ $session->ecart == 0 ? '' : ($session->ecart > 0 ? 'text-success' : 'text-danger') }} fw-medium">
                                 {{ $session->ecart > 0 ? '+' : '' }}{{ number_format($session->ecart, 0, ',', ' ') }} F

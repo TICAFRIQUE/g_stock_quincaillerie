@@ -4,10 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Enums\MouvementStockType;
 use App\Http\Controllers\Concerns\ExporteListe;
+use App\Http\Controllers\Concerns\JournalCaisse;
 use App\Models\Caisse;
 use App\Models\Inventaire;
 use App\Models\Magasin;
 use App\Models\MouvementStock;
+use App\Models\Paiement;
+use App\Models\ReglementPaiement;
 use App\Models\SessionCaisse;
 use App\Models\Stock;
 use App\Models\User;
@@ -15,12 +18,14 @@ use App\Models\Vente;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RapportController extends Controller
 {
-    use ExporteListe;
+    use ExporteListe, JournalCaisse;
 
     public function index(): View
     {
@@ -47,9 +52,22 @@ class RapportController extends Controller
             ->when($request->filled('caisse_id'), fn ($q) => $q->whereHas('sessionCaisse', fn ($sc) => $sc->where('caisse_id', $request->integer('caisse_id'))))
             ->whereBetween('created_at', [$debut, $fin]);
 
+        // Reste dû réel : nécessite paiements/reglementsClient par vente
+        // (voir Vente::soldeDuReel()), donc une collection plutôt qu'un
+        // simple sum() SQL — même périmètre exact que $requeteTotaux.
+        $totalDu = (int) (clone $requeteTotaux)->with('paiements', 'reglementsClient')->get()
+            ->sum(fn (Vente $v) => $v->soldeDuReel());
+
         return view('rapports.ventes', [
             'ventes' => $ventes,
             'totalNet' => (int) (clone $requeteTotaux)->sum('total_net'),
+            'totalDu' => $totalDu,
+            // Informationnel uniquement : l'avoir appliqué n'entre jamais dans
+            // le comptage du tiroir (règle 10), contrairement aux espèces —
+            // ce KPI répond juste au besoin de voir combien d'avoirs ont
+            // servi à régler des factures sur la période.
+            'totalAvoirApplique' => (int) (clone $requeteTotaux)->sum('avoir_applique'),
+            'totalEspeces' => $this->totalEspecesFiltre($request, $debut, $fin, $magasinId),
             'nombre' => (clone $requeteTotaux)->count(),
             'magasins' => Magasin::orderBy('nom')->get(),
             'caissiers' => User::when($magasinId, fn ($q) => $q->where('magasin_id', $magasinId))->orderBy('name')->get(),
@@ -59,6 +77,41 @@ class RapportController extends Controller
         ]);
     }
 
+    /**
+     * Espèces réellement encaissées sur le périmètre filtré (paiements à la
+     * vente + règlements clients, règle 10) — mêmes filtres que
+     * requeteVentesFiltree()/$requeteTotaux, jamais confondu avec totalNet
+     * (qui inclut crédit et avoir, jamais encaissés).
+     */
+    private function totalEspecesFiltre(Request $request, Carbon $debut, Carbon $fin, ?int $magasinId): int
+    {
+        $especesVente = (int) Paiement::query()
+            ->join('ventes', 'ventes.id', '=', 'paiements.vente_id')
+            ->join('moyen_paiements', 'moyen_paiements.id', '=', 'paiements.moyen_paiement_id')
+            ->join('session_caisses', 'session_caisses.id', '=', 'ventes.session_caisse_id')
+            ->where('moyen_paiements.est_espece', true)
+            ->when($magasinId, fn ($q) => $q->where('ventes.magasin_id', $magasinId))
+            ->when($request->filled('caissier_id'), fn ($q) => $q->where('ventes.caissier_id', $request->integer('caissier_id')))
+            ->when($request->filled('caisse_id'), fn ($q) => $q->where('session_caisses.caisse_id', $request->integer('caisse_id')))
+            ->whereBetween('ventes.created_at', [$debut, $fin])
+            ->whereNull('ventes.deleted_at')
+            ->sum('paiements.montant');
+
+        $especesReglement = (int) ReglementPaiement::query()
+            ->join('reglement_clients', 'reglement_clients.id', '=', 'reglement_paiements.reglement_client_id')
+            ->join('session_caisses', 'session_caisses.id', '=', 'reglement_clients.session_caisse_id')
+            ->join('caisses', 'caisses.id', '=', 'session_caisses.caisse_id')
+            ->join('moyen_paiements', 'moyen_paiements.id', '=', 'reglement_paiements.moyen_paiement_id')
+            ->where('moyen_paiements.est_espece', true)
+            ->when($magasinId, fn ($q) => $q->where('caisses.magasin_id', $magasinId))
+            ->when($request->filled('caissier_id'), fn ($q) => $q->where('reglement_clients.caissier_id', $request->integer('caissier_id')))
+            ->when($request->filled('caisse_id'), fn ($q) => $q->where('session_caisses.caisse_id', $request->integer('caisse_id')))
+            ->whereBetween('reglement_clients.created_at', [$debut, $fin])
+            ->sum('reglement_paiements.montant');
+
+        return $especesVente + $especesReglement;
+    }
+
     public function ventesPdf(Request $request): Response
     {
         [$debut, $fin] = $this->periode($request);
@@ -66,7 +119,7 @@ class RapportController extends Controller
 
         return $this->pdfDepuisListe(
             'Rapport des ventes',
-            ['Numéro', 'Date', 'Magasin', 'Caisse', 'Caissier', 'Total net'],
+            ['Numéro', 'Date', 'Magasin', 'Caisse', 'Caissier', 'Total net', 'Avoir appliqué'],
             $this->requeteVentesFiltree($request, $debut, $fin, $magasinId)->get()->map(fn (Vente $v) => [
                 $v->numero,
                 $v->created_at->format('d/m/Y H:i'),
@@ -74,6 +127,7 @@ class RapportController extends Controller
                 $v->sessionCaisse->caisse->nom,
                 $v->caissier->name,
                 number_format($v->total_net, 0, ',', ' ').' F',
+                $v->avoir_applique > 0 ? number_format($v->avoir_applique, 0, ',', ' ').' F' : '—',
             ]),
             'rapport-ventes.pdf',
             'Du '.$debut->format('d/m/Y').' au '.$fin->format('d/m/Y'),
@@ -87,7 +141,7 @@ class RapportController extends Controller
 
         return $this->excelDepuisListe(
             'Rapport des ventes',
-            ['Numéro', 'Date', 'Magasin', 'Caisse', 'Caissier', 'Total net'],
+            ['Numéro', 'Date', 'Magasin', 'Caisse', 'Caissier', 'Total net', 'Avoir appliqué'],
             $this->requeteVentesFiltree($request, $debut, $fin, $magasinId)->get()->map(fn (Vente $v) => [
                 $v->numero,
                 $v->created_at->format('d/m/Y H:i'),
@@ -95,6 +149,7 @@ class RapportController extends Controller
                 $v->sessionCaisse->caisse->nom,
                 $v->caissier->name,
                 $v->total_net,
+                $v->avoir_applique,
             ]),
             'rapport-ventes.xlsx',
         );
@@ -300,6 +355,100 @@ class RapportController extends Controller
             ->when($magasinId, fn ($q) => $q->whereHas('caisse', fn ($c) => $c->where('magasin_id', $magasinId)))
             ->whereBetween('date_cloture', [$debut, $fin])
             ->orderByDesc('date_cloture');
+    }
+
+    public function mouvementsCaisse(Request $request): View
+    {
+        [$debut, $fin] = $this->periode($request);
+        $magasinId = $this->resoudreMagasinId($request);
+        $caisseId = $request->filled('caisse_id') ? $request->integer('caisse_id') : null;
+        $caissierId = $request->filled('caissier_id') ? $request->integer('caissier_id') : null;
+        $type = $request->filled('type') ? $request->string('type')->toString() : null;
+
+        $requeteMouvements = $this->requeteJournalCaisse($debut, $fin, magasinId: $magasinId, caisseId: $caisseId, caissierId: $caissierId, type: $type);
+
+        $mouvements = $request->boolean('tout')
+            ? $requeteMouvements->get()
+            : $requeteMouvements->paginate(25)->withQueryString();
+
+        $lignes = $mouvements instanceof LengthAwarePaginator ? $mouvements->getCollection() : $mouvements;
+        $lignes->transform(fn ($l) => $this->decorerLigneJournal($l));
+
+        // KPI sur le même périmètre filtré (date/magasin/caisse/caissier),
+        // mais toujours tous types confondus — la répartition entrées/
+        // sorties/ventes ne doit pas dépendre du filtre "type" qui ne
+        // pilote que la table affichée.
+        $toutesLesLignes = $this->requeteJournalCaisse($debut, $fin, magasinId: $magasinId, caisseId: $caisseId, caissierId: $caissierId)->get();
+        $totalEntrees = (int) $toutesLesLignes->where('type', 'entree')->sum('montant');
+        $totalSorties = (int) $toutesLesLignes->where('type', 'sortie')->sum('montant');
+        $totalVentes = (int) $toutesLesLignes->where('type', 'vente')->sum('montant');
+
+        return view('rapports.mouvements-caisse', [
+            'mouvements' => $mouvements,
+            'magasins' => Magasin::orderBy('nom')->get(),
+            'caisses' => Caisse::when($magasinId, fn ($q) => $q->where('magasin_id', $magasinId))->orderBy('nom')->get(),
+            'caissiers' => User::when($magasinId, fn ($q) => $q->where('magasin_id', $magasinId))->orderBy('name')->get(),
+            'debut' => $debut,
+            'fin' => $fin,
+            'nombre' => $request->boolean('tout') ? $mouvements->count() : $mouvements->total(),
+            'totalEntrees' => $totalEntrees,
+            'totalSorties' => $totalSorties,
+            'totalVentes' => $totalVentes,
+        ]);
+    }
+
+    public function mouvementsCaissePdf(Request $request): Response
+    {
+        [$debut, $fin] = $this->periode($request);
+        $magasinId = $this->resoudreMagasinId($request);
+
+        return $this->pdfDepuisListe(
+            'Mouvements de caisse',
+            ['Date', 'Caisse', 'Magasin', 'Type', 'Motif', 'Montant', 'Auteur'],
+            $this->requeteJournalCaissePourExport($request, $debut, $fin, $magasinId)->map(fn (object $l) => [
+                Carbon::parse($l->created_at)->format('d/m/Y H:i'),
+                $l->caisse_nom,
+                $l->magasin_nom,
+                $this->decorerLigneJournal($l)->type_libelle,
+                $l->motif,
+                ($l->type === 'sortie' ? '− ' : '+ ').number_format($l->montant, 0, ',', ' ').' F',
+                $l->auteur_nom ?? 'Utilisateur supprimé',
+            ]),
+            'rapport-mouvements-caisse.pdf',
+            'Du '.$debut->format('d/m/Y').' au '.$fin->format('d/m/Y'),
+        );
+    }
+
+    public function mouvementsCaisseExcel(Request $request): StreamedResponse
+    {
+        [$debut, $fin] = $this->periode($request);
+        $magasinId = $this->resoudreMagasinId($request);
+
+        return $this->excelDepuisListe(
+            'Mouvements de caisse',
+            ['Date', 'Caisse', 'Magasin', 'Type', 'Motif', 'Montant', 'Auteur'],
+            $this->requeteJournalCaissePourExport($request, $debut, $fin, $magasinId)->map(fn (object $l) => [
+                Carbon::parse($l->created_at)->format('d/m/Y H:i'),
+                $l->caisse_nom,
+                $l->magasin_nom,
+                $this->decorerLigneJournal($l)->type_libelle,
+                $l->motif,
+                $l->type === 'sortie' ? -$l->montant : $l->montant,
+                $l->auteur_nom ?? 'Utilisateur supprimé',
+            ]),
+            'rapport-mouvements-caisse.xlsx',
+        );
+    }
+
+    private function requeteJournalCaissePourExport(Request $request, Carbon $debut, Carbon $fin, ?int $magasinId): Collection
+    {
+        return $this->requeteJournalCaisse(
+            $debut, $fin,
+            magasinId: $magasinId,
+            caisseId: $request->filled('caisse_id') ? $request->integer('caisse_id') : null,
+            caissierId: $request->filled('caissier_id') ? $request->integer('caissier_id') : null,
+            type: $request->filled('type') ? $request->string('type')->toString() : null,
+        )->get();
     }
 
     public function inventaires(Request $request): View

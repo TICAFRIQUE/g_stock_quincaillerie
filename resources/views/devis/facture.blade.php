@@ -44,11 +44,42 @@
         table.totaux td { padding: 5px 8px; }
         table.totaux .net td { font-weight: bold; font-size: 15px; border-top: 2px solid #241e19; }
         .mention { margin-top: 30px; font-size: 11px; color: #888; text-align: center; }
+        /* @page (pas body padding) : seul mécanisme qui réserve une marge de
+           sécurité fiable sur CHAQUE page côté dompdf comme à l'impression
+           navigateur — un padding sur body ne protège que le tout début/la
+           toute fin du document, pas les bords de chaque page. Sans cette
+           marge, le contenu touchait le bord physique et se faisait rogner
+           par la zone non imprimable de l'imprimante. */
+        @page {
+            margin: 15mm 12mm;
+        }
         @media print {
             .actions { display: none; }
-            body { padding: 0; }
+            body { padding: 0; margin: 0; color: #000; }
+            /* Noir et blanc par défaut à l'impression/PDF : les couleurs
+               d'accent (orange, beige) restent réservées à l'écran. */
+            .devis-titre { color: #000; }
+            .devis-meta { color: #000; }
+            .bloc-client { background: #fff; border-color: #000; }
+            .bloc-client .label { color: #000; }
+            table.lignes th { background: #fff; }
+            .mention { color: #000; }
         }
     </style>
+    @if ($pourPdf ?? false)
+        <style>
+            /* Le PDF téléchargé est généré par dompdf en media "screen" par
+               défaut (@media print ci-dessus ne s'y applique jamais) : mêmes
+               règles noir et blanc dupliquées ici pour le PDF, l'impression
+               navigateur réelle restant, elle, couverte par @media print. */
+            .devis-titre { color: #000; }
+            .devis-meta { color: #000; }
+            .bloc-client { background: #fff; border-color: #000; }
+            .bloc-client .label { color: #000; }
+            table.lignes th { background: #fff; }
+            .mention { color: #000; }
+        </style>
+    @endif
 </head>
 <body>
     @unless ($pourPdf ?? false)

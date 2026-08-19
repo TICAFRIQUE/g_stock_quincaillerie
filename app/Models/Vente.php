@@ -14,7 +14,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 #[Fillable([
     'numero', 'magasin_id', 'session_caisse_id', 'caissier_id', 'client_id', 'sous_total',
     'remise_totale_type', 'remise_totale_valeur', 'remise_totale_montant', 'total_net',
-    'montant_recu', 'monnaie_rendue', 'motif_annulation', 'annulee_par',
+    'montant_recu', 'monnaie_rendue', 'avoir_applique', 'motif_annulation', 'annulee_par',
 ])]
 class Vente extends Model
 {
@@ -37,6 +37,7 @@ class Vente extends Model
             'total_net' => 'integer',
             'montant_recu' => 'integer',
             'monnaie_rendue' => 'integer',
+            'avoir_applique' => 'integer',
             'deleted_at' => 'datetime',
         ];
     }
@@ -81,6 +82,11 @@ class Vente extends Model
         return $this->hasMany(LigneVente::class);
     }
 
+    public function retours(): HasMany
+    {
+        return $this->hasMany(RetourVente::class);
+    }
+
     public function paiements(): HasMany
     {
         return $this->hasMany(Paiement::class);
@@ -113,5 +119,20 @@ class Vente extends Model
     public function soldeDu(): int
     {
         return $this->total_net - $this->montantRegle();
+    }
+
+    /**
+     * Reste réellement dû : soldeDu() net de la part déjà couverte par un
+     * avoir client au moment de la vente (avoir_applique, figé à la
+     * création — voir VenteService::vendre()). Sans ça, une facture
+     * intégralement compensée par un avoir préexistant continuait d'afficher
+     * un "reste dû" alors que le compte du client était déjà à 0 (l'avoir
+     * se déduit automatiquement de la dette posée, règle 12/20) — c'est
+     * cette valeur qu'il faut utiliser partout où "reste dû" signifie une
+     * vraie dette encore ouverte (ticket, bouton "Régler", export).
+     */
+    public function soldeDuReel(): int
+    {
+        return max(0, $this->soldeDu() - $this->avoir_applique);
     }
 }

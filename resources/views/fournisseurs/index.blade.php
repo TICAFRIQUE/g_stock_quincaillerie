@@ -24,6 +24,7 @@
             <table class="table table-hover align-middle mb-0">
                 <thead>
                     <tr>
+                        <th>Code</th>
                         <x-th-tri champ="nom" label="Nom" />
                         <th>Téléphone</th>
                         <th>E-mail</th>
@@ -36,6 +37,7 @@
                     @forelse ($fournisseurs as $fournisseur)
                         @php $solde = (int) ($soldes[$fournisseur->id] ?? 0); @endphp
                         <tr>
+                            <td><code>{{ $fournisseur->code }}</code></td>
                             <td><a href="{{ route('fournisseurs.show', $fournisseur) }}">{{ $fournisseur->nom }}</a></td>
                             <td>{{ $fournisseur->telephone ?? '—' }}</td>
                             <td>{{ $fournisseur->email ?? '—' }}</td>
@@ -56,7 +58,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center text-secondary py-4">Aucun fournisseur pour l'instant.</td>
+                            <td colspan="7" class="text-center text-secondary py-4">Aucun fournisseur pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>

@@ -45,6 +45,15 @@
         <div class="col-12 col-md-6 col-lg-4">
             <div class="card h-100">
                 <div class="card-body">
+                    <h3 class="h6"><i class="bi bi-arrow-left-right me-2"></i>Mouvements de caisse</h3>
+                    <p class="text-secondary small">Entrées et sorties manuelles, par caisse et par période.</p>
+                    <a href="{{ route('rapports.mouvements-caisse') }}" class="btn btn-sm btn-outline-primary">Voir</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
                     <h3 class="h6"><i class="bi bi-x-octagon me-2"></i>Casse / pertes</h3>
                     <p class="text-secondary small">Pièces perdues, par produit et magasin.</p>
                     <a href="{{ route('rapports.casse') }}" class="btn btn-sm btn-outline-primary">Voir</a>

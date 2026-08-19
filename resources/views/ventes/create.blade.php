@@ -9,7 +9,8 @@
         {{ \Illuminate\Support\Js::from($venteEnAttente->libelle ?? '') }},
         {{ \Illuminate\Support\Js::from(old('client_id', $devisTransformation->client_id ?? $venteEnAttente->client_id ?? '')) }},
         {{ \Illuminate\Support\Js::from($session->caisse->magasin_id) }},
-        {{ \Illuminate\Support\Js::from($session->caisse->magasin->nom) }}
+        {{ \Illuminate\Support\Js::from($session->caisse->magasin->nom) }},
+        {{ \Illuminate\Support\Js::from($clientSoldes) }}
     )">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
             <div>
@@ -237,8 +238,25 @@
                                         </button>
                                     @endcan
                                 </div>
-                                <div class="form-text small" x-show="clientId" x-cloak>
+                                <div class="form-text small" x-show="clientId && !avoirDisponible" x-cloak>
                                     Le solde restant dû sera porté au compte de ce client.
+                                </div>
+                                <div class="form-text small text-success" x-show="clientId && avoirDisponible > 0" x-cloak>
+                                    <i class="bi bi-piggy-bank me-1"></i>Ce client a un avoir de <strong x-text="avoirDisponible + ' F'"></strong>.
+                                    <button type="button" class="btn btn-link btn-sm p-0 align-baseline" @click="appliquerAvoir()">
+                                        Appliquer l'avoir à cette facture
+                                    </button>
+                                </div>
+                                <div class="form-text small fw-semibold" :class="netApresAvoir > 0 ? 'text-warning' : 'text-success'"
+                                     x-show="clientId && avoirDisponible > 0 && totalNet > 0" x-cloak>
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    <span x-text="avoirApplicable + ' F'"></span> de l'avoir couvriront cette facture de <span x-text="totalNet + ' F'"></span>.
+                                    <template x-if="netApresAvoir > 0">
+                                        <span>Il restera <strong x-text="netApresAvoir + ' F'"></strong> à régler (en paiement et/ou en solde à crédit).</span>
+                                    </template>
+                                    <template x-if="netApresAvoir === 0">
+                                        <span>Facture entièrement couverte par l'avoir, aucun paiement n'est nécessaire.</span>
+                                    </template>
                                 </div>
                             </div>
                         </div>
@@ -281,8 +299,18 @@
                                 Total réglé : <span x-text="totalPaiements"></span> F
                                 <span x-show="totalPaiements < totalNet"> (net à payer : <span x-text="totalNet"></span> F)</span>
                             </div>
-                            <div class="mt-1 small fw-medium text-warning" x-show="clientId && totalPaiements < totalNet" x-cloak>
+                            <div class="mt-1 small fw-medium text-warning" x-show="clientId && totalPaiements < totalNet && !avoirDisponible" x-cloak>
                                 <i class="bi bi-credit-card me-1"></i>Solde à crédit : <span x-text="totalNet - totalPaiements"></span> F sur le compte du client.
+                            </div>
+                            <div class="mt-1 small fw-medium" :class="resteApresAvoir > 0 ? 'text-warning' : 'text-success'"
+                                 x-show="clientId && avoirDisponible > 0 && totalPaiements < totalNet" x-cloak>
+                                <i class="bi bi-piggy-bank me-1"></i>
+                                <template x-if="resteApresAvoir > 0">
+                                    <span>Avoir appliqué : <span x-text="avoirUtiliseSurCetteVente + ' F'"></span>. Il restera <strong x-text="resteApresAvoir + ' F'"></strong> de solde à crédit sur le compte du client.</span>
+                                </template>
+                                <template x-if="resteApresAvoir === 0">
+                                    <span>Couvert par l'avoir du client (<span x-text="avoirUtiliseSurCetteVente + ' F'"></span>) — aucune dette ne sera créée.</span>
+                                </template>
                             </div>
                             <div class="mt-1 small fw-medium text-primary" x-show="monnaieARendre > 0" x-cloak>
                                 <i class="bi bi-cash-coin me-1"></i>Monnaie à rendre : <span x-text="monnaieARendre"></span> F
@@ -344,9 +372,7 @@
                                     :disabled="panier.length === 0 || (totalPaiements < totalNet && !({{ $gardeCredit }})) || aUnDoublon || aUneLigneNonChoisie || aUneSourceNonChoisie || aUneLigneEnRupture || aUnPaiementSansMoyen"
                                     @click="declencherFinalisation($event)"
                                     data-form-id="formVente"
-                                    :data-message="clientId && totalPaiements < totalNet
-                                        ? 'Finaliser cette vente à crédit ? Le stock sera mis à jour et le solde restant sera porté au compte du client. Cette action est irréversible.'
-                                        : 'Finaliser cette vente ? Le stock sera mis à jour et le paiement enregistré. Cette action est irréversible.'"
+                                    :data-message="messageConfirmationVente"
                                     data-button-label="Finaliser la vente" data-button-class="btn-primary">
                                 <i class="bi bi-check-circle me-1"></i>{{ $devisTransformation ? 'Transformer en vente' : 'Finaliser la vente' }}
                             </button>

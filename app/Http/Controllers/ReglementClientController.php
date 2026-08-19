@@ -56,8 +56,8 @@ class ReglementClientController extends Controller
         if ($vente) {
             $vente->loadMissing('paiements', 'reglementsClient');
             $montantTotal = array_sum(array_column($donnees['paiements'], 'montant'));
-            if ($montantTotal > $vente->soldeDu()) {
-                return back()->withInput()->with('erreur', 'Le montant dépasse le reste dû sur cette vente ('.number_format($vente->soldeDu(), 0, ',', ' ').' F).');
+            if ($montantTotal > $vente->soldeDuReel()) {
+                return back()->withInput()->with('erreur', 'Le montant dépasse le reste dû sur cette vente ('.number_format($vente->soldeDuReel(), 0, ',', ' ').' F).');
             }
         }
 

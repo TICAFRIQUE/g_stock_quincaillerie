@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Enums\EcritureCompteFournisseurType;
 use App\Enums\MouvementStockType;
 use App\Models\CommandeAchat;
+use App\Models\EcritureCompteFournisseur;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -90,6 +92,14 @@ class AchatService
             throw new RuntimeException("La commande {$commandeAchat->numero} n'est pas validée : utilisez la suppression pour un brouillon.");
         }
 
+        // annuler() restitue la quantite_pieces ORIGINALE de chaque ligne :
+        // si une partie a déjà été rendue au fournisseur via un retour, ce
+        // stock a déjà été repris, une annulation totale le reprendrait une
+        // seconde fois.
+        if ($commandeAchat->retours()->exists()) {
+            throw new RuntimeException("La commande {$commandeAchat->numero} a déjà fait l'objet d'un retour partiel : annulation totale impossible.");
+        }
+
         return DB::transaction(function () use ($commandeAchat, $auteur, $motif) {
             $commandeAchat->loadMissing('lignes.produit', 'lignes.uniteVente', 'lignes.magasinDestination');
 
@@ -103,6 +113,20 @@ class AchatService
                     reference: $commandeAchat,
                     motif: $motif,
                 );
+            }
+
+            // Reverse la dette exacte posée par crediterDette() à la
+            // validation (retrouvée via l'écriture elle-même plutôt que
+            // recalculée, pour rester robuste même si le total TTC a bougé
+            // depuis — ex. taxe désactivée). Rien à faire si l'achat avait
+            // été réglé intégralement à la validation (aucune écriture posée).
+            $montantDette = EcritureCompteFournisseur::where('reference_type', $commandeAchat->getMorphClass())
+                ->where('reference_id', $commandeAchat->id)
+                ->where('type', EcritureCompteFournisseurType::AchatCredit)
+                ->value('montant');
+
+            if ($montantDette > 0) {
+                $this->compteFournisseurService->annulerDette($commandeAchat->fournisseur, $montantDette, $commandeAchat, $auteur);
             }
 
             $commandeAchat->motif_annulation = $motif;

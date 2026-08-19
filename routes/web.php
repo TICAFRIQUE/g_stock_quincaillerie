@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\CaisseController;
+use App\Http\Controllers\CaisseMouvementController;
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CommandeAchatController;
@@ -18,6 +19,10 @@ use App\Http\Controllers\ProduitController;
 use App\Http\Controllers\RapportController;
 use App\Http\Controllers\ReglementClientController;
 use App\Http\Controllers\ReglementFournisseurController;
+use App\Http\Controllers\RemboursementAvoirClientController;
+use App\Http\Controllers\RemboursementAvoirFournisseurController;
+use App\Http\Controllers\RetourAchatController;
+use App\Http\Controllers\RetourVenteController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SessionCaisseController;
 use App\Http\Controllers\StockController;
@@ -111,6 +116,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('can:fournisseur.reglement')->group(function () {
         Route::post('fournisseurs/{fournisseur}/reglements', [ReglementFournisseurController::class, 'store'])->name('reglements-fournisseur.store');
+        Route::post('fournisseurs/{fournisseur}/remboursements-avoir', [RemboursementAvoirFournisseurController::class, 'store'])->name('remboursements-avoir-fournisseur.store');
     });
 
     Route::middleware('can:typeclient.gerer')->group(function () {
@@ -157,6 +163,10 @@ Route::middleware('auth')->group(function () {
         // Pas de withTrashed() ici : tenter d'annuler une commande déjà
         // annulée doit échouer (404 sur la liaison de route), pas la re-traiter.
         Route::post('commande-achats/{commandeAchat}/annuler', [CommandeAchatController::class, 'annuler'])->name('commande-achats.annuler');
+    });
+
+    Route::middleware('can:achat.retour')->group(function () {
+        Route::post('commande-achats/{commandeAchat}/retours', [RetourAchatController::class, 'store'])->name('commande-achats.retours.store');
     });
 
     Route::middleware('can:stock.voir')->group(function () {
@@ -208,6 +218,12 @@ Route::middleware('auth')->group(function () {
         Route::post('sessions/{session}/cloturer', [SessionCaisseController::class, 'cloturer'])->name('sessions.cloturer');
     });
 
+    Route::middleware('can:caisse.mouvement')->group(function () {
+        Route::get('caisse', [CaisseMouvementController::class, 'index'])->name('caisse.index');
+        Route::get('caisse/{session}', [CaisseMouvementController::class, 'show'])->name('caisse.show');
+        Route::post('caisse/{session}/mouvements', [CaisseMouvementController::class, 'store'])->name('caisse.mouvements.store');
+    });
+
     Route::middleware('can:caisse.fermer')->group(function () {
         Route::post('sessions/{session}/fermer', [SessionCaisseController::class, 'fermer'])->name('sessions.fermer');
     });
@@ -234,9 +250,14 @@ Route::middleware('auth')->group(function () {
         Route::post('ventes/{vente}/annuler', [VenteController::class, 'annuler'])->name('ventes.annuler');
     });
 
+    Route::middleware('can:vente.retour')->group(function () {
+        Route::post('ventes/{vente}/retours', [RetourVenteController::class, 'store'])->name('ventes.retours.store');
+    });
+
     Route::middleware('can:client.reglement')->group(function () {
         Route::get('sessions/{session}/reglements/creer', [ReglementClientController::class, 'create'])->name('reglements.create');
         Route::post('sessions/{session}/reglements', [ReglementClientController::class, 'store'])->name('reglements.store');
+        Route::post('clients/{client}/remboursements-avoir', [RemboursementAvoirClientController::class, 'store'])->name('remboursements-avoir-client.store');
     });
 
     Route::middleware('can:devis.voir')->group(function () {
@@ -308,6 +329,10 @@ Route::middleware('auth')->group(function () {
         Route::get('rapports/ecarts-caisse', [RapportController::class, 'ecartsCaisse'])->name('rapports.ecarts-caisse');
         Route::get('rapports/ecarts-caisse/pdf', [RapportController::class, 'ecartsCaissePdf'])->name('rapports.ecarts-caisse.pdf');
         Route::get('rapports/ecarts-caisse/excel', [RapportController::class, 'ecartsCaisseExcel'])->name('rapports.ecarts-caisse.excel');
+
+        Route::get('rapports/mouvements-caisse', [RapportController::class, 'mouvementsCaisse'])->name('rapports.mouvements-caisse');
+        Route::get('rapports/mouvements-caisse/pdf', [RapportController::class, 'mouvementsCaissePdf'])->name('rapports.mouvements-caisse.pdf');
+        Route::get('rapports/mouvements-caisse/excel', [RapportController::class, 'mouvementsCaisseExcel'])->name('rapports.mouvements-caisse.excel');
 
         Route::get('rapports/casse', [RapportController::class, 'casse'])->name('rapports.casse');
         Route::get('rapports/casse/pdf', [RapportController::class, 'cassePdf'])->name('rapports.casse.pdf');

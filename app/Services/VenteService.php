@@ -93,6 +93,17 @@ class VenteService
             $montantRecu = max($montantRecu ?? $totalNet, $totalNet);
             $monnaieRendue = $montantRecu - $totalNet;
 
+            // Avoir déjà disponible sur le compte AVANT cette vente : la part
+            // du solde à crédit qu'il couvrira est figée ici pour un ticket
+            // reproductible (voir Vente::soldeDuReel()) — l'écriture de dette
+            // elle-même (crediterDette ci-dessous) reste inchangée, seule
+            // cette annotation informative est nouvelle.
+            $avoirApplique = 0;
+            if ($soldeDu > 0 && $client !== null) {
+                $avoirDisponible = max(0, -$this->compteClientService->solde($client));
+                $avoirApplique = min($avoirDisponible, $soldeDu);
+            }
+
             $vente = Vente::create([
                 'numero' => $numero,
                 'magasin_id' => $magasin->id,
@@ -106,6 +117,7 @@ class VenteService
                 'total_net' => $totalNet,
                 'montant_recu' => $montantRecu,
                 'monnaie_rendue' => $monnaieRendue,
+                'avoir_applique' => $avoirApplique,
             ]);
 
             foreach ($lignesResolues as $l) {

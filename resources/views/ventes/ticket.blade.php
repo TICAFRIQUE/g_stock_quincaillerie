@@ -37,10 +37,14 @@
     @endif
 
     @php
-        $afficheReglerClient = ! $vente->trashed() && $peutRegler && $vente->soldeDu() > 0;
+        $afficheReglerClient = ! $vente->trashed() && $peutRegler && $vente->soldeDuReel() > 0;
         $afficheSignaler = ! $vente->trashed() && auth()->user()->can('vente.signaler');
         $afficheAnnulerVente = ! $vente->trashed() && auth()->user()->can('vente.annuler');
-        $nombreActionsVente = collect([$afficheReglerClient, $afficheSignaler, $afficheAnnulerVente])->filter()->count();
+        $afficheRetourner = ! $vente->trashed() && $peutRetourner;
+        $lignesRetournables = $vente->lignes->filter(
+            fn ($ligne) => $ligne->quantite_pieces - ($dejaRetourneParLigne[$ligne->id] ?? 0) > 0
+        );
+        $nombreActionsVente = collect([$afficheReglerClient, $afficheSignaler, $afficheAnnulerVente, $afficheRetourner])->filter()->count();
         $colActionVente = match ($nombreActionsVente) {
             1 => 'col-md-6 col-lg-4',
             2 => 'col-md-6',
@@ -81,11 +85,40 @@
         </div>
     </div>
 
-    @if ($afficheReglerClient || $afficheSignaler || $afficheAnnulerVente)
+    @if ($afficheReglerClient || $afficheSignaler || $afficheAnnulerVente || $afficheRetourner)
         <div class="row g-3 mb-3 d-print-none">
+            @if ($afficheRetourner)
+                <div class="{{ $colActionVente }}">
+                    <div class="card h-100 shadow-sm bg-info-subtle border-0">
+                        <div class="card-body d-flex flex-column">
+                            <div class="d-flex align-items-center gap-2 text-info-emphasis fw-semibold">
+                                <i class="bi bi-arrow-return-left fs-5"></i>Retourner des articles
+                            </div>
+                            @if (! $vente->client_id)
+                                <div class="small text-secondary mt-1">
+                                    Cette vente n'a pas de client identifié : un retour ne peut pas être enregistré
+                                    (aucun compte à créditer).
+                                </div>
+                            @elseif ($lignesRetournables->isEmpty())
+                                <div class="small text-secondary mt-1">
+                                    Tous les articles de cette facture ont déjà été retournés.
+                                </div>
+                            @else
+                                <div class="small text-secondary mt-1 mb-2">
+                                    L'article sera remis en stock et un avoir sera crédité au compte du client.
+                                </div>
+                                <button type="button" class="btn btn-info btn-sm mt-auto align-self-start" data-bs-toggle="modal" data-bs-target="#retourVenteModal">
+                                    <i class="bi bi-arrow-return-left me-1"></i>Enregistrer un retour
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             @if ($afficheReglerClient)
                 <div class="{{ $colActionVente }}">
-                    <div class="card h-100 shadow-sm bg-reglement-subtle border-0" x-data="{ ouvert: false, paiements: [{ moyen_paiement_id: '', montant: {{ $vente->soldeDu() }} }],
+                    <div class="card h-100 shadow-sm bg-reglement-subtle border-0" x-data="{ ouvert: false, paiements: [{ moyen_paiement_id: '', montant: {{ $vente->soldeDuReel() }} }],
                             get totalPaiements() { return this.paiements.reduce((total, p) => total + (Number(p.montant) || 0), 0); },
                             ajouterPaiement() { this.paiements.push({ moyen_paiement_id: '', montant: '' }); },
                             retirerPaiement(index) { this.paiements.splice(index, 1); } }">
@@ -96,7 +129,7 @@
                                         <i class="bi bi-cash-coin fs-5"></i>Règlement client
                                     </div>
                                     <div class="small text-secondary mt-1">
-                                        Reste dû sur cette facture : <strong>{{ number_format($vente->soldeDu(), 0, ',', ' ') }} F</strong>
+                                        Reste dû sur cette facture : <strong>{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</strong>
                                     </div>
                                 </div>
                                 @if ($sessionOuverte)
@@ -310,12 +343,47 @@
                 <span>Total réglé</span>
                 <span>{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</span>
             </div>
-            <div class="d-flex justify-content-between fw-semibold {{ $vente->soldeDu() > 0 ? 'text-danger' : '' }}">
+            @if ($vente->avoir_applique > 0)
+                <div class="d-flex justify-content-between text-success">
+                    <span><i class="bi bi-piggy-bank me-1"></i>Avoir appliqué</span>
+                    <span>{{ number_format($vente->avoir_applique, 0, ',', ' ') }} F</span>
+                </div>
+            @endif
+            <div class="d-flex justify-content-between fw-semibold {{ $vente->soldeDuReel() > 0 ? 'text-danger' : '' }}">
                 <span>Reste dû</span>
-                <span>{{ number_format($vente->soldeDu(), 0, ',', ' ') }} F</span>
+                <span>{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</span>
             </div>
         </div>
     </div>
+
+    @if ($vente->retours->isNotEmpty())
+        <div class="card mb-3 d-print-none bg-light border-0">
+            <div class="card-body">
+                <h3 class="h6">Retours</h3>
+                @foreach ($vente->retours as $retour)
+                    <div class="small border-bottom py-1 text-info-emphasis">
+                        <div class="d-flex justify-content-between">
+                            <span>
+                                <i class="bi bi-arrow-return-left me-1"></i><code>{{ $retour->numero }}</code>
+                                du {{ $retour->created_at->format('d/m/Y') }}
+                                par {{ $retour->auteur?->name ?? 'utilisateur supprimé' }}
+                            </span>
+                            <span class="fw-medium">Avoir {{ number_format($retour->montant_total, 0, ',', ' ') }} F</span>
+                        </div>
+                        @if ($retour->motif)
+                            <div class="text-secondary ps-4 fst-italic">{{ $retour->motif }}</div>
+                        @endif
+                        @foreach ($retour->lignes as $ligneRetour)
+                            <div class="d-flex justify-content-between text-secondary ps-4">
+                                <span>{{ $ligneRetour->produit->libelle_affichage }} × {{ $ligneRetour->quantite_pieces }}</span>
+                                <span>{{ number_format($ligneRetour->montant, 0, ',', ' ') }} F</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
 
     <div class="card recu-pos mx-auto d-none d-print-block" style="max-width: 420px;">
         <div class="card-body">
@@ -396,9 +464,15 @@
                         <td>Montant payé</td>
                         <td class="text-end">{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</td>
                     </tr>
-                    <tr class="fw-bold text-danger">
+                    @if ($vente->avoir_applique > 0)
+                        <tr>
+                            <td>Avoir appliqué</td>
+                            <td class="text-end">{{ number_format($vente->avoir_applique, 0, ',', ' ') }} F</td>
+                        </tr>
+                    @endif
+                    <tr class="fw-bold {{ $vente->soldeDuReel() > 0 ? 'text-danger' : '' }}">
                         <td>Reste à payer</td>
-                        <td class="text-end">{{ number_format($vente->soldeDu(), 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</td>
                     </tr>
                 @endif
             </table>
@@ -517,9 +591,15 @@
                     <td>Montant payé</td>
                     <td class="text-end">{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</td>
                 </tr>
-                <tr class="credit">
+                @if ($vente->avoir_applique > 0)
+                    <tr>
+                        <td>Avoir appliqué</td>
+                        <td class="text-end">{{ number_format($vente->avoir_applique, 0, ',', ' ') }} F</td>
+                    </tr>
+                @endif
+                <tr class="{{ $vente->soldeDuReel() > 0 ? 'credit' : '' }}">
                     <td>Reste à payer</td>
-                    <td class="text-end">{{ number_format($vente->soldeDu(), 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</td>
                 </tr>
             @endif
         </table>
@@ -529,6 +609,72 @@
             @if ($parametre->slogan) {{ $parametre->slogan }} @endif
         </div>
     </div>
+
+    @if ($afficheRetourner && $vente->client_id && $lignesRetournables->isNotEmpty())
+        <div class="modal fade d-print-none" id="retourVenteModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content"
+                     x-data="{
+                        lignes: {{ $lignesRetournables->mapWithKeys(fn ($l) => [$l->id => 0])->toJson() }},
+                        max: {{ $lignesRetournables->mapWithKeys(fn ($l) => [$l->id => $l->quantite_pieces - ($dejaRetourneParLigne[$l->id] ?? 0)])->toJson() }},
+                        get total() { return Object.values(this.lignes).reduce((s, q) => s + (Number(q) || 0), 0); },
+                     }">
+                    <form method="POST" action="{{ route('ventes.retours.store', $vente) }}">
+                        @csrf
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-arrow-return-left me-1"></i>Retourner des articles</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="small text-secondary">
+                                Quantité à retourner par article (unité de base — pièce). Le stock est remis à
+                                disposition et un avoir est crédité au compte du client, jamais un remboursement caisse.
+                            </p>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Produit</th>
+                                            <th class="text-end">Vendu</th>
+                                            <th class="text-end">Déjà retourné</th>
+                                            <th class="text-end" style="width: 140px;">À retourner</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($lignesRetournables as $ligne)
+                                            @php $dejaRetourne = $dejaRetourneParLigne[$ligne->id] ?? 0; @endphp
+                                            <tr>
+                                                <td>
+                                                    {{ $ligne->produit->libelle_affichage }}
+                                                    <input type="hidden" name="lignes[{{ $ligne->id }}][ligne_vente_id]" value="{{ $ligne->id }}">
+                                                </td>
+                                                <td class="text-end">{{ $ligne->quantite_pieces }}</td>
+                                                <td class="text-end">{{ $dejaRetourne }}</td>
+                                                <td>
+                                                    <input type="number" name="lignes[{{ $ligne->id }}][quantite_pieces]"
+                                                           x-model.number="lignes[{{ $ligne->id }}]"
+                                                           min="0" max="{{ $ligne->quantite_pieces - $dejaRetourne }}"
+                                                           class="form-control form-control-sm text-end">
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mb-2">
+                                <label for="retour-motif" class="form-label small">Motif (optionnel)</label>
+                                <textarea name="motif" id="retour-motif" class="form-control form-control-sm" rows="2"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-link" data-bs-dismiss="modal">Fermer</button>
+                            <button type="submit" class="btn btn-info" :disabled="total <= 0">Enregistrer le retour</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
 @endsection
 
 @push('scripts')

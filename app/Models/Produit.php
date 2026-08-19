@@ -83,6 +83,48 @@ class Produit extends Model implements HasMedia
         );
     }
 
+    /**
+     * Nom complet + abréviation (ex. « Kilogramme (kg) ») — même valeur que
+     * catalogueVente() calculait en dur, désormais réutilisable partout
+     * (état de stock…) sans dupliquer l'expression.
+     */
+    protected function uniteBaseLibelleComplet(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->uniteBase?->nom_avec_abbreviation ?? 'pièce',
+        );
+    }
+
+    /**
+     * Répartit une quantité en pièces selon la plus grande unité de vente
+     * active du produit qui y "rentre" au moins une fois — ex. 25 pièces
+     * avec un « Carton de 10 » devient 2 cartons + 5 pièces. Purement un
+     * confort d'affichage (état de stock) : ne touche jamais au stock
+     * lui-même, qui reste compté en pièces (règle 5). Retourne null si le
+     * produit n'a aucune unité de vente active, ou si la quantité est
+     * inférieure au facteur de la plus petite d'entre elles (rien d'utile à
+     * afficher). Suppose la relation uniteVentes déjà chargée.
+     *
+     * @return array{unite: UniteVente, nombre: int, reste: int}|null
+     */
+    public function repartirQuantite(int $quantitePieces): ?array
+    {
+        $uniteDominante = $this->uniteVentes
+            ->where('actif', true)
+            ->sortByDesc('facteur')
+            ->first(fn (UniteVente $u) => $quantitePieces >= $u->facteur);
+
+        if (! $uniteDominante) {
+            return null;
+        }
+
+        return [
+            'unite' => $uniteDominante,
+            'nombre' => intdiv($quantitePieces, $uniteDominante->facteur),
+            'reste' => $quantitePieces % $uniteDominante->facteur,
+        ];
+    }
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('image')->singleFile();
@@ -160,7 +202,7 @@ class Produit extends Model implements HasMedia
                     // le select d'unité à la vente/au devis — unite_base_libelle
                     // reste l'abréviation seule, utilisée ailleurs pour un
                     // affichage compact (ticket, quantités, prix/unité…).
-                    'unite_base_libelle_complet' => $p->uniteBase?->nom_avec_abbreviation ?? 'pièce',
+                    'unite_base_libelle_complet' => $p->unite_base_libelle_complet,
                     'unites' => $p->uniteVentes->map(fn (UniteVente $u) => [
                         'id' => $u->id,
                         'libelle' => $u->libelle,

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'vente_id', 'produit_id', 'unite_vente_id', 'magasin_source_id', 'quantite', 'quantite_pieces',
@@ -59,5 +60,10 @@ class LigneVente extends Model
     public function magasinSource(): BelongsTo
     {
         return $this->belongsTo(Magasin::class, 'magasin_source_id')->withTrashed();
+    }
+
+    public function retours(): HasMany
+    {
+        return $this->hasMany(LigneRetourVente::class);
     }
 }

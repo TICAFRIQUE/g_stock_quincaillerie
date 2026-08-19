@@ -40,6 +40,11 @@
                         @endif
                     </a>
                 @endcan
+                @if ($peutMouvementer)
+                    <a href="{{ route('caisse.show', $session) }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left-right me-1"></i>Mouvements de caisse
+                    </a>
+                @endif
                 @can('vente.creer')
                     <a href="{{ route('ventes.create', $session) }}" class="btn btn-primary">
                         <i class="bi bi-cart-plus me-1"></i>Vendre
@@ -72,34 +77,54 @@
         </div>
     </div>
 
-    <div class="row g-3 mb-3">
+    <div class="row g-2 mb-2">
         <div class="col-6 col-md-3">
-            <x-kpi-card label="Fond de caisse" icon="bi-cash-stack" color="primary"
+            <x-kpi-card compact label="Fond de caisse" icon="bi-cash-stack" color="primary"
                 :value="number_format($session->fond_de_caisse, 0, ',', ' ') . ' F'" />
         </div>
         <div class="col-6 col-md-3">
-            <x-kpi-card label="Total ventes" icon="bi-receipt" color="info"
+            <x-kpi-card compact label="Total ventes" icon="bi-receipt" color="info"
                 :value="$session->ventes_count" />
         </div>
         <div class="col-6 col-md-3">
-            <x-kpi-card label="Ventes en attente" icon="bi-hourglass-split" color="warning"
+            <x-kpi-card compact label="Ventes en attente" icon="bi-hourglass-split" color="warning"
                 :value="$venteEnAttentesVisibles" />
         </div>
         <div class="col-6 col-md-3">
-            <x-kpi-card label="Total net en caisse" icon="bi-graph-up-arrow" color="success"
+            <x-kpi-card compact label="Chiffre d'affaires" icon="bi-graph-up-arrow" color="success"
                 :value="number_format($totalVentes, 0, ',', ' ') . ' F'" />
         </div>
     </div>
 
+    {{-- Décompose le chiffre d'affaires ci-dessus : dû (crédit encore
+         ouvert), avoir (compensé, jamais encaissé) et espèces (réellement
+         dans le tiroir) — séparés pour ne jamais laisser croire que le CA
+         est de l'argent en caisse (règle 10). --}}
+    <p class="text-secondary small mb-1">Décomposition</p>
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-4">
+            <x-kpi-card compact label="Total dû (crédit)" icon="bi-credit-card" :color="$totalDu > 0 ? 'warning' : 'secondary'"
+                :value="number_format($totalDu, 0, ',', ' ') . ' F'" />
+        </div>
+        <div class="col-6 col-md-4">
+            <x-kpi-card compact label="Avoirs appliqués" icon="bi-piggy-bank" color="info"
+                :value="number_format($avoirApplique, 0, ',', ' ') . ' F'" />
+        </div>
+        <div class="col-6 col-md-4">
+            <x-kpi-card compact label="Total en caisse" icon="bi-cash-stack" color="success"
+                :value="number_format($totalEspeces, 0, ',', ' ') . ' F'" />
+        </div>
+    </div>
+
     @if ($paiementsParMoyen->isNotEmpty())
-        <div class="card mb-3">
-            <div class="card-body">
-                <h3 class="h6">Répartition par moyen de paiement</h3>
-                <div class="row g-3">
+        <div class="card mb-2">
+            <div class="card-body p-2 px-3">
+                <div class="text-secondary small mb-1">Répartition par moyen de paiement</div>
+                <div class="d-flex flex-wrap column-gap-4 row-gap-1">
                     @foreach ($paiementsParMoyen as $paiement)
-                        <div class="col-6 col-md-3">
-                            <div class="text-secondary small">{{ $paiement->moyenPaiement->nom }}</div>
-                            <div class="fw-medium">{{ number_format($paiement->total, 0, ',', ' ') }} F</div>
+                        <div>
+                            <div class="text-secondary" style="font-size: .75rem;">{{ $paiement->moyenPaiement->nom }}</div>
+                            <div class="fw-medium" style="font-size: 1.05rem;">{{ number_format($paiement->total, 0, ',', ' ') }} F</div>
                         </div>
                     @endforeach
                 </div>
@@ -108,27 +133,39 @@
     @endif
 
     @if ($session->date_cloture)
-        <div class="card mb-3">
-            <div class="card-body">
-                <h3 class="h6">Clôture</h3>
-                <div class="row g-3">
-                    <div class="col-6 col-md-3">
-                        <div class="text-secondary small">Théorique</div>
-                        <div class="fw-medium">{{ number_format($session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes, 0, ',', ' ') }} F</div>
+        <div class="card mb-2">
+            <div class="card-body p-2 px-3">
+                <div class="text-secondary small mb-1">Clôture</div>
+                <div class="d-flex flex-wrap column-gap-4 row-gap-1">
+                    <div>
+                        <div class="text-secondary" style="font-size: .75rem;">Théorique</div>
+                        <div class="fw-medium" style="font-size: 1.05rem;">{{ number_format($session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes + $session->total_entrees_especes - $session->total_sorties_especes, 0, ',', ' ') }} F</div>
                     </div>
                     @if ($session->total_reglements_especes > 0)
-                        <div class="col-6 col-md-3">
-                            <div class="text-secondary small">Règlements clients (espèces)</div>
-                            <div class="fw-medium">{{ number_format($session->total_reglements_especes, 0, ',', ' ') }} F</div>
+                        <div>
+                            <div class="text-secondary" style="font-size: .75rem;">Règlements clients (espèces)</div>
+                            <div class="fw-medium" style="font-size: 1.05rem;">{{ number_format($session->total_reglements_especes, 0, ',', ' ') }} F</div>
                         </div>
                     @endif
-                    <div class="col-6 col-md-3">
-                        <div class="text-secondary small">Compté</div>
-                        <div class="fw-medium">{{ number_format($session->montant_compte, 0, ',', ' ') }} F</div>
+                    @if ($session->total_entrees_especes > 0)
+                        <div>
+                            <div class="text-secondary" style="font-size: .75rem;">Entrées de caisse</div>
+                            <div class="fw-medium" style="font-size: 1.05rem;">{{ number_format($session->total_entrees_especes, 0, ',', ' ') }} F</div>
+                        </div>
+                    @endif
+                    @if ($session->total_sorties_especes > 0)
+                        <div>
+                            <div class="text-secondary" style="font-size: .75rem;">Sorties de caisse</div>
+                            <div class="fw-medium" style="font-size: 1.05rem;">− {{ number_format($session->total_sorties_especes, 0, ',', ' ') }} F</div>
+                        </div>
+                    @endif
+                    <div>
+                        <div class="text-secondary" style="font-size: .75rem;">Compté</div>
+                        <div class="fw-medium" style="font-size: 1.05rem;">{{ number_format($session->montant_compte, 0, ',', ' ') }} F</div>
                     </div>
-                    <div class="col-6 col-md-3">
-                        <div class="text-secondary small">Écart</div>
-                        <div class="fw-medium {{ $session->ecart === 0 ? '' : ($session->ecart > 0 ? 'text-success' : 'text-danger') }}">
+                    <div>
+                        <div class="text-secondary" style="font-size: .75rem;">Écart</div>
+                        <div class="fw-medium {{ $session->ecart === 0 ? '' : ($session->ecart > 0 ? 'text-success' : 'text-danger') }}" style="font-size: 1.05rem;">
                             {{ $session->ecart > 0 ? '+' : '' }}{{ number_format($session->ecart, 0, ',', ' ') }} F
                         </div>
                     </div>
@@ -146,7 +183,10 @@
                     <tr>
                         <x-th-tri champ="numero" label="Numéro" />
                         <x-th-tri champ="created_at" label="Date et heure" />
-                        <x-th-tri champ="total_net" label="Total" />
+                        <x-th-tri champ="total_net" label="Montant dû" />
+                        <th class="text-end">Déjà réglé</th>
+                        <th class="text-end">Avoir appliqué</th>
+                        <th class="text-end">Reste à payer</th>
                         <th>Statut</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -157,6 +197,9 @@
                             <td><code>{{ $vente->numero }}</code></td>
                             <td>{{ $vente->created_at->format('d/m/Y H:i') }}</td>
                             <td>{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
+                            <td class="text-end text-success">{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</td>
+                            <td class="text-end text-secondary">{{ $vente->avoir_applique > 0 ? number_format($vente->avoir_applique, 0, ',', ' ').' F' : '—' }}</td>
+                            <td class="text-end {{ $vente->soldeDuReel() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</td>
                             <td><span class="badge text-bg-success">Validée</span></td>
                             <td class="text-end">
                                 <a href="{{ route('ventes.ticket', $vente) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Détail de la vente">
@@ -167,7 +210,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="text-center text-secondary py-4">Aucune vente pour l'instant.</td>
+                            <td colspan="8" class="text-center text-secondary py-4">Aucune vente pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>

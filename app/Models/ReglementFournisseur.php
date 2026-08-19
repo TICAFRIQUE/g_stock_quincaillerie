@@ -12,10 +12,11 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * Paiement (total ou partiel) d'une dette fournisseur, immuable comme
- * ReglementClient mais SANS lien avec une caisse : indépendant de toute
- * session, n'impacte jamais le tiroir (décision produit, voir CLAUDE.md).
+ * ReglementClient. Indépendant de toute session de caisse SAUF si une partie
+ * est payée en espèces (session_caisse_id alors renseigné et une sortie de
+ * caisse liée est générée — voir ReglementFournisseurService, CLAUDE.md).
  */
-#[Fillable(['fournisseur_id', 'commande_achat_id', 'created_by', 'montant'])]
+#[Fillable(['fournisseur_id', 'commande_achat_id', 'session_caisse_id', 'created_by', 'montant'])]
 class ReglementFournisseur extends Model
 {
     use HasFactory, LogsActivity;
@@ -51,6 +52,11 @@ class ReglementFournisseur extends Model
     public function auteur(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function sessionCaisse(): BelongsTo
+    {
+        return $this->belongsTo(SessionCaisse::class);
     }
 
     public function paiements(): HasMany

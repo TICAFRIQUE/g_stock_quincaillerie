@@ -8,8 +8,11 @@ use App\Exceptions\VentesEnAttentePresentesException;
 use App\Http\Controllers\Concerns\AutoriseMagasin;
 use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\Caisse;
+use App\Models\MoyenPaiement;
 use App\Models\Paiement;
+use App\Models\ReglementPaiement;
 use App\Models\SessionCaisse;
+use App\Models\Vente;
 use App\Services\CaisseSessionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -87,7 +90,20 @@ class SessionCaisseController extends Controller
         $totalVentes = (int) $session->ventes()->sum('total_net');
         $paiementsParMoyen = $this->paiementsParMoyen($session);
 
+        // Décomposition du CA ci-dessus : sur TOUTE la session, pas
+        // seulement la page affichée par $ventes plus bas (paginée).
+        $totalDu = (int) $session->ventes()->with('paiements', 'reglementsClient')->get()
+            ->sum(fn (Vente $v) => $v->soldeDuReel());
+        $avoirApplique = (int) $session->ventes()->sum('avoir_applique');
+        $totalEspeces = (int) $paiementsParMoyen
+            ->filter(fn ($p) => $p->moyenPaiement->est_espece)
+            ->sum('total');
+
+        // paiements/reglementsClient : nécessaires à Vente::montantRegle()/
+        // soldeDu() (colonnes Réglé/Reste dû du tableau) — chargées ici pour
+        // éviter un N+1 sur chaque ligne de la page.
         $query = $session->ventes()->getQuery()
+            ->with(['paiements', 'reglementsClient'])
             ->when($request->filled('recherche'), function ($q) use ($request) {
                 $recherche = $request->string('recherche');
                 $q->where('numero', 'like', "%{$recherche}%");
@@ -108,14 +124,18 @@ class SessionCaisseController extends Controller
         return view('sessions.show', [
             'session' => $session,
             'totalVentes' => $totalVentes,
+            'totalDu' => $totalDu,
+            'avoirApplique' => $avoirApplique,
+            'totalEspeces' => $totalEspeces,
             'venteEnAttentesVisibles' => $venteEnAttentesVisibles,
             'paiementsParMoyen' => $paiementsParMoyen,
             'ventes' => $ventes,
             'sessionsAujourdhui' => $sessionsAujourdhui,
+            'peutMouvementer' => $request->user()->can('caisse.mouvement'),
         ]);
     }
 
-    public function cloturerForm(SessionCaisse $session): View|RedirectResponse
+    public function cloturerForm(SessionCaisse $session, CaisseSessionService $caisseSessionService): View|RedirectResponse
     {
         $this->assurerMagasin($session->caisse->magasin_id);
         abort_if($session->date_cloture, 403, 'Cette session est déjà clôturée.');
@@ -132,17 +152,13 @@ class SessionCaisseController extends Controller
         }
 
         $totalVentes = (int) $session->ventes()->sum('total_net');
-
-        $totalEspeces = (int) Paiement::query()
-            ->whereHas('vente', fn ($q) => $q->where('session_caisse_id', $session->id))
-            ->whereHas('moyenPaiement', fn ($q) => $q->where('est_espece', true))
-            ->sum('montant');
-
+        $detail = $caisseSessionService->calculerTheorique($session);
         $paiementsParMoyen = $this->paiementsParMoyen($session);
 
         return view('sessions.cloturer', [
             'session' => $session,
-            'theorique' => $session->fond_de_caisse + $totalEspeces,
+            'theorique' => $detail['theorique'],
+            'detailTheorique' => $detail,
             'totalVentes' => $totalVentes,
             'paiementsParMoyen' => $paiementsParMoyen,
         ]);
@@ -196,14 +212,39 @@ class SessionCaisseController extends Controller
      * Répartition du total encaissé par moyen de paiement (espèces, mobile
      * money…) — factorisé pour ne pas dupliquer cette agrégation entre la
      * page de session, la clôture et le rapport de caisse.
+     *
+     * Deux sources alimentent le même tiroir (règle 10/14) : les paiements
+     * encaissés à la vente ET les règlements clients encaissés plus tard
+     * dans CETTE session — un règlement ignoré ici sous-comptait le total
+     * réellement encaissé par moyen (visible dès qu'un règlement a lieu dans
+     * la session).
      */
     private function paiementsParMoyen(SessionCaisse $session)
     {
-        return Paiement::query()
+        $parPaiement = Paiement::query()
             ->whereHas('vente', fn ($q) => $q->where('session_caisse_id', $session->id))
             ->selectRaw('moyen_paiement_id, sum(montant) as total')
             ->groupBy('moyen_paiement_id')
-            ->with('moyenPaiement')
-            ->get();
+            ->pluck('total', 'moyen_paiement_id');
+
+        $parReglement = ReglementPaiement::query()
+            ->whereHas('reglementClient', fn ($q) => $q->where('session_caisse_id', $session->id))
+            ->selectRaw('moyen_paiement_id, sum(montant) as total')
+            ->groupBy('moyen_paiement_id')
+            ->pluck('total', 'moyen_paiement_id');
+
+        $totaux = collect();
+        foreach ([$parPaiement, $parReglement] as $source) {
+            foreach ($source as $moyenId => $total) {
+                $totaux[$moyenId] = ($totaux[$moyenId] ?? 0) + $total;
+            }
+        }
+
+        $moyens = MoyenPaiement::whereIn('id', $totaux->keys())->get()->keyBy('id');
+
+        return $totaux->map(fn ($total, $moyenId) => (object) [
+            'moyenPaiement' => $moyens[$moyenId],
+            'total' => $total,
+        ])->values();
     }
 }

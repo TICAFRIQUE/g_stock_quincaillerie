@@ -9,9 +9,14 @@ use App\Models\EcritureCompteFournisseur;
 use App\Models\Fournisseur;
 use App\Models\MoyenPaiement;
 use App\Models\ReglementFournisseur;
+use App\Models\RemboursementAvoirFournisseur;
+use App\Models\RetourAchat;
+use App\Models\SessionCaisse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -51,7 +56,7 @@ class FournisseurController extends Controller
     {
         return $this->pdfDepuisListe(
             'Fournisseurs',
-            ['Nom', 'Téléphone', 'E-mail', 'Solde dû', 'Statut'],
+            ['Code', 'Nom', 'Téléphone', 'E-mail', 'Solde dû', 'Statut'],
             $this->lignesExport($request),
             'fournisseurs.pdf',
         );
@@ -61,7 +66,7 @@ class FournisseurController extends Controller
     {
         return $this->excelDepuisListe(
             'Fournisseurs',
-            ['Nom', 'Téléphone', 'E-mail', 'Solde dû', 'Statut'],
+            ['Code', 'Nom', 'Téléphone', 'E-mail', 'Solde dû', 'Statut'],
             $this->lignesExport($request),
             'fournisseurs.xlsx',
         );
@@ -87,6 +92,7 @@ class FournisseurController extends Controller
             ->pluck('solde', 'fournisseur_id');
 
         return $fournisseurs->map(fn (Fournisseur $f) => [
+            $f->code,
             $f->nom,
             $f->telephone ?? '—',
             $f->email ?? '—',
@@ -109,6 +115,8 @@ class FournisseurController extends Controller
                 $morphTo->morphWith([
                     CommandeAchat::class => ['lignes', 'paiements', 'reglementsFournisseur'],
                     ReglementFournisseur::class => ['commandeAchat'],
+                    RetourAchat::class => ['lignes.produit'],
+                    RemboursementAvoirFournisseur::class => ['paiements'],
                 ]);
             }])
             ->latest('created_at')
@@ -123,10 +131,33 @@ class FournisseurController extends Controller
         return view('fournisseurs.show', [
             'fournisseur' => $fournisseur,
             'solde' => $fournisseur->solde(),
+            'totalAchats' => $fournisseur->totalAchats(),
+            'nombreAchats' => $fournisseur->nombreAchats(),
+            'totalRegle' => $fournisseur->totalRegle(),
             'ecritures' => $ecritures,
             'commandes' => $commandes,
             'moyensPaiement' => MoyenPaiement::actifs(),
+            'sessionsOuvertes' => $this->sessionsOuvertes(),
         ]);
+    }
+
+    /**
+     * Sessions de caisse actuellement ouvertes, scopées au magasin du
+     * gérant (Superadmin/gérant multi-magasin voit tout) — pour le
+     * sélecteur "session de caisse" du formulaire de règlement fournisseur,
+     * requis seulement si une partie du paiement est en espèces (voir
+     * ReglementFournisseurService).
+     */
+    private function sessionsOuvertes(): Collection
+    {
+        return SessionCaisse::whereNull('date_fermeture')
+            ->whereNull('date_cloture')
+            ->when(
+                request()->user()->magasin_id,
+                fn ($q, $magasinId) => $q->whereHas('caisse', fn ($qc) => $qc->where('magasin_id', $magasinId))
+            )
+            ->with('caisse.magasin', 'caissier')
+            ->get();
     }
 
     public function create(): View
@@ -137,10 +168,17 @@ class FournisseurController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $donnees = $this->valider($request);
+        $codeGenere = blank($donnees['code']);
 
-        Fournisseur::create($donnees);
+        if ($codeGenere) {
+            $donnees['code'] = $this->genererCode();
+        }
 
-        return redirect()->route('fournisseurs.index')->with('succes', 'Fournisseur créé.');
+        $fournisseur = Fournisseur::create($donnees);
+
+        $message = 'Fournisseur créé.'.($codeGenere ? " Code généré automatiquement : {$fournisseur->code}." : '');
+
+        return redirect()->route('fournisseurs.index')->with('succes', $message);
     }
 
     public function edit(Fournisseur $fournisseur): View
@@ -151,10 +189,17 @@ class FournisseurController extends Controller
     public function update(Request $request, Fournisseur $fournisseur): RedirectResponse
     {
         $donnees = $this->valider($request, $fournisseur);
+        $codeGenere = blank($donnees['code']);
+
+        if ($codeGenere) {
+            $donnees['code'] = $this->genererCode();
+        }
 
         $fournisseur->update($donnees);
 
-        return redirect()->route('fournisseurs.index')->with('succes', 'Fournisseur mis à jour.');
+        $message = 'Fournisseur mis à jour.'.($codeGenere ? " Code généré automatiquement : {$fournisseur->code}." : '');
+
+        return redirect()->route('fournisseurs.index')->with('succes', $message);
     }
 
     public function destroy(Fournisseur $fournisseur): RedirectResponse
@@ -172,6 +217,7 @@ class FournisseurController extends Controller
     {
         $donnees = $request->validate([
             'nom' => ['required', 'string', 'max:255'],
+            'code' => ['nullable', 'string', 'max:50', Rule::unique('fournisseurs', 'code')->ignore($fournisseur?->id)],
             'telephone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
             'adresse' => ['nullable', 'string', 'max:255'],
@@ -181,5 +227,14 @@ class FournisseurController extends Controller
         $donnees['actif'] = $request->boolean('actif', true);
 
         return $donnees;
+    }
+
+    private function genererCode(): string
+    {
+        do {
+            $code = 'FRN-'.str_pad((string) random_int(1, 999999), 6, '0', STR_PAD_LEFT);
+        } while (Fournisseur::withTrashed()->where('code', $code)->exists());
+
+        return $code;
     }
 }

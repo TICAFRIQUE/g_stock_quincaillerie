@@ -7,6 +7,8 @@ use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\Client;
 use App\Models\EcritureCompteClient;
 use App\Models\MoyenPaiement;
+use App\Models\RemboursementAvoirClient;
+use App\Models\RetourVente;
 use App\Models\SessionCaisse;
 use App\Models\TypeClient;
 use App\Models\Vente;
@@ -14,8 +16,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -57,7 +61,7 @@ class ClientController extends Controller
     {
         return $this->pdfDepuisListe(
             'Clients',
-            ['Nom', 'Type', 'Téléphone', 'Solde dû', 'Limite de crédit', 'Statut'],
+            ['Code', 'Nom', 'Type', 'Téléphone', 'Solde dû', 'Limite de crédit', 'Statut'],
             $this->lignesExport($request),
             'clients.pdf',
         );
@@ -67,7 +71,7 @@ class ClientController extends Controller
     {
         return $this->excelDepuisListe(
             'Clients',
-            ['Nom', 'Type', 'Téléphone', 'Solde dû', 'Limite de crédit', 'Statut'],
+            ['Code', 'Nom', 'Type', 'Téléphone', 'Solde dû', 'Limite de crédit', 'Statut'],
             $this->lignesExport($request),
             'clients.xlsx',
         );
@@ -93,6 +97,7 @@ class ClientController extends Controller
             ->pluck('solde', 'client_id');
 
         return $clients->map(fn (Client $c) => [
+            $c->code,
             $c->nom,
             $c->typeClient->nom ?? '—',
             $c->telephone ?? '—',
@@ -110,10 +115,17 @@ class ClientController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $donnees = $this->valider($request);
+        $codeGenere = blank($donnees['code']);
 
-        Client::create($donnees);
+        if ($codeGenere) {
+            $donnees['code'] = $this->genererCode();
+        }
 
-        return redirect()->route('clients.index')->with('succes', 'Client créé.');
+        $client = Client::create($donnees);
+
+        $message = 'Client créé.'.($codeGenere ? " Code généré automatiquement : {$client->code}." : '');
+
+        return redirect()->route('clients.index')->with('succes', $message);
     }
 
     /**
@@ -153,12 +165,14 @@ class ClientController extends Controller
         $client->loadCount('ventes');
 
         // Le "reste dû" par vente (bouton "Régler cette dette") a besoin de
-        // soldeDu() sur la vente référencée : précharger ses
-        // paiements/règlements pour éviter un N+1 (voir Vente::soldeDu()).
+        // soldeDuReel() sur la vente référencée : précharger ses
+        // paiements/règlements pour éviter un N+1 (voir Vente::soldeDuReel()).
         $ecritures = $client->ecritures()
             ->with(['auteur', 'reference' => function ($morphTo) {
                 $morphTo->morphWith([
                     Vente::class => ['paiements', 'reglementsClient'],
+                    RetourVente::class => ['lignes.produit'],
+                    RemboursementAvoirClient::class => ['paiements'],
                 ]);
             }])
             ->latest('created_at')
@@ -188,13 +202,36 @@ class ClientController extends Controller
         return view('clients.show', [
             'client' => $client,
             'solde' => $client->solde(),
+            'totalVentes' => $client->totalVentes(),
+            'totalRegle' => $client->totalRegle(),
             'ecritures' => $ecritures,
             'ventes' => $ventes,
             'sessionOuverte' => $sessionOuverte,
+            'sessionsOuvertes' => $this->sessionsOuvertes(),
             'peutRegler' => request()->user()->can('client.reglement'),
             'moyensPaiement' => MoyenPaiement::actifs(),
             'devis' => $devis,
         ]);
+    }
+
+    /**
+     * Sessions de caisse actuellement ouvertes, scopées au magasin du
+     * gérant (Superadmin/gérant multi-magasin voit tout) — pour le
+     * sélecteur "session de caisse" du remboursement d'avoir (requis
+     * seulement si une partie sort en espèces, voir
+     * RemboursementAvoirClientService). Même logique que
+     * FournisseurController::sessionsOuvertes().
+     */
+    private function sessionsOuvertes(): Collection
+    {
+        return SessionCaisse::whereNull('date_fermeture')
+            ->whereNull('date_cloture')
+            ->when(
+                request()->user()->magasin_id,
+                fn ($q, $magasinId) => $q->whereHas('caisse', fn ($qc) => $qc->where('magasin_id', $magasinId))
+            )
+            ->with('caisse.magasin', 'caissier')
+            ->get();
     }
 
     public function exporterVentes(Client $client): StreamedResponse
@@ -269,10 +306,17 @@ class ClientController extends Controller
     public function update(Request $request, Client $client): RedirectResponse
     {
         $donnees = $this->valider($request, $client);
+        $codeGenere = blank($donnees['code']);
+
+        if ($codeGenere) {
+            $donnees['code'] = $this->genererCode();
+        }
 
         $client->update($donnees);
 
-        return redirect()->route('clients.index')->with('succes', 'Client mis à jour.');
+        $message = 'Client mis à jour.'.($codeGenere ? " Code généré automatiquement : {$client->code}." : '');
+
+        return redirect()->route('clients.index')->with('succes', $message);
     }
 
     public function destroy(Client $client): RedirectResponse
@@ -290,6 +334,7 @@ class ClientController extends Controller
     {
         $donnees = $request->validate([
             'nom' => ['required', 'string', 'max:255'],
+            'code' => ['nullable', 'string', 'max:50', Rule::unique('clients', 'code')->ignore($client?->id)],
             'type_client_id' => ['nullable', 'exists:type_clients,id'],
             'telephone' => ['nullable', 'string', 'max:50'],
             'adresse' => ['nullable', 'string', 'max:255'],
@@ -300,5 +345,14 @@ class ClientController extends Controller
         $donnees['actif'] = $request->boolean('actif', true);
 
         return $donnees;
+    }
+
+    private function genererCode(): string
+    {
+        do {
+            $code = 'CLI-'.str_pad((string) random_int(1, 999999), 6, '0', STR_PAD_LEFT);
+        } while (Client::withTrashed()->where('code', $code)->exists());
+
+        return $code;
     }
 }

@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
-#[Fillable(['nom', 'type_client_id', 'telephone', 'adresse', 'limite_credit', 'actif'])]
+#[Fillable(['nom', 'code', 'type_client_id', 'telephone', 'adresse', 'limite_credit', 'actif'])]
 class Client extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
@@ -61,6 +61,27 @@ class Client extends Model
     public function solde(): int
     {
         return $this->ecritures()->sum('montant');
+    }
+
+    /**
+     * Chiffre d'affaires total réalisé avec ce client (ventes non annulées).
+     * KPI fiche client.
+     */
+    public function totalVentes(): int
+    {
+        return $this->ventes()->sum('total_net');
+    }
+
+    /**
+     * Total effectivement encaissé auprès de ce client, toutes voies
+     * confondues : paiements à la vente + règlements ultérieurs. Distinct de
+     * solde() qui reflète la dette RESTANTE (après retours/annulations).
+     */
+    public function totalRegle(): int
+    {
+        $paiements = Paiement::whereHas('vente', fn ($q) => $q->where('client_id', $this->id))->sum('montant');
+
+        return $paiements + $this->reglements()->sum('montant');
     }
 
     /**

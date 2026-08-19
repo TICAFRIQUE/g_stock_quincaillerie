@@ -39,7 +39,7 @@ class StockController extends Controller
         // habituellement décroissant, pensé pour "created_at" — ici on veut
         // explicitement A→Z tant que l'utilisateur n'a pas cliqué une colonne.
         $query = $this->appliquerTri($query, $request, ['nom' => 'produits.nom', 'quantite' => 'stocks.quantite'], 'produits.nom', 'asc')
-            ->with(['produit', 'magasin']);
+            ->with(['produit.uniteVentes', 'magasin']);
 
         // L'impression (voir x-bouton-imprimer) couvre tout le résultat
         // filtré, pas seulement la page affichée à l'écran.
@@ -69,7 +69,7 @@ class StockController extends Controller
         $spreadsheet = new Spreadsheet();
         $feuille = $spreadsheet->getActiveSheet();
         $feuille->setTitle('État du stock');
-        $feuille->fromArray(['Produit', 'SKU', 'Destination', 'Quantité', 'Seuil d\'alerte', 'Coût moyen pondéré'], null, 'A1');
+        $feuille->fromArray(['Produit', 'SKU', 'Destination', 'Quantité', 'Seuil d\'alerte', 'Prix de vente', 'Coût moyen pondéré'], null, 'A1');
 
         $ligne = 2;
         foreach ($stocks as $stock) {
@@ -78,11 +78,12 @@ class StockController extends Controller
             $feuille->setCellValue("C{$ligne}", $stock->magasin->nom);
             $feuille->setCellValue("D{$ligne}", $stock->quantite);
             $feuille->setCellValue("E{$ligne}", $stock->produit->seuil_alerte);
-            $feuille->setCellValue("F{$ligne}", $stock->cout_moyen_pondere);
+            $feuille->setCellValue("F{$ligne}", $stock->produit->prix_piece);
+            $feuille->setCellValue("G{$ligne}", $stock->cout_moyen_pondere);
             $ligne++;
         }
 
-        foreach (['A', 'B', 'C', 'D', 'E', 'F'] as $colonne) {
+        foreach (['A', 'B', 'C', 'D', 'E', 'F', 'G'] as $colonne) {
             $feuille->getColumnDimension($colonne)->setAutoSize(true);
         }
 
@@ -114,7 +115,7 @@ class StockController extends Controller
             ->when($request->boolean('sous_seuil'), fn ($q) => $q->whereColumn('stocks.quantite', '<=', 'produits.seuil_alerte'))
             ->select('stocks.*')
             ->orderBy('produits.nom')
-            ->with(['produit', 'magasin'])
+            ->with(['produit.uniteVentes', 'magasin'])
             ->get();
     }
 

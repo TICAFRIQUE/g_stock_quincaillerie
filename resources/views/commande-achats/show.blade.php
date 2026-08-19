@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', "Bon de commande {$commande->numero}")
+@section('title', "Bon d'achat {$commande->numero}")
 
 @section('content')
     <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
-            <h2 class="h4 mb-1">Bon de commande <code>{{ $commande->numero }}</code></h2>
+            <h2 class="h4 mb-1">Bon d'achat <code>{{ $commande->numero }}</code></h2>
             @if ($commande->trashed())
                 <span class="badge text-bg-danger">Annulée</span>
             @elseif ($commande->statut === 'validee')
@@ -17,7 +17,7 @@
 
         <div class="d-flex gap-2">
             <a href="{{ route('commande-achats.facture', $commande) }}" class="btn btn-outline-secondary" target="_blank" rel="noopener">
-                <i class="bi bi-file-earmark-text me-1"></i>Voir le bon de commande
+                <i class="bi bi-file-earmark-text me-1"></i>Voir le bon d'achat
             </a>
             @if (! $commande->trashed() && $commande->statut === 'brouillon' && $peutAnnuler)
                 <x-delete-button :action="route('commande-achats.destroy', $commande)" :label="'la commande « '.$commande->numero.' »'" />
@@ -37,7 +37,7 @@
                         <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
                             <div>
                                 <div class="d-flex align-items-center gap-2 text-success fw-semibold">
-                                    <i class="bi bi-check-circle fs-5"></i>Valider le bon de commande
+                                    <i class="bi bi-check-circle fs-5"></i>Valider le bon d'achat
                                 </div>
                                 <div class="small text-secondary mt-1">
                                     Total TTC à régler : <strong>{{ number_format($commande->totalTtc(), 0, ',', ' ') }} F</strong>
@@ -83,9 +83,9 @@
                                 <button type="button" class="btn btn-success btn-sm flex-fill"
                                         data-bs-toggle="modal" data-bs-target="#confirmActionModal"
                                         data-form-id="formValiderAchat"
-                                        data-message="Valider ce bon de commande maintenant ? Le stock sera mis à jour immédiatement et cette action est irréversible."
-                                        data-button-label="Valider le bon de commande" data-button-class="btn-success">
-                                    Valider le bon de commande
+                                        data-message="Valider ce bon d'achat maintenant ? Le stock sera mis à jour immédiatement et cette action est irréversible."
+                                        data-button-label="Valider le bon d'achat" data-button-class="btn-success">
+                                    Valider le bon d'achat
                                 </button>
                                 <button type="button" class="btn btn-link btn-sm" @click="ouvert = false">Fermer</button>
                             </div>
@@ -108,14 +108,38 @@
     @php
         $afficheRegler = ! $commande->trashed() && $commande->statut === 'validee' && $peutRegler && $commande->resteDu() > 0;
         $afficheAnnuler = ! $commande->trashed() && $commande->statut === 'validee' && $peutAnnuler;
+        $afficheRetourner = ! $commande->trashed() && $commande->statut === 'validee' && $peutRetourner;
+        $lignesRetournables = $commande->lignes->filter(
+            fn ($ligne) => $ligne->quantite_pieces - ($dejaRetourneParLigne[$ligne->id] ?? 0) > 0
+        );
     @endphp
 
-    @if ($afficheRegler || $afficheAnnuler)
+    @if ($afficheRegler || $afficheAnnuler || $afficheRetourner)
         <div class="row g-3 mb-3">
+            @if ($afficheRetourner && $lignesRetournables->isNotEmpty())
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 shadow-sm bg-info-subtle border-0">
+                        <div class="card-body d-flex flex-column">
+                            <div class="d-flex align-items-center gap-2 text-info-emphasis fw-semibold">
+                                <i class="bi bi-arrow-return-left fs-5"></i>Retourner au fournisseur
+                            </div>
+                            <div class="small text-secondary mt-1 mb-2">
+                                Le stock sera repris et un avoir sera crédité au compte du fournisseur.
+                            </div>
+                            <button type="button" class="btn btn-info btn-sm mt-auto align-self-start" data-bs-toggle="modal" data-bs-target="#retourAchatModal">
+                                <i class="bi bi-arrow-return-left me-1"></i>Enregistrer un retour
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             @if ($afficheRegler)
                 <div class="{{ $afficheAnnuler ? 'col-md-6' : 'col-md-6 col-lg-5' }}">
                     <div class="card h-100 shadow-sm" x-data="{ ouvert: false, paiements: [{ moyen_paiement_id: '', montant: {{ $commande->resteDu() }} }],
+                            especeIds: @json($moyensPaiement->where('est_espece', true)->pluck('id')->values()),
                             get totalPaiements() { return this.paiements.reduce((total, p) => total + (Number(p.montant) || 0), 0); },
+                            get contientEspeces() { return this.paiements.some(p => this.especeIds.includes(Number(p.moyen_paiement_id))); },
                             ajouterPaiement() { this.paiements.push({ moyen_paiement_id: '', montant: '' }); },
                             retirerPaiement(index) { this.paiements.splice(index, 1); } }">
                         <div class="card-body">
@@ -125,7 +149,7 @@
                                         <i class="bi bi-cash-coin fs-5"></i>Règlement fournisseur
                                     </div>
                                     <div class="small text-secondary mt-1">
-                                        Reste dû sur ce bon de commande : <strong>{{ number_format($commande->resteDu(), 0, ',', ' ') }} F</strong>
+                                        Reste dû sur ce bon d'achat : <strong>{{ number_format($commande->resteDu(), 0, ',', ' ') }} F</strong>
                                     </div>
                                 </div>
                                 <button type="button" class="btn btn-reglement btn-sm flex-shrink-0" @click="ouvert = !ouvert" x-show="!ouvert">
@@ -162,6 +186,26 @@
                                 <button type="button" class="btn btn-sm btn-outline-reglement mb-2" @click="ajouterPaiement()">
                                     <i class="bi bi-plus-lg"></i> Ajouter un paiement
                                 </button>
+
+                                <div class="mb-2" x-show="contientEspeces" x-cloak>
+                                    @if ($sessionsOuvertes->isEmpty())
+                                        <div class="alert alert-warning small mb-0">
+                                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                            Paiement en espèces : aucune session de caisse ouverte pour y enregistrer la sortie.
+                                        </div>
+                                    @else
+                                        <label for="session_caisse_id_achat" class="form-label small mb-1">
+                                            Session de caisse (le tiroir d'où sort l'argent)<span class="required-marker">*</span>
+                                        </label>
+                                        <select name="session_caisse_id" id="session_caisse_id_achat" class="form-select form-select-sm" :required="contientEspeces">
+                                            <option value="">Choisir une session ouverte…</option>
+                                            @foreach ($sessionsOuvertes as $s)
+                                                <option value="{{ $s->id }}">{{ $s->caisse->nom }} — {{ $s->caisse->magasin->nom }} ({{ $s->caissier->name ?? '' }})</option>
+                                            @endforeach
+                                        </select>
+                                    @endif
+                                </div>
+
                                 <div class="d-flex gap-2">
                                     <button type="submit" class="btn btn-reglement btn-sm flex-fill" :disabled="totalPaiements <= 0">
                                         Enregistrer le règlement
@@ -181,7 +225,7 @@
                             <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
                                 <div>
                                     <div class="d-flex align-items-center gap-2 text-danger fw-semibold">
-                                        <i class="bi bi-x-circle fs-5"></i>Annuler le bon de commande
+                                        <i class="bi bi-x-circle fs-5"></i>Annuler le bon d'achat
                                     </div>
                                     <div class="small text-secondary mt-1">Le stock sera remis à jour automatiquement.</div>
                                 </div>
@@ -200,8 +244,8 @@
                                     <button type="button" class="btn btn-danger btn-sm flex-fill"
                                             data-bs-toggle="modal" data-bs-target="#confirmActionModal"
                                             data-form-id="formAnnulerAchat"
-                                            data-message="Annuler ce bon de commande ? Le stock sera décrémenté en conséquence (échoue si une partie a déjà été vendue ou transférée ailleurs). Cette action est irréversible."
-                                            data-button-label="Annuler le bon de commande" data-button-class="btn-danger">
+                                            data-message="Annuler ce bon d'achat ? Le stock sera décrémenté en conséquence (échoue si une partie a déjà été vendue ou transférée ailleurs). Cette action est irréversible."
+                                            data-button-label="Annuler le bon d'achat" data-button-class="btn-danger">
                                         Confirmer l'annulation
                                     </button>
                                     <button type="button" class="btn btn-link btn-sm" @click="ouvert = false">Fermer</button>
@@ -329,7 +373,101 @@
         </div>
     @endif
 
+    @if ($commande->retours->isNotEmpty())
+        <div class="card mt-3">
+            <div class="card-body">
+                <h3 class="h6">Retours</h3>
+                @foreach ($commande->retours as $retour)
+                    <div class="small border-bottom py-1 text-info-emphasis">
+                        <div class="d-flex justify-content-between">
+                            <span>
+                                <i class="bi bi-arrow-return-left me-1"></i><code>{{ $retour->numero }}</code>
+                                du {{ $retour->created_at->format('d/m/Y') }}
+                                par {{ $retour->auteur?->name ?? 'utilisateur supprimé' }}
+                            </span>
+                            <span class="fw-medium">Avoir {{ number_format($retour->montant_total, 0, ',', ' ') }} F</span>
+                        </div>
+                        @if ($retour->motif)
+                            <div class="text-secondary ps-4 fst-italic">{{ $retour->motif }}</div>
+                        @endif
+                        @foreach ($retour->lignes as $ligneRetour)
+                            <div class="d-flex justify-content-between text-secondary ps-4">
+                                <span>{{ $ligneRetour->produit->libelle_affichage }} × {{ $ligneRetour->quantite_pieces }}</span>
+                                <span>{{ number_format($ligneRetour->montant, 0, ',', ' ') }} F</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <div class="mt-3">
         <a href="{{ route('commande-achats.index') }}" class="btn btn-link ps-0">Retour à la liste</a>
     </div>
+
+    @if ($afficheRetourner && $lignesRetournables->isNotEmpty())
+        <div class="modal fade" id="retourAchatModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content"
+                     x-data="{
+                        lignes: {{ $lignesRetournables->mapWithKeys(fn ($l) => [$l->id => 0])->toJson() }},
+                        get total() { return Object.values(this.lignes).reduce((s, q) => s + (Number(q) || 0), 0); },
+                     }">
+                    <form method="POST" action="{{ route('commande-achats.retours.store', $commande) }}">
+                        @csrf
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-arrow-return-left me-1"></i>Retourner au fournisseur</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="small text-secondary">
+                                Quantité à rendre au fournisseur par article (unité de base — pièce). Le stock est
+                                repris et un avoir est crédité au compte du fournisseur.
+                            </p>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Produit</th>
+                                            <th class="text-end">Reçu</th>
+                                            <th class="text-end">Déjà retourné</th>
+                                            <th class="text-end" style="width: 140px;">À retourner</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($lignesRetournables as $ligne)
+                                            @php $dejaRetourne = $dejaRetourneParLigne[$ligne->id] ?? 0; @endphp
+                                            <tr>
+                                                <td>
+                                                    {{ $ligne->produit->libelle_affichage }}
+                                                    <input type="hidden" name="lignes[{{ $ligne->id }}][ligne_commande_achat_id]" value="{{ $ligne->id }}">
+                                                </td>
+                                                <td class="text-end">{{ $ligne->quantite_pieces }}</td>
+                                                <td class="text-end">{{ $dejaRetourne }}</td>
+                                                <td>
+                                                    <input type="number" name="lignes[{{ $ligne->id }}][quantite_pieces]"
+                                                           x-model.number="lignes[{{ $ligne->id }}]"
+                                                           min="0" max="{{ $ligne->quantite_pieces - $dejaRetourne }}"
+                                                           class="form-control form-control-sm text-end">
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mb-2">
+                                <label for="retour-achat-motif" class="form-label small">Motif (optionnel)</label>
+                                <textarea name="motif" id="retour-achat-motif" class="form-control form-control-sm" rows="2"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-link" data-bs-dismiss="modal">Fermer</button>
+                            <button type="submit" class="btn btn-info" :disabled="total <= 0">Enregistrer le retour</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
 @endsection

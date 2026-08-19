@@ -23,12 +23,34 @@ select2Factory(window, jQuery);
 import 'select2/dist/css/select2.min.css';
 import 'select2-bootstrap-5-theme/dist/select2-bootstrap-5-theme.min.css';
 
+// "Commence par", pas "contient" : demandé côté client pour retrouver un
+// produit en tapant la première lettre de son nom (ex. taper "c" charge tout
+// ce qui commence par "c"). Un libellé "Nom — Libellé distinctif" est coupé
+// en segments pour que chacun puisse matcher indépendamment (taper "c" doit
+// aussi trouver un produit dont seul le libellé distinctif commence par "c",
+// pas seulement le nom).
+function matcherCommencePar(params, data) {
+    const terme = (params.term || '').trim().toLocaleLowerCase();
+
+    if (terme === '' || !data.text) {
+        return data;
+    }
+
+    const correspond = data.text
+        .toLocaleLowerCase()
+        .split(' — ')
+        .some((segment) => segment.trim().startsWith(terme));
+
+    return correspond ? data : null;
+}
+
 // Sélecteur recherchable (produits, etc.) — thème Bootstrap 5 cohérent avec le
 // reste de l'app. Un seul point d'appel pour ne pas répéter les options.
 window.initSelect2 = function (selector, options = {}) {
     const $select = jQuery(selector).select2({
         theme: 'bootstrap-5',
         width: '100%',
+        matcher: matcherCommencePar,
         language: {
             noResults: () => 'Aucun résultat',
             searching: () => 'Recherche…',
@@ -68,7 +90,7 @@ window.dataTableFrLang = {
  * côté client pour griser en amont (voir CLAUDE.md), le serveur revalide tout
  * de toute façon dans VenteService avant d'écrire le moindre mouvement.
  */
-window.posApp = function (produits, panierInitial = [], libelleInitial = '', clientIdInitial = '', magasinCaisseId = null, magasinCaisseNom = '') {
+window.posApp = function (produits, panierInitial = [], libelleInitial = '', clientIdInitial = '', magasinCaisseId = null, magasinCaisseNom = '', clientSoldes = {}) {
     return {
         produits,
         panier: panierInitial,
@@ -81,6 +103,67 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
         // Pré-rempli et figé lors de la transformation d'un devis (le client
         // vient toujours du devis, jamais d'un choix libre à cet écran).
         clientId: clientIdInitial,
+
+        // Solde de chaque client (clé = id, valeur = somme des écritures,
+        // voir CLAUDE.md règle 12) — un solde négatif est un avoir. Ne sert
+        // qu'à informer/faciliter la saisie ici : le serveur applique déjà
+        // l'avoir automatiquement à toute nouvelle vente à crédit (le solde
+        // n'est qu'une somme d'écritures), ces getters ne font qu'anticiper
+        // ce même calcul pour ne pas laisser le caissier croire qu'une
+        // facture couverte par un avoir est une "vraie" dette.
+        clientSoldes,
+
+        get avoirDisponible() {
+            if (!this.clientId) return 0;
+            const solde = Number(this.clientSoldes[this.clientId] ?? 0);
+            return solde < 0 ? -solde : 0;
+        },
+
+        // Part de l'avoir qui couvrirait cette facture si elle était payée
+        // comptant à 0 F — plafonnée au net à payer (jamais plus que la
+        // facture elle-même).
+        get avoirApplicable() {
+            return Math.min(this.avoirDisponible, this.totalNet);
+        },
+
+        get netApresAvoir() {
+            return Math.max(0, this.totalNet - this.avoirApplicable);
+        },
+
+        // Part de l'avoir qui couvre réellement l'écart encore ouvert une
+        // fois les paiements déjà saisis pris en compte (contrairement à
+        // avoirApplicable, qui ignore les paiements pour la simple
+        // information du bloc client ci-dessus).
+        get avoirUtiliseSurCetteVente() {
+            return Math.min(this.avoirDisponible, Math.max(0, this.totalNet - this.totalPaiements));
+        },
+
+        get resteApresAvoir() {
+            return Math.max(0, this.totalNet - this.totalPaiements - this.avoirDisponible);
+        },
+
+        // Pré-remplit le montant réellement à collecter (net de l'avoir),
+        // sur le premier moyen de paiement — jamais l'avoir lui-même : ce
+        // n'est pas un moyen de paiement (il n'entre jamais dans le
+        // comptage du tiroir), juste une écriture qui se compense
+        // automatiquement côté serveur (voir CLAUDE.md, avoir client).
+        appliquerAvoir() {
+            if (!this.paiements.length) this.ajouterPaiement();
+            const autres = this.totalPaiements - (Number(this.paiements[0].montant) || 0);
+            this.paiements[0].montant = Math.max(this.netApresAvoir - autres, 0);
+        },
+
+        get messageConfirmationVente() {
+            if (!this.clientId || this.totalPaiements >= this.totalNet) {
+                return 'Finaliser cette vente ? Le stock sera mis à jour et le paiement enregistré. Cette action est irréversible.';
+            }
+            if (this.avoirUtiliseSurCetteVente > 0) {
+                return this.resteApresAvoir > 0
+                    ? `Finaliser cette vente à crédit ? ${this.avoirUtiliseSurCetteVente} F seront couverts par l'avoir du client, il restera ${this.resteApresAvoir} F de solde à crédit sur son compte. Cette action est irréversible.`
+                    : `Finaliser cette vente ? Elle sera entièrement couverte par l'avoir du client (${this.avoirUtiliseSurCetteVente} F), aucune dette ne sera créée. Cette action est irréversible.`;
+            }
+            return 'Finaliser cette vente à crédit ? Le stock sera mis à jour et le solde restant sera porté au compte du client. Cette action est irréversible.';
+        },
 
         // Lieu de prélèvement du stock, par ligne (voir CLAUDE.md — un
         // produit peut être vendu depuis un magasin ou un dépôt différent du

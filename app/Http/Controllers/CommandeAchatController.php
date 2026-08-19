@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\CommandeAchat;
+use App\Models\EcritureCompteFournisseur;
 use App\Models\Fournisseur;
 use App\Models\Magasin;
 use App\Models\MoyenPaiement;
 use App\Models\Parametre;
 use App\Models\Produit;
+use App\Models\SessionCaisse;
 use App\Models\Taxe;
 use App\Models\UniteVente;
 use App\Services\AchatService;
@@ -62,6 +64,10 @@ class CommandeAchatController extends Controller
 
         return view('commande-achats.create', [
             'fournisseurs' => Fournisseur::where('actif', true)->orderBy('nom')->get(),
+            // Solde en un seul agrégat (pas de N+1 par fournisseur) : un
+            // solde négatif est un avoir, affiché à la saisie pour rappeler
+            // qu'il se déduira automatiquement de la dette du nouvel achat.
+            'fournisseurSoldes' => EcritureCompteFournisseur::selectRaw('fournisseur_id, SUM(montant) as solde')->groupBy('fournisseur_id')->pluck('solde', 'fournisseur_id'),
             'magasins' => Magasin::where('actif', true)->orderBy('nom')->get(),
             'taxes' => Taxe::where('actif', true)->orderBy('nom')->get(),
             'moyensPaiement' => MoyenPaiement::actifs(),
@@ -154,10 +160,10 @@ class CommandeAchatController extends Controller
             }
 
             return redirect()->route('commande-achats.show', $commande)
-                ->with('succes', 'Bon de commande créé et validé : le stock a été mis à jour.');
+                ->with('succes', "Bon d'achat créé et validé : le stock a été mis à jour.");
         }
 
-        $message = 'Bon de commande créé.'.($numeroGenere ? " Numéro généré automatiquement : {$commande->numero}." : '');
+        $message = "Bon d'achat créé.".($numeroGenere ? " Numéro généré automatiquement : {$commande->numero}." : '');
 
         return redirect()->route('commande-achats.show', $commande)->with('succes', $message);
     }
@@ -167,16 +173,45 @@ class CommandeAchatController extends Controller
         $commandeAchat->load([
             'fournisseur', 'lignes.produit', 'lignes.uniteVente.unite', 'lignes.taxe', 'lignes.magasinDestination',
             'paiements.moyenPaiement', 'reglementsFournisseur.paiements.moyenPaiement', 'reglementsFournisseur.auteur',
+            'retours.lignes.produit', 'retours.auteur',
             'auteur', 'validateur', 'annulateur',
         ]);
+
+        // Reste retournable par ligne (quantite_pieces − déjà retourné) — une
+        // seule passe sur les retours déjà chargés (voir RetourAchatService,
+        // même logique de calcul, et VenteController::ticket()).
+        $dejaRetourneParLigne = $commandeAchat->retours
+            ->flatMap(fn ($retour) => $retour->lignes)
+            ->groupBy('ligne_commande_achat_id')
+            ->map(fn ($lignes) => $lignes->sum('quantite_pieces'));
 
         return view('commande-achats.show', [
             'commande' => $commandeAchat,
             'peutValider' => request()->user()->can('achat.valider'),
             'peutAnnuler' => request()->user()->can('achat.annuler'),
             'peutRegler' => request()->user()->can('fournisseur.reglement'),
+            'peutRetourner' => request()->user()->can('achat.retour'),
+            'dejaRetourneParLigne' => $dejaRetourneParLigne,
             'moyensPaiement' => MoyenPaiement::actifs(),
+            'sessionsOuvertes' => $this->sessionsOuvertes(),
         ]);
+    }
+
+    /**
+     * Sessions de caisse ouvertes, pour le sélecteur du formulaire de
+     * règlement fournisseur (voir FournisseurController::sessionsOuvertes(),
+     * même logique dupliquée volontairement — pas de trait pour 6 lignes).
+     */
+    private function sessionsOuvertes(): \Illuminate\Support\Collection
+    {
+        return SessionCaisse::whereNull('date_fermeture')
+            ->whereNull('date_cloture')
+            ->when(
+                request()->user()->magasin_id,
+                fn ($q, $magasinId) => $q->whereHas('caisse', fn ($qc) => $qc->where('magasin_id', $magasinId))
+            )
+            ->with('caisse.magasin', 'caissier')
+            ->get();
     }
 
     public function facture(CommandeAchat $commandeAchat): View
@@ -188,7 +223,7 @@ class CommandeAchatController extends Controller
     {
         $pdf = Pdf::loadView('commande-achats.facture', $this->chargerDonneesFacture($commandeAchat) + ['pourPdf' => true]);
 
-        return $pdf->download("bon-de-commande-{$commandeAchat->numero}.pdf");
+        return $pdf->download("bon-d-achat-{$commandeAchat->numero}.pdf");
     }
 
     public function excel(CommandeAchat $commandeAchat): StreamedResponse
@@ -197,14 +232,14 @@ class CommandeAchatController extends Controller
 
         $spreadsheet = new Spreadsheet();
         $feuille = $spreadsheet->getActiveSheet();
-        $feuille->setTitle('Bon de commande');
+        $feuille->setTitle("Bon d'achat");
 
         $parametre = Parametre::actuel();
         $feuille->setCellValue('A1', $parametre->nom);
         $feuille->setCellValue('A2', $parametre->adresse);
         $feuille->setCellValue('A3', $parametre->numero ? 'Tél : '.$parametre->numero : '');
 
-        $feuille->setCellValue('D1', 'BON DE COMMANDE');
+        $feuille->setCellValue('D1', "BON D'ACHAT");
         $feuille->setCellValue('D2', 'N° '.$commandeAchat->numero);
         $feuille->setCellValue('D3', 'Date : '.$commandeAchat->date_commande->format('d/m/Y'));
 
@@ -255,7 +290,7 @@ class CommandeAchatController extends Controller
             $feuille->getColumnDimension($colonne)->setAutoSize(true);
         }
 
-        $nomFichier = "bon-de-commande-{$commandeAchat->numero}.xlsx";
+        $nomFichier = "bon-d-achat-{$commandeAchat->numero}.xlsx";
         $writer = new Xlsx($spreadsheet);
 
         return response()->streamDownload(function () use ($writer) {
@@ -308,7 +343,7 @@ class CommandeAchatController extends Controller
         abort_unless($request->user()->can('achat.annuler'), 403);
 
         if ($commandeAchat->statut !== 'brouillon') {
-            return redirect()->route('commande-achats.index')->with('erreur', 'Seule une commande en brouillon peut être supprimée : une commande validée a déjà mis à jour le stock, utilisez « Annuler le bon de commande » à la place.');
+            return redirect()->route('commande-achats.index')->with('erreur', 'Seule une commande en brouillon peut être supprimée : une commande validée a déjà mis à jour le stock, utilisez « Annuler le bon d\'achat » à la place.');
         }
 
         $commandeAchat->delete();

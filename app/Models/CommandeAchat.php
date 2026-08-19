@@ -62,6 +62,11 @@ class CommandeAchat extends Model
         return $this->hasMany(LigneCommandeAchat::class);
     }
 
+    public function retours(): HasMany
+    {
+        return $this->hasMany(RetourAchat::class);
+    }
+
     /**
      * Suppose `lignes` chargée (loadMissing en amont, voir
      * CommandeAchatController::show()).

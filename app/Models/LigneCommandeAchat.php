@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * quantite_pieces n'est volontairement pas fillable : c'est un champ dérivé,
@@ -73,6 +74,11 @@ class LigneCommandeAchat extends Model
     public function magasinDestination(): BelongsTo
     {
         return $this->belongsTo(Magasin::class, 'magasin_destination_id')->withTrashed();
+    }
+
+    public function retours(): HasMany
+    {
+        return $this->hasMany(LigneRetourAchat::class);
     }
 
     /**

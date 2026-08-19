@@ -34,6 +34,47 @@
     </div>
 </div>
 
+{{-- Aperçu global : chacun de ces 4 chiffres mesure une chose différente
+     du même mois (facturé, dû, compensé par avoir, réellement en caisse) —
+     regroupés ensemble pour que le gérant voie d'un coup d'œil qu'ils ne se
+     recoupent pas (le CA n'est pas de l'argent en caisse, un avoir non plus,
+     voir CLAUDE.md règle 10). --}}
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">Total ventes (mois)</div>
+                <div class="fs-5 fw-medium">{{ number_format($caMois, 0, ',', ' ') }} F</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card h-100 {{ $creancesClients > 0 ? 'border-warning' : '' }}">
+            <div class="card-body">
+                <div class="text-secondary small">Total dû (créances clients)</div>
+                <div class="fs-5 fw-medium {{ $creancesClients > 0 ? 'text-warning-emphasis' : '' }}">{{ number_format($creancesClients, 0, ',', ' ') }} F</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">Avoirs appliqués (mois)</div>
+                <div class="fs-5 fw-medium">{{ number_format($avoirAppliqueMois, 0, ',', ' ') }} F</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">Total en caisse (mois)</div>
+                <div class="fs-5 fw-medium">{{ number_format($totalEspecesMois, 0, ',', ' ') }} F</div>
+                <div class="small text-secondary fst-italic">Espèces réellement encaissées</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row g-3 mb-3">
     <div class="col-6 col-md-3">
         <div class="card h-100">
@@ -159,6 +200,32 @@
         </div>
     </div>
 </div>
+
+@if ($mouvementsCaisseJour->isNotEmpty())
+    <div class="card mb-3">
+        <div class="card-body">
+            <h3 class="h6">Mouvements de caisse aujourd'hui</h3>
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Motif</th>
+                        <th class="text-end">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($mouvementsCaisseJour as $ligne)
+                        <tr>
+                            <td><span class="badge {{ $ligne->type->classeBadge() }}">{{ $ligne->type->libelle() }}</span></td>
+                            <td>{{ $ligne->motif }}</td>
+                            <td class="text-end fw-medium">{{ number_format($ligne->total, 0, ',', ' ') }} F</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+@endif
 
 <div class="card mb-3">
     <div class="card-body">

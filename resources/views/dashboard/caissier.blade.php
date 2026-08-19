@@ -42,7 +42,7 @@
             <div class="col-6 col-md-3">
                 <div class="card h-100">
                     <div class="card-body">
-                        <div class="text-secondary small">Total encaissé</div>
+                        <div class="text-secondary small">Chiffre d'affaires</div>
                         <div class="fs-4 fw-medium">{{ number_format($totalVentes, 0, ',', ' ') }} F</div>
                     </div>
                 </div>
@@ -60,6 +60,39 @@
                     <div class="card-body">
                         <div class="text-secondary small">Ventes en attente</div>
                         <div class="fs-4 fw-medium">{{ $venteEnAttenteCount }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Ces trois chiffres décomposent le chiffre d'affaires ci-dessus :
+             dû (crédit encore ouvert), avoir (compensé, jamais encaissé) et
+             espèces (réellement dans le tiroir) — volontairement séparés
+             pour ne jamais laisser croire que le CA est de l'argent en caisse. --}}
+        <p class="text-secondary small mb-2">Décomposition</p>
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small">Total dû (crédit)</div>
+                        <div class="fs-4 fw-medium {{ $totalDu > 0 ? 'text-warning-emphasis' : '' }}">{{ number_format($totalDu, 0, ',', ' ') }} F</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small">Avoirs appliqués</div>
+                        <div class="fs-4 fw-medium">{{ number_format($avoirApplique, 0, ',', ' ') }} F</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small">Total en caisse</div>
+                        <div class="fs-4 fw-medium">{{ number_format($totalEspeces, 0, ',', ' ') }} F</div>
+                        <div class="small text-secondary fst-italic">Espèces réellement encaissées</div>
                     </div>
                 </div>
             </div>

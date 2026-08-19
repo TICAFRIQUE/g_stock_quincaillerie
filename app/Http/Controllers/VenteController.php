@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EcritureCompteClientType;
 use App\Enums\MouvementStockType;
 use App\Exceptions\DevisNonTransformableException;
 use App\Exceptions\LimiteCreditDepasseeException;
@@ -12,6 +13,7 @@ use App\Http\Controllers\Concerns\AutoriseVenteEnAttente;
 use App\Http\Controllers\Concerns\ValideRemises;
 use App\Models\Client;
 use App\Models\Devis;
+use App\Models\EcritureCompteClient;
 use App\Models\MoyenPaiement;
 use App\Models\Paiement;
 use App\Models\Parametre;
@@ -23,6 +25,7 @@ use App\Models\User;
 use App\Models\Vente;
 use App\Models\VenteEnAttente;
 use App\Notifications\VenteSignalee;
+use App\Services\CompteClientService;
 use App\Services\DevisService;
 use App\Services\StockService;
 use App\Services\VenteService;
@@ -195,6 +198,12 @@ class VenteController extends Controller
                 ? Client::where('actif', true)->orderBy('nom')->get(['id', 'nom', 'telephone'])
                 : collect(),
             'typesClient' => TypeClient::where('actif', true)->orderBy('nom')->get(),
+            // Soldes en un seul aggregat (pas de N+1 par client) : un solde
+            // négatif est un avoir, affiché au caissier au moment de choisir
+            // le client pour qu'il puisse le mentionner/l'appliquer.
+            'clientSoldes' => request()->user()->can('vente.credit')
+                ? EcritureCompteClient::selectRaw('client_id, SUM(montant) as solde')->groupBy('client_id')->pluck('solde', 'client_id')
+                : collect(),
         ]);
     }
 
@@ -310,10 +319,19 @@ class VenteController extends Controller
         $this->assurerMagasin($vente->magasin_id);
 
         $vente->load([
-            'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement',
+            'lignes.produit', 'lignes.uniteVente', 'lignes.magasinSource', 'paiements.moyenPaiement',
             'reglementsClient.paiements.moyenPaiement', 'reglementsClient.caissier',
+            'retours.lignes.produit', 'retours.auteur',
             'magasin', 'caissier', 'sessionCaisse.caisse', 'annulateur', 'client',
         ]);
+
+        // Reste retournable par ligne (quantite_pieces − déjà retourné) : une
+        // seule passe sur les retours déjà chargés, jamais une requête par
+        // ligne (voir RetourVenteService, même logique de calcul).
+        $dejaRetourneParLigne = $vente->retours
+            ->flatMap(fn ($retour) => $retour->lignes)
+            ->groupBy('ligne_vente_id')
+            ->map(fn ($lignes) => $lignes->sum('quantite_pieces'));
 
         $signalements = $vente->activities()
             ->where('description', 'like', '%» signalée :%')
@@ -343,6 +361,8 @@ class VenteController extends Controller
             'signalements' => $signalements,
             'sessionOuverte' => $sessionOuverte,
             'peutRegler' => request()->user()->can('client.reglement'),
+            'peutRetourner' => request()->user()->can('vente.retour'),
+            'dejaRetourneParLigne' => $dejaRetourneParLigne,
             'moyensPaiement' => MoyenPaiement::actifs(),
             'parametre' => $parametre,
             'logoDataUri' => $logoDataUri,
@@ -415,9 +435,14 @@ class VenteController extends Controller
             $feuille->setCellValue("F{$ligne}", $paiement->montant);
             $ligne++;
         }
-        if ($vente->soldeDu() > 0) {
+        if ($vente->avoir_applique > 0) {
+            $feuille->setCellValue("E{$ligne}", 'Avoir appliqué');
+            $feuille->setCellValue("F{$ligne}", $vente->avoir_applique);
+            $ligne++;
+        }
+        if ($vente->soldeDuReel() > 0) {
             $feuille->setCellValue("E{$ligne}", 'Solde à crédit');
-            $feuille->setCellValue("F{$ligne}", $vente->soldeDu());
+            $feuille->setCellValue("F{$ligne}", $vente->soldeDuReel());
         }
 
         foreach (['A', 'B', 'C', 'D', 'E', 'F'] as $colonne) {
@@ -490,7 +515,7 @@ class VenteController extends Controller
      * vente. Exclue automatiquement des CA/rapports par le scope par défaut
      * du modèle Vente (soft deleted).
      */
-    public function annuler(Request $request, Vente $vente, StockService $stockService): RedirectResponse
+    public function annuler(Request $request, Vente $vente, StockService $stockService, CompteClientService $compteClientService): RedirectResponse
     {
         $this->assurerMagasin($vente->magasin_id);
 
@@ -498,9 +523,17 @@ class VenteController extends Controller
             'motif' => ['required', 'string', 'max:500'],
         ]);
 
-        $vente->load('lignes.produit', 'lignes.magasinSource', 'magasin');
+        // annuler() restitue la quantite_pieces ORIGINALE de chaque ligne :
+        // si une partie a déjà été rendue via un retour, ce stock a déjà été
+        // restitué, une annulation totale le restituerait une seconde fois.
+        if ($vente->retours()->exists()) {
+            return redirect()->route('ventes.ticket', $vente)
+                ->with('erreur', "Impossible d'annuler cette vente : elle a déjà fait l'objet d'un retour partiel.");
+        }
 
-        DB::transaction(function () use ($vente, $donnees, $request, $stockService) {
+        $vente->load('lignes.produit', 'lignes.magasinSource', 'magasin', 'client');
+
+        DB::transaction(function () use ($vente, $donnees, $request, $stockService, $compteClientService) {
             foreach ($vente->lignes as $ligne) {
                 // Chaque ligne restitue son propre magasin/dépôt source, qui
                 // peut différer du magasin de la vente (voir CLAUDE.md) —
@@ -514,6 +547,18 @@ class VenteController extends Controller
                     reference: $vente,
                     motif: $donnees['motif'],
                 );
+            }
+
+            // Reverse la dette exacte posée par crediterDette() à la vente
+            // (retrouvée via l'écriture elle-même, pas recalculée) — rien à
+            // faire pour une vente comptant, qui n'en a jamais posé.
+            $montantDette = EcritureCompteClient::where('reference_type', $vente->getMorphClass())
+                ->where('reference_id', $vente->id)
+                ->where('type', EcritureCompteClientType::VenteCredit)
+                ->value('montant');
+
+            if ($montantDette > 0) {
+                $compteClientService->annulerDette($vente->client, $montantDette, $vente, $request->user());
             }
 
             $vente->motif_annulation = $donnees['motif'];

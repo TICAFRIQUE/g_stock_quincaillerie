@@ -1,9 +1,9 @@
 @extends('layouts.app')
 
-@section('title', 'Nouveau bon de commande')
+@section('title', "Nouveau bon d'achat")
 
 @section('content')
-    <h2 class="h4 mb-3">Nouveau bon de commande</h2>
+    <h2 class="h4 mb-3">Nouveau bon d'achat</h2>
 
     <div class="row">
         <div class="col-12 col-xl-10">
@@ -32,6 +32,8 @@
                             )) }}.map((l, i) => ({ ...l, _cle: 'l' + i + '-' + Date.now() })),
                             unitesParProduit: {{ Js::from($unitesParProduit) }},
                             taxes: {{ Js::from($taxes->map(fn ($t) => ['id' => $t->id, 'libelle' => $t->nom, 'taux' => $t->taux])) }},
+                            fournisseurId: {{ Js::from(old('fournisseur_id', '')) }},
+                            fournisseurSoldes: {{ Js::from($fournisseurSoldes) }},
                             erreurs: {{ Js::from($errors->getMessages()) }},
                             actionSoumission: {{ Js::from(old('action', 'brouillon')) }},
                             // Deux lignes du même produit ne sont un doublon que si
@@ -136,13 +138,16 @@
                             <div class="col-md-4 mb-3">
                                 <label for="fournisseur_id" class="form-label">Fournisseur<span class="required-marker">*</span></label>
                                 <select name="fournisseur_id" id="fournisseur_id" class="form-select @error('fournisseur_id') is-invalid @enderror"
-                                        x-init="window.initSelect2($el)" required>
+                                        x-model="fournisseurId" x-init="window.initSelect2($el)" required>
                                     <option value="">— Choisir —</option>
                                     @foreach ($fournisseurs as $fournisseur)
                                         <option value="{{ $fournisseur->id }}" @selected(old('fournisseur_id') == $fournisseur->id)>{{ $fournisseur->nom }}</option>
                                     @endforeach
                                 </select>
                                 @error('fournisseur_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <div class="form-text small text-success fw-semibold" x-show="fournisseurId && fournisseurSoldes[fournisseurId] < 0" x-cloak>
+                                    <i class="bi bi-piggy-bank me-1"></i>Avoir de <span x-text="(-fournisseurSoldes[fournisseurId]) + ' F'"></span> sur ce fournisseur — il sera automatiquement déduit de la dette de cet achat.
+                                </div>
                             </div>
 
                             <div class="col-md-4 mb-3">
@@ -266,10 +271,9 @@
                         @if ($peutValider)
                             <div class="card mb-3 bg-white border">
                                 <div class="card-body">
-                                    <h3 class="h6">Règlement au fournisseur (si validation immédiate)</h3>
+                                    <h3 class="h6">Règlement au fournisseur</h3>
                                     <p class="text-secondary small">
                                         Laissez vide pour ne rien encaisser maintenant : le total TTC devient une dette fournisseur.
-                                        Sans effet si vous enregistrez en brouillon.
                                     </p>
 
                                     <template x-for="(paiement, index) in paiements" :key="paiement._cle">
@@ -304,16 +308,18 @@
 
                         <hr>
 
-                        <button type="submit" class="btn btn-outline-primary" @click="actionSoumission = 'brouillon'" :disabled="aUnDoublon">
-                            Enregistrer en brouillon
-                        </button>
+                        @unless ($peutValider)
+                            <button type="submit" class="btn btn-outline-primary" @click="actionSoumission = 'brouillon'" :disabled="aUnDoublon">
+                                Enregistrer en brouillon
+                            </button>
+                        @endunless
                         @if ($peutValider)
                             <button type="button" class="btn btn-success" :disabled="aUnDoublon"
                                     @click="declencherValidation($event)"
                                     data-form-id="formCommandeAchat"
-                                    data-message="Valider ce bon de commande maintenant ? Le stock sera mis à jour immédiatement et cette action est irréversible."
-                                    data-button-label="Valider le bon de commande" data-button-class="btn-success">
-                                <i class="bi bi-check-circle me-1"></i>Valider le bon de commande
+                                    data-message="Valider ce bon d'achat maintenant ? Le stock sera mis à jour immédiatement et cette action est irréversible."
+                                    data-button-label="Valider le bon d'achat" data-button-class="btn-success">
+                                <i class="bi bi-check-circle me-1"></i>Valider le bon d'achat
                             </button>
                         @endif
                         <a href="{{ route('commande-achats.index') }}" class="btn btn-link">Annuler</a>

@@ -10,6 +10,8 @@ enum MouvementStockType: string
     case Transfert = 'transfert';
     case Ajustement = 'ajustement';
     case Annulation = 'annulation';
+    case RetourClient = 'retour_client';
+    case RetourFournisseur = 'retour_fournisseur';
 
     public function libelle(): string
     {
@@ -20,6 +22,8 @@ enum MouvementStockType: string
             self::Transfert => 'Transfert',
             self::Ajustement => 'Ajustement',
             self::Annulation => 'Annulation de vente',
+            self::RetourClient => 'Retour client',
+            self::RetourFournisseur => 'Retour fournisseur',
         };
     }
 
@@ -32,6 +36,7 @@ enum MouvementStockType: string
             self::Transfert => 'text-bg-info',
             self::Ajustement => 'text-bg-secondary',
             self::Annulation => 'text-bg-warning',
+            self::RetourClient, self::RetourFournisseur => 'text-bg-dark',
         };
     }
 }

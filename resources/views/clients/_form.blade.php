@@ -6,6 +6,13 @@
 </div>
 
 <div class="mb-3">
+    <label for="code" class="form-label">Code</label>
+    <input type="text" name="code" id="code" class="form-control @error('code') is-invalid @enderror"
+           value="{{ old('code', $client->code ?? '') }}" placeholder="Génération automatique">
+    @error('code') <div class="invalid-feedback">{{ $message }}</div> @enderror
+</div>
+
+<div class="mb-3">
     <label for="type_client_id" class="form-label">Type de client</label>
     <select name="type_client_id" id="type_client_id" class="form-select @error('type_client_id') is-invalid @enderror">
         <option value="">— Aucun —</option>

@@ -57,7 +57,15 @@
          }">
         <div class="card-body">
             <p class="text-secondary small mb-1">Seules les espèces sont comptées dans le tiroir.</p>
-            <p class="mb-3">Théorique (fond de caisse + ventes espèces) : <strong>{{ number_format($theorique, 0, ',', ' ') }} F</strong></p>
+            <p class="mb-1">Théorique (fond de caisse + ventes et règlements espèces + entrées − sorties) : <strong>{{ number_format($theorique, 0, ',', ' ') }} F</strong></p>
+            @if ($detailTheorique['entrees'] > 0 || $detailTheorique['sorties'] > 0)
+                <p class="text-secondary small mb-3">
+                    dont entrées de caisse : {{ number_format($detailTheorique['entrees'], 0, ',', ' ') }} F,
+                    sorties de caisse : − {{ number_format($detailTheorique['sorties'], 0, ',', ' ') }} F
+                </p>
+            @else
+                <div class="mb-3"></div>
+            @endif
 
             <form id="formCloture" method="POST" action="{{ route('sessions.cloturer', $session) }}">
                 @csrf

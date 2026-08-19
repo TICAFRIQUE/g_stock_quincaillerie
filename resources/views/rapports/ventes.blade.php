@@ -75,17 +75,45 @@
         @endif
     </form>
 
-    <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
+    <div class="row g-3 mb-2">
+        <div class="col-6 col-md-6">
             <div class="card h-100"><div class="card-body">
                 <div class="text-secondary small">Nombre de ventes</div>
                 <div class="fs-5 fw-medium">{{ $nombre }}</div>
             </div></div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-6">
             <div class="card h-100"><div class="card-body">
                 <div class="text-secondary small">Total net</div>
                 <div class="fs-5 fw-medium">{{ number_format($totalNet, 0, ',', ' ') }} F</div>
+            </div></div>
+        </div>
+    </div>
+
+    {{-- Ces trois chiffres décomposent le total net ci-dessus : dû (crédit
+         encore ouvert), avoir (compensé, jamais encaissé) et espèces
+         (réellement dans le tiroir) — volontairement séparés du total net
+         pour ne jamais laisser croire que ce sont tous des espèces. --}}
+    <p class="text-secondary small mb-2">Décomposition</p>
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-4">
+            <div class="card h-100"><div class="card-body">
+                <div class="text-secondary small">Total dû (crédit)</div>
+                <div class="fs-5 fw-medium {{ $totalDu > 0 ? 'text-warning-emphasis' : '' }}">{{ number_format($totalDu, 0, ',', ' ') }} F</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card h-100"><div class="card-body">
+                <div class="text-secondary small">Avoirs appliqués</div>
+                <div class="fs-5 fw-medium">{{ number_format($totalAvoirApplique, 0, ',', ' ') }} F</div>
+                <div class="small text-secondary fst-italic">N'entre jamais dans le tiroir</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card h-100"><div class="card-body">
+                <div class="text-secondary small">Total en caisse</div>
+                <div class="fs-5 fw-medium">{{ number_format($totalEspeces, 0, ',', ' ') }} F</div>
+                <div class="small text-secondary fst-italic">Espèces réellement encaissées</div>
             </div></div>
         </div>
     </div>
@@ -101,6 +129,7 @@
                         <th>Caisse</th>
                         <th>Caissier</th>
                         <th>Total net</th>
+                        <th>Avoir appliqué</th>
                         <th class="text-end d-print-none">Actions</th>
                     </tr>
                 </thead>
@@ -113,6 +142,7 @@
                             <td>{{ $vente->sessionCaisse->caisse->nom }}</td>
                             <td>{{ $vente->caissier->name }}</td>
                             <td>{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
+                            <td class="text-secondary">{{ $vente->avoir_applique > 0 ? number_format($vente->avoir_applique, 0, ',', ' ').' F' : '—' }}</td>
                             <td class="text-end d-print-none">
                                 <a href="{{ route('ventes.ticket', $vente) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Détail de la vente">
                                     <i class="bi bi-eye"></i>
@@ -122,7 +152,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center text-secondary py-4">Aucune vente sur cette période.</td>
+                            <td colspan="8" class="text-center text-secondary py-4">Aucune vente sur cette période.</td>
                         </tr>
                     @endforelse
                 </tbody>

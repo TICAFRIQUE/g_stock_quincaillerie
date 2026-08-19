@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
-#[Fillable(['nom', 'telephone', 'email', 'adresse', 'actif'])]
+#[Fillable(['nom', 'code', 'telephone', 'email', 'adresse', 'actif'])]
 class Fournisseur extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
@@ -51,6 +51,43 @@ class Fournisseur extends Model
     public function solde(): int
     {
         return $this->ecritures()->sum('montant');
+    }
+
+    /**
+     * Total des achats passés auprès de ce fournisseur (commandes validées
+     * non annulées, TTC). KPI fiche fournisseur. Suppose que le total TTC de
+     * chaque ligne peut être sommé en SQL : prix_achat HT × quantité ×
+     * (1 + taux taxe / 100) n'est pas trivial à exprimer en SQL brut à cause
+     * de l'arrondi applicatif (voir Arrondi::entier) — calculé ligne par
+     * ligne en PHP via LigneCommandeAchat::montantTtc() plutôt qu'une requête
+     * agrégée, sur un nombre de lignes qui reste raisonnable par fournisseur.
+     */
+    public function totalAchats(): int
+    {
+        return LigneCommandeAchat::whereHas(
+            'commandeAchat',
+            fn ($q) => $q->where('fournisseur_id', $this->id)->where('statut', 'validee')
+        )->with('taxe')->get()->sum(fn (LigneCommandeAchat $l) => $l->montantTtc());
+    }
+
+    public function nombreAchats(): int
+    {
+        return $this->commandeAchats()->where('statut', 'validee')->count();
+    }
+
+    /**
+     * Total effectivement versé à ce fournisseur, toutes voies confondues :
+     * paiements à la validation + règlements ultérieurs. Distinct de
+     * solde() qui reflète la dette RESTANTE (après retours/annulations).
+     */
+    public function totalRegle(): int
+    {
+        $paiements = PaiementAchat::whereHas(
+            'commandeAchat',
+            fn ($q) => $q->where('fournisseur_id', $this->id)
+        )->sum('montant');
+
+        return $paiements + $this->reglements()->sum('montant');
     }
 
     /**

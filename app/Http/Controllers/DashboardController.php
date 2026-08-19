@@ -3,9 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Caisse;
+use App\Models\EcritureCompteClient;
 use App\Models\EcritureCompteFournisseur;
 use App\Models\Magasin;
+use App\Models\MouvementCaisse;
+use App\Models\MoyenPaiement;
 use App\Models\Paiement;
+use App\Models\ReglementPaiement;
 use App\Models\SessionCaisse;
 use App\Models\Stock;
 use App\Models\User;
@@ -45,22 +49,54 @@ class DashboardController extends Controller
             return ['session' => null];
         }
 
-        $nombreVentes = $session->ventes()->count();
-        $totalVentes = (int) $session->ventes()->sum('total_net');
+        $ventesSession = $session->ventes()->with('paiements', 'reglementsClient')->get();
+        $nombreVentes = $ventesSession->count();
+        $totalVentes = (int) $ventesSession->sum('total_net');
 
-        $parMoyen = Paiement::query()
+        // Deux sources alimentent le tiroir de cette session (règle 10/14) :
+        // les paiements encaissés à la vente ET les règlements clients
+        // encaissés séparément dans la même session — un règlement ignoré
+        // ici sous-comptait la répartition par moyen affichée au caissier.
+        $parPaiement = Paiement::query()
             ->join('ventes', 'ventes.id', '=', 'paiements.vente_id')
-            ->join('moyen_paiements', 'moyen_paiements.id', '=', 'paiements.moyen_paiement_id')
             ->where('ventes.session_caisse_id', $session->id)
             ->whereNull('ventes.deleted_at')
-            ->selectRaw('moyen_paiements.nom as nom, SUM(paiements.montant) as total')
-            ->groupBy('moyen_paiements.id', 'moyen_paiements.nom')
-            ->get();
+            ->selectRaw('paiements.moyen_paiement_id, SUM(paiements.montant) as total')
+            ->groupBy('paiements.moyen_paiement_id')
+            ->pluck('total', 'moyen_paiement_id');
+
+        $parReglement = ReglementPaiement::query()
+            ->join('reglement_clients', 'reglement_clients.id', '=', 'reglement_paiements.reglement_client_id')
+            ->where('reglement_clients.session_caisse_id', $session->id)
+            ->selectRaw('reglement_paiements.moyen_paiement_id, SUM(reglement_paiements.montant) as total')
+            ->groupBy('reglement_paiements.moyen_paiement_id')
+            ->pluck('total', 'moyen_paiement_id');
+
+        $totauxParMoyen = collect();
+        foreach ([$parPaiement, $parReglement] as $source) {
+            foreach ($source as $moyenId => $total) {
+                $totauxParMoyen[$moyenId] = ($totauxParMoyen[$moyenId] ?? 0) + $total;
+            }
+        }
+        $moyens = MoyenPaiement::whereIn('id', $totauxParMoyen->keys())->get()->keyBy('id');
+        $parMoyen = $totauxParMoyen->map(fn ($total, $moyenId) => (object) [
+            'nom' => $moyens[$moyenId]->nom,
+            'total' => $total,
+        ])->values();
+
+        // Espèces uniquement (règle 10) : seul chiffre qui alimente vraiment
+        // le tiroir, jamais confondu avec le chiffre d'affaires ci-dessous
+        // (qui inclut crédit et avoir, jamais encaissés).
+        $totalEspeces = (int) $moyens->filter(fn ($m) => $m->est_espece)
+            ->sum(fn ($m) => $totauxParMoyen[$m->id] ?? 0);
 
         return [
             'session' => $session,
             'nombreVentes' => $nombreVentes,
             'totalVentes' => $totalVentes,
+            'totalDu' => (int) $ventesSession->sum(fn (Vente $v) => $v->soldeDuReel()),
+            'avoirApplique' => (int) $ventesSession->sum('avoir_applique'),
+            'totalEspeces' => $totalEspeces,
             'panierMoyen' => $nombreVentes > 0 ? (int) round($totalVentes / $nombreVentes) : 0,
             'parMoyen' => $parMoyen,
             // Le tableau de bord du caissier ne montre que ses propres
@@ -100,11 +136,92 @@ class DashboardController extends Controller
             // central, comme le catalogue) : la dette totale est la même
             // pour un gérant que pour le superadmin, jamais filtrée.
             'detteFournisseurs' => $this->detteFournisseurs(),
+            // Même logique côté client (référentiel central, pas rattaché à
+            // un magasin) : la créance totale n'est jamais filtrée non plus.
+            // Solde par client, jamais net entre clients — l'avoir de l'un ne
+            // doit jamais compenser la dette d'un autre (règle 12).
+            'creancesClients' => $this->creancesClients(),
+            'avoirAppliqueMois' => (int) (clone $ventesMois)->sum('avoir_applique'),
+            'totalEspecesMois' => $this->totalEspecesMois($magasinId, $debutMois),
             'ecartsCaisse' => $this->ecartsCaisseRecents($magasinId),
             'caissesOuvertes' => $this->caissesOuvertes($magasinId),
             'evolutionVentes' => $this->evolutionVentes($magasinId),
             'repartitionMoyens' => $this->repartitionMoyensPaiement($magasinId, $debutMois),
+            'mouvementsCaisseJour' => $this->mouvementsCaisseParMotif($magasinId, $debutJour),
         ];
+    }
+
+    /**
+     * Total dû par les clients (créances), tous magasins confondus — somme
+     * des soldes POSITIFS uniquement : un avoir sur le compte d'un client ne
+     * doit jamais compenser la dette d'un autre (règle 12, solde dérivé par
+     * client, jamais entre clients).
+     */
+    private function creancesClients(): int
+    {
+        return (int) EcritureCompteClient::query()
+            ->select('client_id', DB::raw('SUM(montant) as solde'))
+            ->groupBy('client_id')
+            ->havingRaw('SUM(montant) > 0')
+            ->get()
+            ->sum('solde');
+    }
+
+    /**
+     * Espèces réellement encaissées ce mois (paiements à la vente + règlements
+     * clients) — la seule chose qui alimente vraiment un tiroir (règle 10),
+     * contrairement au CA (total_net) qui inclut aussi le crédit et l'avoir.
+     */
+    private function totalEspecesMois(?int $magasinId, Carbon $depuis): int
+    {
+        $ventes = (int) Paiement::query()
+            ->join('ventes', 'ventes.id', '=', 'paiements.vente_id')
+            ->join('moyen_paiements', 'moyen_paiements.id', '=', 'paiements.moyen_paiement_id')
+            ->where('moyen_paiements.est_espece', true)
+            ->when($magasinId, fn ($q) => $q->where('ventes.magasin_id', $magasinId))
+            ->where('ventes.created_at', '>=', $depuis)
+            ->whereNull('ventes.deleted_at')
+            ->sum('paiements.montant');
+
+        $reglements = (int) ReglementPaiement::query()
+            ->join('reglement_clients', 'reglement_clients.id', '=', 'reglement_paiements.reglement_client_id')
+            ->join('session_caisses', 'session_caisses.id', '=', 'reglement_clients.session_caisse_id')
+            ->join('caisses', 'caisses.id', '=', 'session_caisses.caisse_id')
+            ->join('moyen_paiements', 'moyen_paiements.id', '=', 'reglement_paiements.moyen_paiement_id')
+            ->where('moyen_paiements.est_espece', true)
+            ->when($magasinId, fn ($q) => $q->where('caisses.magasin_id', $magasinId))
+            ->where('reglement_clients.created_at', '>=', $depuis)
+            ->sum('reglement_paiements.montant');
+
+        return $ventes + $reglements;
+    }
+
+    /**
+     * Sorties/entrées de caisse manuelles du jour, ventilées par motif — pour
+     * repérer vite une sortie inhabituelle (voir CLAUDE.md, Mouvements de
+     * caisse). Scopé au magasin du gérant comme les autres KPI de ce tableau
+     * de bord.
+     */
+    private function mouvementsCaisseParMotif(?int $magasinId, Carbon $depuis)
+    {
+        return MouvementCaisse::query()
+            ->join('session_caisses', 'session_caisses.id', '=', 'mouvement_caisses.session_caisse_id')
+            ->join('caisses', 'caisses.id', '=', 'session_caisses.caisse_id')
+            ->when($magasinId, fn ($q) => $q->where('caisses.magasin_id', $magasinId))
+            ->where('mouvement_caisses.created_at', '>=', $depuis)
+            ->selectRaw('mouvement_caisses.type as type, mouvement_caisses.motif as motif, SUM(mouvement_caisses.montant) as total')
+            ->groupBy('mouvement_caisses.type', 'mouvement_caisses.motif')
+            ->orderByDesc('total')
+            ->get()
+            ->map(fn ($ligne) => (object) [
+                // $ligne->type est déjà casté en MouvementCaisseType par le
+                // modèle (Eloquent applique les casts même sur une colonne
+                // ramenée via selectRaw) : pas de ::from() ici, ça lèverait
+                // un TypeError (l'enum n'est pas une string/int).
+                'type' => $ligne->type,
+                'motif' => $ligne->motif,
+                'total' => (int) $ligne->total,
+            ]);
     }
 
     private function topProduits(?int $magasinId, Carbon $depuis, int $limite = 5)
@@ -207,17 +324,46 @@ class DashboardController extends Controller
         return ['labels' => $labels, 'valeurs' => $valeurs];
     }
 
+    /**
+     * Répartition espèces/mobile money/… du mois — deux sources, comme
+     * SessionCaisseController::paiementsParMoyen() : les paiements encaissés
+     * à la vente ET les règlements clients encaissés séparément (règle 10),
+     * sinon la ventilation sous-comptait tout règlement hors vente.
+     */
     private function repartitionMoyensPaiement(?int $magasinId, Carbon $depuis)
     {
-        return Paiement::query()
+        $parVente = Paiement::query()
             ->join('ventes', 'ventes.id', '=', 'paiements.vente_id')
-            ->join('moyen_paiements', 'moyen_paiements.id', '=', 'paiements.moyen_paiement_id')
             ->when($magasinId, fn ($q) => $q->where('ventes.magasin_id', $magasinId))
             ->where('ventes.created_at', '>=', $depuis)
             ->whereNull('ventes.deleted_at')
-            ->selectRaw('moyen_paiements.nom as nom, SUM(paiements.montant) as total')
-            ->groupBy('moyen_paiements.id', 'moyen_paiements.nom')
-            ->get();
+            ->selectRaw('paiements.moyen_paiement_id, SUM(paiements.montant) as total')
+            ->groupBy('paiements.moyen_paiement_id')
+            ->pluck('total', 'moyen_paiement_id');
+
+        $parReglement = ReglementPaiement::query()
+            ->join('reglement_clients', 'reglement_clients.id', '=', 'reglement_paiements.reglement_client_id')
+            ->join('session_caisses', 'session_caisses.id', '=', 'reglement_clients.session_caisse_id')
+            ->join('caisses', 'caisses.id', '=', 'session_caisses.caisse_id')
+            ->when($magasinId, fn ($q) => $q->where('caisses.magasin_id', $magasinId))
+            ->where('reglement_clients.created_at', '>=', $depuis)
+            ->selectRaw('reglement_paiements.moyen_paiement_id, SUM(reglement_paiements.montant) as total')
+            ->groupBy('reglement_paiements.moyen_paiement_id')
+            ->pluck('total', 'moyen_paiement_id');
+
+        $totaux = collect();
+        foreach ([$parVente, $parReglement] as $source) {
+            foreach ($source as $moyenId => $total) {
+                $totaux[$moyenId] = ($totaux[$moyenId] ?? 0) + $total;
+            }
+        }
+
+        $moyens = MoyenPaiement::whereIn('id', $totaux->keys())->pluck('nom', 'id');
+
+        return $totaux->map(fn ($total, $moyenId) => (object) [
+            'nom' => $moyens[$moyenId] ?? '—',
+            'total' => $total,
+        ])->values();
     }
 
     private function comparatifMagasins()

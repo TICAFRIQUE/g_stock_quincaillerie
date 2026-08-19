@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="utf-8">
-    <title>Bon de commande {{ $commande->numero }}</title>
+    <title>Bon d'achat {{ $commande->numero }}</title>
     <style>
         /* Feuille de style volontairement autonome (pas de Bootstrap) : ce
            document sert aussi de source au PDF (dompdf), dont le support CSS
@@ -46,11 +46,46 @@
         table.totaux .credit td { color: #b02a37; font-weight: bold; }
         .badge-annulee { display: inline-block; padding: 4px 10px; border: 1px solid #b02a37; color: #b02a37; font-weight: bold; margin-bottom: 12px; }
         .mention { margin-top: 30px; font-size: 11px; color: #888; text-align: center; }
+        /* @page (pas body padding) : seul mécanisme qui réserve une marge de
+           sécurité fiable sur CHAQUE page côté dompdf comme à l'impression
+           navigateur — un padding sur body ne protège que le tout début/la
+           toute fin du document, pas les bords de chaque page. Sans cette
+           marge, le contenu touchait le bord physique et se faisait rogner
+           par la zone non imprimable de l'imprimante. */
+        @page {
+            margin: 15mm 12mm;
+        }
         @media print {
             .actions { display: none; }
-            body { padding: 0; }
+            body { padding: 0; margin: 0; color: #000; }
+            /* Noir et blanc par défaut à l'impression/PDF : les couleurs
+               d'accent (orange, rouge, beige) restent réservées à l'écran. */
+            .facture-titre { color: #000; }
+            .facture-meta { color: #000; }
+            .bloc-client { background: #fff; border-color: #000; }
+            .bloc-client .label { color: #000; }
+            table.lignes th { background: #fff; }
+            table.totaux .credit td { color: #000; }
+            .badge-annulee { color: #000; border-color: #000; }
+            .mention { color: #000; }
         }
     </style>
+    @if ($pourPdf ?? false)
+        <style>
+            /* Le PDF téléchargé est généré par dompdf en media "screen" par
+               défaut (@media print ci-dessus ne s'y applique jamais) : mêmes
+               règles noir et blanc dupliquées ici pour le PDF, l'impression
+               navigateur réelle restant, elle, couverte par @media print. */
+            .facture-titre { color: #000; }
+            .facture-meta { color: #000; }
+            .bloc-client { background: #fff; border-color: #000; }
+            .bloc-client .label { color: #000; }
+            table.lignes th { background: #fff; }
+            table.totaux .credit td { color: #000; }
+            .badge-annulee { color: #000; border-color: #000; }
+            .mention { color: #000; }
+        </style>
+    @endif
 </head>
 <body>
     @unless ($pourPdf ?? false)
@@ -78,7 +113,7 @@
                 @if ($parametre->numero) Tél : {{ $parametre->numero }} @endif
             </td>
             <td style="width: 45%;">
-                <div class="facture-titre">BON DE COMMANDE</div>
+                <div class="facture-titre">BON D'ACHAT</div>
                 <div class="facture-meta">
                     N° {{ $commande->numero }}<br>
                     Date : {{ $commande->date_commande->format('d/m/Y') }}<br>

@@ -22,7 +22,12 @@
                 <div class="text-secondary small">Caissier : {{ $session->caissier->name }}</div>
                 <div class="text-secondary small">Ouverte le {{ $session->date_ouverture->format('d/m/Y à H:i') }}</div>
                 @if ($session->date_cloture)
-                    <div class="text-secondary small">Clôturée le {{ $session->date_cloture->format('d/m/Y à H:i') }}</div>
+                    <div class="text-secondary small">
+                        Clôturée le {{ $session->date_cloture->format('d/m/Y à H:i') }}
+                        @if ($session->clotureePar)
+                            par {{ $session->clotureePar->name }}
+                        @endif
+                    </div>
                 @else
                     <span class="badge text-bg-success">Session en cours</span>
                 @endif
@@ -30,62 +35,63 @@
 
             <hr>
 
-            <div class="row g-3 mb-3">
-                <div class="col-6 col-md-3">
+            {{-- Chaque chiffre dans son propre bloc compact (label au-dessus
+                 de la valeur), tous alignés sur la même ligne et repliés
+                 naturellement en flex-wrap — évite les rangées Bootstrap à
+                 largeur fixe (25%/33%) qui gaspillent l'espace dès qu'un
+                 bloc contient peu de texte. --}}
+            <div class="d-flex flex-wrap column-gap-4 row-gap-2 mb-3">
+                <div>
                     <div class="text-secondary small">Fond de caisse</div>
                     <div class="fw-medium">{{ number_format($session->fond_de_caisse, 0, ',', ' ') }} F</div>
                 </div>
-                <div class="col-6 col-md-3">
+                <div>
                     <div class="text-secondary small">Nombre de ventes</div>
                     <div class="fw-medium">{{ $ventes->count() }}</div>
                 </div>
-                <div class="col-6 col-md-3">
+                <div>
                     <div class="text-secondary small">Total net</div>
                     <div class="fw-medium">{{ number_format($totalVentes, 0, ',', ' ') }} F</div>
                 </div>
+                @foreach ($paiementsParMoyen as $paiement)
+                    <div>
+                        <div class="text-secondary small">{{ $paiement->moyenPaiement->nom }}</div>
+                        <div class="fw-medium">{{ number_format($paiement->total, 0, ',', ' ') }} F</div>
+                    </div>
+                @endforeach
             </div>
 
-            @if ($paiementsParMoyen->isNotEmpty())
-                <h3 class="h6">Répartition par moyen de paiement</h3>
-                <div class="row g-3 mb-3">
-                    @foreach ($paiementsParMoyen as $paiement)
-                        <div class="col-6 col-md-3">
-                            <div class="text-secondary small">{{ $paiement->moyenPaiement->nom }}</div>
-                            <div class="fw-medium">{{ number_format($paiement->total, 0, ',', ' ') }} F</div>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
-
             @if ($session->date_cloture)
-                <h3 class="h6">Clôture</h3>
-                <div class="row g-3 mb-3">
-                    <div class="col-6 col-md-3">
+                <p class="text-secondary small mb-1">Clôture</p>
+                <div class="d-flex flex-wrap column-gap-4 row-gap-2 mb-3">
+                    <div>
                         <div class="text-secondary small">Théorique</div>
-                        <div class="fw-medium">{{ number_format($session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes, 0, ',', ' ') }} F</div>
+                        <div class="fw-medium">{{ number_format($session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes + $session->total_entrees_especes - $session->total_sorties_especes, 0, ',', ' ') }} F</div>
                     </div>
                     @if ($session->total_reglements_especes > 0)
-                        <div class="col-6 col-md-3">
+                        <div>
                             <div class="text-secondary small">Règlements clients (espèces)</div>
                             <div class="fw-medium">{{ number_format($session->total_reglements_especes, 0, ',', ' ') }} F</div>
                         </div>
                     @endif
-                    <div class="col-6 col-md-3">
+                    <div>
+                        <div class="text-secondary small">Entrées de caisse</div>
+                        <div class="fw-medium text-success">{{ number_format($session->total_entrees_especes, 0, ',', ' ') }} F</div>
+                    </div>
+                    <div>
+                        <div class="text-secondary small">Sorties de caisse</div>
+                        <div class="fw-medium text-danger">{{ number_format($session->total_sorties_especes, 0, ',', ' ') }} F</div>
+                    </div>
+                    <div>
                         <div class="text-secondary small">Compté</div>
                         <div class="fw-medium">{{ number_format($session->montant_compte, 0, ',', ' ') }} F</div>
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div>
                         <div class="text-secondary small">Écart</div>
                         <div class="fw-medium {{ $session->ecart === 0 ? '' : ($session->ecart > 0 ? 'text-success' : 'text-danger') }}">
                             {{ $session->ecart > 0 ? '+' : '' }}{{ number_format($session->ecart, 0, ',', ' ') }} F
                         </div>
                     </div>
-                    @if ($session->clotureePar)
-                        <div class="col-6 col-md-3">
-                            <div class="text-secondary small">Clôturée par</div>
-                            <div class="fw-medium">{{ $session->clotureePar->name }}</div>
-                        </div>
-                    @endif
                 </div>
             @endif
 
@@ -95,7 +101,7 @@
                     <thead>
                         <tr>
                             <th>Numéro</th>
-                            <th>Heure</th>
+                            <th>Date et heure</th>
                             <th class="text-end">Total net</th>
                         </tr>
                     </thead>
@@ -103,7 +109,7 @@
                         @forelse ($ventes as $vente)
                             <tr>
                                 <td><code>{{ $vente->numero }}</code></td>
-                                <td>{{ $vente->created_at->format('H:i') }}</td>
+                                <td>{{ $vente->created_at->format('d/m/Y H:i') }}</td>
                                 <td class="text-end">{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
                             </tr>
                         @empty

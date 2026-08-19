@@ -101,27 +101,42 @@
                         <th>Destination</th>
                         <x-th-tri champ="quantite" label="Quantité" />
                         <th>Seuil d'alerte</th>
+                        <th>Prix de vente</th>
                         <th>Coût moyen pondéré</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($stocks as $stock)
-                        @php $sousSeuil = $stock->quantite <= $stock->produit->seuil_alerte; @endphp
+                        @php
+                            $sousSeuil = $stock->quantite <= $stock->produit->seuil_alerte;
+                            $repartition = $stock->produit->repartirQuantite($stock->quantite);
+                        @endphp
                         <tr class="{{ $sousSeuil ? 'table-danger' : '' }}">
                             <td>{{ $stock->produit->libelle_affichage }} <code class="small">{{ $stock->produit->sku }}</code></td>
                             <td>{{ $stock->magasin->nom }}</td>
                             <td>
-                                {{ $stock->quantite }} pièces
+                                {{ $stock->quantite }} {{ $stock->produit->unite_base_libelle_complet }}
                                 @if ($sousSeuil)
                                     <i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="Sous le seuil d'alerte"></i>
                                 @endif
+                                @if ($repartition)
+                                    <br>
+                                    <span class="small fst-italic text-secondary">
+                                        dont
+                                        @if ($repartition['reste'] > 0)
+                                            {{ $repartition['reste'] }} {{ $stock->produit->unite_base_libelle_complet }} et
+                                        @endif
+                                        {{ $repartition['nombre'] }} {{ $repartition['unite']->libelle }}
+                                    </span>
+                                @endif
                             </td>
                             <td>{{ $stock->produit->seuil_alerte }}</td>
+                            <td>{{ number_format($stock->produit->prix_piece, 0, ',', ' ') }} F</td>
                             <td>{{ number_format($stock->cout_moyen_pondere, 0, ',', ' ') }} F</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="text-center text-secondary py-4">Aucun stock enregistré pour l'instant.</td>
+                            <td colspan="6" class="text-center text-secondary py-4">Aucun stock enregistré pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>
