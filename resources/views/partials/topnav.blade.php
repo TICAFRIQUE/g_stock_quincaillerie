@@ -5,35 +5,27 @@
         </a>
     </li>
 
-    @canany(['caisse.ouvrir', 'client.voir', 'devis.voir'])
+      @canany(['produit.voir', 'categorie.gerer'])
         <li class="nav-item dropdown">
             <a href="#"
-                class="nav-link dropdown-toggle {{ request()->routeIs('sessions.*', 'ventes.*', 'ventes-en-attente.*', 'reglements.*', 'devis.*', 'clients.*') ? 'active' : '' }}"
+                class="nav-link dropdown-toggle {{ request()->routeIs('categories.*', 'produits.*') ? 'active' : '' }}"
                 data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-cart3 me-1"></i>Vente
+                <i class="bi bi-tags me-1"></i>Catalogue
             </a>
             <ul class="dropdown-menu">
-                @can('caisse.ouvrir')
+                @can('categorie.gerer')
                     <li>
-                        <a href="{{ route('sessions.index') }}"
-                            class="dropdown-item {{ request()->routeIs('sessions.*', 'ventes.*', 'ventes-en-attente.*', 'reglements.*') ? 'active' : '' }}">
-                            <i class="bi bi-cash-stack me-2"></i>Facture
+                        <a href="{{ route('categories.index') }}"
+                            class="dropdown-item {{ request()->routeIs('categories.*') ? 'active' : '' }}">
+                            <i class="bi bi-tags me-2"></i>Catégories
                         </a>
                     </li>
                 @endcan
-                @can('devis.voir')
+                @can('produit.voir')
                     <li>
-                        <a href="{{ route('devis.index') }}"
-                            class="dropdown-item {{ request()->routeIs('devis.*') ? 'active' : '' }}">
-                            <i class="bi bi-file-earmark-text me-2"></i>Devis
-                        </a>
-                    </li>
-                @endcan
-                @can('client.voir')
-                    <li>
-                        <a href="{{ route('clients.index') }}"
-                            class="dropdown-item {{ request()->routeIs('clients.*') ? 'active' : '' }}">
-                            <i class="bi bi-people-fill me-2"></i>Clients
+                        <a href="{{ route('produits.index') }}"
+                            class="dropdown-item {{ request()->routeIs('produits.*') ? 'active' : '' }}">
+                            <i class="bi bi-cup-hot me-2"></i>Produits
                         </a>
                     </li>
                 @endcan
@@ -86,33 +78,42 @@
         </li>
     @endcanany
 
-    @canany(['produit.voir', 'categorie.gerer'])
+    @canany(['caisse.ouvrir', 'client.voir', 'devis.voir'])
         <li class="nav-item dropdown">
             <a href="#"
-                class="nav-link dropdown-toggle {{ request()->routeIs('categories.*', 'produits.*') ? 'active' : '' }}"
+                class="nav-link dropdown-toggle {{ request()->routeIs('sessions.*', 'ventes.*', 'ventes-en-attente.*', 'reglements.*', 'devis.*', 'clients.*') ? 'active' : '' }}"
                 data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-tags me-1"></i>Catalogue
+                <i class="bi bi-cart3 me-1"></i>Vente
             </a>
             <ul class="dropdown-menu">
-                @can('categorie.gerer')
+                @can('caisse.ouvrir')
                     <li>
-                        <a href="{{ route('categories.index') }}"
-                            class="dropdown-item {{ request()->routeIs('categories.*') ? 'active' : '' }}">
-                            <i class="bi bi-tags me-2"></i>Catégories
+                        <a href="{{ route('sessions.index') }}"
+                            class="dropdown-item {{ request()->routeIs('sessions.*', 'ventes.*', 'ventes-en-attente.*', 'reglements.*') ? 'active' : '' }}">
+                            <i class="bi bi-cash-stack me-2"></i>Facture
                         </a>
                     </li>
                 @endcan
-                @can('produit.voir')
+                @can('devis.voir')
                     <li>
-                        <a href="{{ route('produits.index') }}"
-                            class="dropdown-item {{ request()->routeIs('produits.*') ? 'active' : '' }}">
-                            <i class="bi bi-cup-hot me-2"></i>Produits
+                        <a href="{{ route('devis.index') }}"
+                            class="dropdown-item {{ request()->routeIs('devis.*') ? 'active' : '' }}">
+                            <i class="bi bi-file-earmark-text me-2"></i>Devis
+                        </a>
+                    </li>
+                @endcan
+                @can('client.voir')
+                    <li>
+                        <a href="{{ route('clients.index') }}"
+                            class="dropdown-item {{ request()->routeIs('clients.*') ? 'active' : '' }}">
+                            <i class="bi bi-people-fill me-2"></i>Clients
                         </a>
                     </li>
                 @endcan
             </ul>
         </li>
     @endcanany
+
 
     @can('caisse.mouvement')
         <li class="nav-item">
