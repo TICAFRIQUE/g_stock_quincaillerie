@@ -51,6 +51,17 @@
                 </div>
             </div>
         </div>
+        @can('tresorerie.voir')
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h3 class="h6"><i class="bi bi-bank me-2"></i>Trésorerie</h3>
+                        <p class="text-secondary small">Caisse Générale et comptes bancaires, par compte et par période.</p>
+                        <a href="{{ route('rapports.tresorerie') }}" class="btn btn-sm btn-outline-primary">Voir</a>
+                    </div>
+                </div>
+            </div>
+        @endcan
         <div class="col-12 col-md-6 col-lg-4">
             <div class="card h-100">
                 <div class="card-body">

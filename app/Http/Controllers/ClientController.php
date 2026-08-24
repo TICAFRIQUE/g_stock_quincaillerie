@@ -16,7 +16,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -207,31 +206,10 @@ class ClientController extends Controller
             'ecritures' => $ecritures,
             'ventes' => $ventes,
             'sessionOuverte' => $sessionOuverte,
-            'sessionsOuvertes' => $this->sessionsOuvertes(),
             'peutRegler' => request()->user()->can('client.reglement'),
             'moyensPaiement' => MoyenPaiement::actifs(),
             'devis' => $devis,
         ]);
-    }
-
-    /**
-     * Sessions de caisse actuellement ouvertes, scopées au magasin du
-     * gérant (Superadmin/gérant multi-magasin voit tout) — pour le
-     * sélecteur "session de caisse" du remboursement d'avoir (requis
-     * seulement si une partie sort en espèces, voir
-     * RemboursementAvoirClientService). Même logique que
-     * FournisseurController::sessionsOuvertes().
-     */
-    private function sessionsOuvertes(): Collection
-    {
-        return SessionCaisse::whereNull('date_fermeture')
-            ->whereNull('date_cloture')
-            ->when(
-                request()->user()->magasin_id,
-                fn ($q, $magasinId) => $q->whereHas('caisse', fn ($qc) => $qc->where('magasin_id', $magasinId))
-            )
-            ->with('caisse.magasin', 'caissier')
-            ->get();
     }
 
     public function exporterVentes(Client $client): StreamedResponse

@@ -53,7 +53,21 @@ client, réglé plus tard.
 7. **Une caisse n'a qu'UNE session ouverte à la fois.** « Libre » = sans session ouverte.
 8. **Interdit de clôturer OU fermer une session tant qu'il reste des ventes en attente**
    sur la caisse. Chaque panier en attente doit être finalisé ou **annulé** d'abord.
-9. **La clôture se calcule par session**, pas par jour.
+9. **La clôture se calcule par session**, pas par jour — une session peut donc légitimement
+   s'étendre sur plusieurs jours calendaires, jamais bloquée pour cette seule raison. Des
+   rappels non bloquants existent néanmoins pour éviter qu'elle traîne par oubli, jamais un
+   blocage de la vente (`SessionCaisse::estOuverteDepuisJourPrecedent()`, mémorisé par jour
+   via `localStorage`) :
+   - Tableau de bord **caissier** (`x-alerte-session-ancienne`) : uniquement **sa propre**
+     session, si ouverte depuis un jour précédent.
+   - Tableau de bord **gérant/superadmin** (`x-alerte-sessions-anciennes`,
+     `DashboardController::donneesMagasin()`) : **toute** session du périmètre (magasin
+     pour un gérant, tous magasins pour le superadmin) encore ouverte depuis un jour
+     précédent, pas seulement celle de l'utilisateur connecté — un gérant/superadmin a
+     l'autorité (`caisse.gerer`) pour clôturer une session qu'il n'a pas ouverte lui-même.
+   - En complément, côté gérant/superadmin uniquement : une notification in-app après 12h
+     sans clôture (commande planifiée horaire `app:alerter-sessions-ouvertes-trop-longtemps`,
+     une seule fois par session, indépendante du jour calendaire).
 10. **Seules les espèces entrent dans le comptage du tiroir** — ventes, règlements clients
     ET mouvements de caisse manuels (entrée/sortie, voir règle 19) confondus. Autres
     moyens totalisés à part.
@@ -73,12 +87,11 @@ client, réglé plus tard.
 16. **Le solde d'un compte fournisseur est dérivé, jamais écrasé.** Même principe que le
     stock (règle 1) et le compte client (règle 12) : solde = somme des écritures
     (`EcritureCompteFournisseur`). Jamais d'`UPDATE fournisseurs SET solde = X`.
-17. **Un règlement fournisseur est indépendant de la caisse pour tout paiement
-    non-espèces.** Contrairement au règlement client (règle 14), il n'exige alors aucune
-    session de caisse ouverte et n'entre jamais dans le comptage du tiroir — c'est un
-    flux de trésorerie distinct de la caisse magasin. **Exception** : la part payée en
-    espèces exige une session de caisse ouverte et génère automatiquement une sortie de
-    caisse liée (règle 19) — cet argent-là sort bien du tiroir.
+17. **Un règlement fournisseur est indépendant de toute caisse de caissier, y compris
+    pour la part payée en espèces.** Contrairement au règlement client (règle 14), il
+    n'exige donc jamais de session de caisse ouverte et n'entre jamais dans le comptage
+    du tiroir d'un caissier. La part payée en espèces sort directement de la **Caisse
+    Générale** (règle 21, voir Trésorerie) — jamais du tiroir d'un vendeur.
 18. **Un retour (client ou fournisseur) crédite toujours un avoir sur le compte
     concerné, jamais un remboursement en espèces.** Il est obligatoirement rattaché à
     une vente/commande d'achat précise, ligne par ligne, dans la limite du reste
@@ -98,10 +111,16 @@ client, réglé plus tard.
     exception à la règle 18** : le retour lui-même ne mouvemente toujours jamais la
     caisse, seul ce remboursement, explicitement déclenché plus tard, le fait. Plafonné à
     l'avoir disponible (jamais plus que le solde négatif actuel du compte). Immuable,
-    comme un règlement. La part payée en espèces suit la règle 19 (session de caisse
-    ouverte requise pour cette part, mouvement de caisse lié) — en **sortie** pour un
-    client (on lui rend son argent) et en **entrée** pour un fournisseur (il nous
-    rembourse).
+    comme un règlement. La part payée en espèces suit la règle 21 (Caisse Générale,
+    aucune session de caisse de caissier requise) — en **sortie** pour un client (on lui
+    rend son argent) et en **entrée** pour un fournisseur (il nous rembourse).
+21. **La Caisse Générale est un compte de trésorerie permanent, indépendant des caisses
+    des caissiers** (règle 6-19) : pas de session, pas de caissier assigné, solde dérivé
+    d'écritures immuables comme un compte client/fournisseur (règle 12/16). Elle reçoit
+    **automatiquement** le montant compté de chaque session de caissier clôturée (règle
+    9), et alimente la part espèces d'un règlement fournisseur (règle 17) ou d'un
+    remboursement d'avoir (règle 20). Un **Compte** (banque/autre) suit le même principe
+    et se remplit par virement depuis la Caisse Générale.
 
 ---
 
@@ -198,11 +217,25 @@ client, réglé plus tard.
 - **Solde fournisseur dérivé** (règle 16) : somme des `EcritureCompteFournisseur`
   (+dette à chaque achat à crédit, −dette à chaque règlement) — même logique que le
   compte client.
-- **Règlement fournisseur** : encaissement ultérieur d'une dette (partiel ou total, un ou
-  plusieurs moyens de paiement), **indépendant de toute session de caisse pour la part
-  non-espèces** (règle 17, contrairement au règlement client) — la part payée en espèces
-  exige une session ouverte et génère une sortie de caisse liée (voir « Mouvements de
-  caisse »). Immuable, comme un règlement client.
+- **Règlement fournisseur** : encaissement ultérieur d'une dette, un ou plusieurs moyens de
+  paiement, **jamais rattaché à une session de caisse de caissier** (règle 17, contrairement
+  au règlement client) — la part payée en espèces sort directement de la Caisse Générale
+  (voir « Trésorerie »), sans aucune session requise. Immuable, comme un règlement client.
+  Deux modes, réservés chacun à un usage précis pour ne jamais laisser un règlement "en
+  l'air" :
+  - **Ciblé sur un bon d'achat précis** (bouton dédié depuis la fiche fournisseur ou le
+    détail du bon d'achat) : **partiel ou total autorisé**, plafonné au reste dû de CE bon
+    d'achat (`CommandeAchat::resteDu()`, indépendant de la dette totale du fournisseur qui
+    peut inclure d'autres bons d'achat).
+  - **Global** (bouton général de la fiche fournisseur, sans bon d'achat ciblé) :
+    **intégral uniquement** — doit couvrir exactement le solde actuel du compte, jamais un
+    montant partiel. `ReglementFournisseurService::reglerIntegralite()` répartit alors
+    automatiquement ce montant en une `ReglementFournisseur` **par bon d'achat encore dû**,
+    le plus ancien d'abord (répartition "en cascade", entière, sans arrondi) — jamais un
+    règlement non imputé à un bon d'achat précis. Sans cette répartition, le solde du
+    compte diminuait bien après un règlement global, mais le "reste dû" affiché sur chaque
+    bon d'achat ne bougeait jamais, ce qui semblait un bug alors que c'était juste une
+    dette non imputée.
 - Pas de limite de crédit fournisseur ni de blocage associé dans le MVP.
 - **Avoir fournisseur** : symétrique de l'avoir client (voir « Vente à crédit et comptes
   clients ») — un solde négatif se déduit automatiquement de la dette d'un prochain achat
@@ -273,22 +306,22 @@ client, réglé plus tard.
   clôture, son aperçu, et le solde théorique temps réel — jamais recalculée deux fois.
 - **Qui peut enregistrer un mouvement** : Caissier (sur sa propre session ouverte) et
   Gérant/Superadmin, via la permission `caisse.mouvement`.
-- **Onglet dédié « Caisse »**, séparé de « Vente » (menu horizontal) : volontairement
-  distinct de l'écran de vente pour ne pas mélanger les deux activités. Sa page d'accueil
-  liste les caisses **actuellement ouvertes** du périmètre de l'utilisateur (jamais un
-  formulaire d'ouverture — ouvrir une caisse reste un geste de vente, règle 6) ; cliquer
-  sur l'une d'elles ouvre son écran de gestion (solde théorique en temps réel, formulaire
-  entrée/sortie, historique de cette caisse). L'écran de vente (Facture) garde un simple
-  lien vers cet onglet, plus aucun formulaire de mouvement.
-- **KPI** : la page d'accueil de l'onglet Caisse affiche d'un coup d'œil, pour tout le
-  périmètre de l'utilisateur, le solde théorique cumulé des tiroirs ouverts et le total
-  des entrées/sorties du jour — plus, par caisse, son propre solde théorique et un accès
-  direct à son écran de gestion. Le tableau de bord du gérant reprend les entrées/sorties
-  du jour ventilées par motif.
+- **Saisie directement sur l'écran de session** (`/sessions/{session}`, pas d'onglet
+  séparé) : `sessions.index`/`sessions.show` couvraient déjà la liste des caisses et le
+  détail d'une session (CA, décomposition, répartition, clôture) — un onglet « Mes
+  caisses » distinct ne faisait plus que dupliquer cet écran pour n'y ajouter que le
+  formulaire entrée/sortie et le solde théorique temps réel ; les deux ont été fusionnés
+  dans `sessions/show.blade.php` pour ne pas faire cohabiter deux écrans qui montrent
+  presque la même chose. Pour une session **ouverte** : KPI « Solde théorique du
+  tiroir » (calculé en direct via `CaisseSessionService::calculerTheorique()`),
+  formulaire entrée/sortie (visible si `caisse.mouvement`, réservé au propriétaire de la
+  session ou à un titulaire de `caisse.gerer` — `SessionCaisseController::storeMouvement()`/
+  `assurerProprietaireOuGerant()`), et l'historique des mouvements manuels de cette
+  session. Une session **clôturée** garde son bloc « Clôture » existant (entrées/sorties
+  y figurent déjà) ; le formulaire disparaît puisqu'aucun mouvement n'est plus possible.
 - **Historique complet** : rapport dédié (`rapports.mouvements-caisse`, sous `rapport.voir`,
-  comme les autres rapports, également accessible depuis l'onglet Caisse) — tous les
-  mouvements toutes sessions/périodes confondues, filtrable par date et magasin,
-  exportable PDF/Excel.
+  comme les autres rapports) — tous les mouvements toutes sessions/périodes confondues,
+  filtrable par date et magasin, exportable PDF/Excel.
 - **Une vente encaissée en espèces apparaît dans ce même historique**, avec le libellé
   « Vente / Facture » — mais **une vente n'est jamais un `MouvementCaisse`** : elle est
   déjà comptabilisée via ses propres `Paiement` (voir « Clôture de session étendue »
@@ -296,6 +329,62 @@ client, réglé plus tard.
   mêmes exports), qui ne duplique jamais le calcul du solde théorique. Seule la part
   encaissée en espèces d'une vente y apparaît (règle 10) ; une vente annulée n'y apparaît
   pas.
+
+---
+
+## Trésorerie (Caisse Générale et Comptes)
+
+- **`CompteTresorerie`** : compte de trésorerie de l'entreprise, `type` = `caisse_generale`
+  | `banque` | `autre`. Un seul enregistrement `caisse_generale` existe (singleton créé
+  par un seeder au déploiement, jamais créable/supprimable/renommable depuis l'UI) ;
+  les comptes `banque`/`autre` se créent librement (nom + type). Solde **dérivé**, jamais
+  écrasé : somme des `EcritureCompteTresorerie` (règle 21), exactement comme un compte
+  client/fournisseur — aucune notion de session, de caissier assigné, ni d'ouverture/
+  fermeture.
+- **Volontairement indépendant des caisses de vente des caissiers** (`Caisse`/
+  `SessionCaisse`/`MouvementCaisse`, voir « Mouvements de caisse » ci-dessus) : les deux
+  univers ne se mélangent jamais comptablement, même s'ils apparaissent côte à côte dans
+  l'écran « Trésorerie » (menu horizontal, entrée dédiée — voir « Interface »).
+- **Dépôt automatique à la clôture d'une session** : dès qu'une session de caissier est
+  clôturée (règle 9), le montant **compté** (pas le théorique) génère une écriture
+  `depot_session_cloturee` sur la Caisse Générale — modélise le geste physique de vider
+  le tiroir dans le coffre. Aucune étape manuelle à faire, aucun oubli possible.
+  `CaisseSessionService::cloturer()` reste la seule méthode qui déclenche ce dépôt, dans
+  la même transaction que la clôture.
+- **Sorties/entrées manuelles** : motif (obligatoire) + montant, comme un mouvement de
+  caisse manuel (règle 19) mais sur un `CompteTresorerie` au lieu d'une session — une
+  sortie ne peut jamais dépasser le solde actuel du compte
+  (`SoldeTresorerieInsuffisantException` sinon).
+- **Virement interne** entre deux comptes de trésorerie (ex. Caisse Générale → compte
+  bancaire) : une sortie sur la source et une entrée sur la destination dans la même
+  transaction, sans valorisation supplémentaire — même principe qu'un transfert de stock
+  inter-magasin.
+- **Alimente automatiquement la part espèces d'un règlement fournisseur** (règle 17) et
+  **d'un remboursement d'avoir client/fournisseur** (règle 20) : sortie pour un
+  règlement fournisseur ou un remboursement d'avoir client (l'argent sort), entrée pour
+  un remboursement d'avoir fournisseur (il nous rembourse) — aucune session de caisse de
+  caissier requise pour ces trois flux, contrairement à un règlement **client** (règle 14)
+  qui reste, lui, toujours rattaché à la session du caissier qui l'encaisse.
+- **Un `Compte` n'a aucun lien avec les `MoyenPaiement`** de la vente (Espèces, Mobile
+  Money, Carte…) : c'est une poche de trésorerie interne, jamais une destination
+  automatique d'un encaissement à la vente.
+- **Permissions dédiées** `tresorerie.voir`/`tresorerie.gerer`, distinctes de
+  `caisse.mouvement`/`caisse.gerer` — accordées au Gérant et au Superadmin, jamais au
+  Caissier (« la Caisse Générale n'a rien à voir avec les caisses des caissiers »).
+- **Rapport dédié** (`rapports.tresorerie`) : tous les mouvements de trésorerie, filtrable
+  par compte/type/période, exportable PDF/Excel — **séparé** de
+  `rapports.mouvements-caisse` qui reste scopé aux tiroirs des caissiers.
+- **Écran « Trésorerie » (`comptabilite.caisses.index`, menu horizontal, entrée dédiée)** :
+  répertoire listant la Caisse Générale, les Comptes, et **toutes** les caisses de vente
+  (pas seulement celles actuellement ouvertes — un répertoire de trésorerie, pas l'écran
+  opérationnel du jour, voir `/sessions`). Cliquer sur une caisse de vente ouvre un
+  **rapport dédié à cette caisse** (`comptabilite.caisses-vente.show`), toutes sessions
+  confondues (contrairement à `/sessions/{session}`, scopé à une session précise) : mêmes
+  KPI et même journal (ventes + mouvements manuels) que `rapports.mouvements-caisse`,
+  juste pré-filtré sur cette caisse, avec export PDF/Excel qui réutilise ces mêmes routes
+  (`caisse_id` forcé). Nommé "Comptabilité" en interne (routes, contrôleur) mais jamais
+  affiché ainsi à l'écran, pour ne pas laisser croire à une comptabilité générale (hors
+  périmètre, voir « Hors périmètre »).
 
 ---
 
@@ -342,10 +431,10 @@ client, réglé plus tard.
   `vente.retour`, `devis.creer`, `devis.transformer`, `achat.creer`,
   `achat.receptionner`, `achat.retour`, `produit.voir`, `produit.modifier`,
   `stock.ajuster`, `stock.transferer`, `inventaire.realiser`, `caisse.ouvrir`,
-  `caisse.cloturer`, `caisse.mouvement`, `client.gerer`, `client.reglement`,
-  `client.depasser_limite`, `fournisseur.voir`, `fournisseur.gerer`,
-  `fournisseur.reglement`, `taxe.gerer`, `typeclient.gerer`, `rapport.voir`,
-  `utilisateur.gerer`, `role.gerer`, `parametre.gerer`.
+  `caisse.cloturer`, `caisse.mouvement`, `tresorerie.voir`, `tresorerie.gerer`,
+  `client.gerer`, `client.reglement`, `client.depasser_limite`, `fournisseur.voir`,
+  `fournisseur.gerer`, `fournisseur.reglement`, `taxe.gerer`, `typeclient.gerer`,
+  `rapport.voir`, `utilisateur.gerer`, `role.gerer`, `parametre.gerer`.
 - **Superadmin** : bypass total via `Gate::before` (ne reçoit pas de permissions).
 - **Noyau de permissions système protégé** : non attribuable aux rôles créés à la volée.
 - Rôles par défaut seedés : Superadmin, Gérant, Caissier — **modifiables**.
@@ -394,8 +483,20 @@ client, réglé plus tard.
   — voir « Mouvements de caisse »).
 - **MouvementCaisse** : immuable (règle 19) ; type = entree | sortie ; montant (toujours
   positif, direction portée par `type`) ; motif (obligatoire) ; session de caisse ;
-  référence optionnelle (`ReglementFournisseur`, `RemboursementAvoirClient` ou
-  `RemboursementAvoirFournisseur` quand auto-générée par une part en espèces) ; auteur.
+  auteur. Réservé aux mouvements manuels d'un caissier sur sa propre session — la part
+  espèces d'un règlement fournisseur ou d'un remboursement d'avoir passe désormais par
+  `EcritureCompteTresorerie` (Caisse Générale, règle 21), jamais par ici.
+- **CompteTresorerie** : compte de trésorerie de l'entreprise (voir « Trésorerie ») ;
+  nom, type (`caisse_generale` | `banque` | `autre`), actif. Un seul enregistrement
+  `caisse_generale` (singleton), indépendant des `Caisse`/`SessionCaisse` des caissiers.
+- **EcritureCompteTresorerie** : immuable ; compte de trésorerie, type
+  (`depot_session_cloturee` | `sortie_manuelle` | `entree_manuelle` |
+  `reglement_fournisseur` | `remboursement_avoir_client` | `remboursement_avoir_fournisseur`
+  | `virement_sortant` | `virement_entrant`), montant **signé** (+ entrée / − sortie,
+  contrairement à `MouvementCaisse`), motif (nullable), référence optionnelle
+  (`SessionCaisse`, `ReglementFournisseur`, `RemboursementAvoirClient`,
+  `RemboursementAvoirFournisseur` ou un autre `CompteTresorerie` pour un virement),
+  auteur. Le solde d'un compte est la somme de ses écritures (règle 21).
 - **Vente** : numéro (`M{magasin}-C{caisse}-{séquence}`), lignes, remise total, session,
   magasin, **client** (nullable — obligatoire si la vente est à crédit), **avoir_applique**
   (part de l'avoir client déjà déduite du solde à crédit posé, figée à la création — voir
@@ -422,8 +523,8 @@ client, réglé plus tard.
 - **ReglementClient** : encaissement d'une dette client ; client + montant + moyen de
   paiement + session de caisse + caissier ; immuable, comme une vente (règle 14).
 - **RemboursementAvoirClient** : remboursement d'un avoir client (règle 20) ; client +
-  montant + session de caisse **nullable** (même logique que `ReglementFournisseur` —
-  renseignée uniquement si une part est en espèces) + auteur ; immuable.
+  montant + auteur ; immuable. La part espèces alimente la Caisse Générale (règle 21),
+  jamais une session de caisse de caissier.
 - **RemboursementAvoirClientPaiement** : rattaché à un remboursement d'avoir client ;
   moyen + montant (paiement mixte possible).
 - **EcritureCompteFournisseur** : immuable ; type = achat_credit | reglement |
@@ -432,14 +533,14 @@ client, réglé plus tard.
   `RemboursementAvoirFournisseur`) ; auteur. Le solde du fournisseur est la somme de ses
   écritures (règle 16).
 - **ReglementFournisseur** : encaissement d'une dette fournisseur ; fournisseur + montant
-  + auteur ; session de caisse **nullable** — renseignée uniquement si une part du
-  règlement est en espèces (règle 17, contrairement à `ReglementClient` où la session est
-  toujours obligatoire). Immuable.
+  + auteur ; jamais de session de caisse de caissier (règle 17, contrairement à
+  `ReglementClient` où la session est toujours obligatoire) — la part espèces alimente
+  la Caisse Générale (règle 21). Immuable.
 - **ReglementFournisseurPaiement** : rattaché à un règlement fournisseur ; moyen + montant
   (paiement mixte possible).
 - **RemboursementAvoirFournisseur** : remboursement d'un avoir fournisseur, symétrique de
-  `RemboursementAvoirClient` (règle 20) ; fournisseur + montant + session de caisse
-  nullable + auteur ; immuable.
+  `RemboursementAvoirClient` (règle 20) ; fournisseur + montant + auteur ; immuable. La
+  part espèces entre dans la Caisse Générale (règle 21).
 - **RemboursementAvoirFournisseurPaiement** : rattaché à un remboursement d'avoir
   fournisseur ; moyen + montant (paiement mixte possible).
 - **RetourVente** : retour client, immuable (règle 18) ; numéro, `Vente` + `Client`
@@ -463,9 +564,13 @@ client, réglé plus tard.
 ## Interface (ERP type Odoo)
 
 - **Layout à menu horizontal sur desktop** : une seule barre en haut de page ; sections
-  regroupées en menus déroulants (Vente, Caisse, Stock, Catalogue, Rapports,
-  Administration) — « Caisse » (entrées/sorties de tiroir) volontairement distinct de
-  « Vente » pour ne pas mélanger les deux activités (voir « Mouvements de caisse »).
+  regroupées en menus déroulants (Vente, Stock, Catalogue, Rapports, Administration) plus
+  une entrée simple « Trésorerie » (Caisse Générale/Comptes, Gérant/Superadmin uniquement,
+  voir « Trésorerie »). Les entrées/sorties de tiroir des caissiers ne sont **pas** un
+  menu séparé : elles se saisissent directement sur l'écran de session de vente
+  (`/sessions/{session}`, voir « Mouvements de caisse ») — `sessions.index`/
+  `sessions.show` couvraient déjà l'essentiel de ce qu'un onglet « Mes caisses » dédié
+  aurait montré, donc pas de duplication.
   Sur mobile/tablette (< lg), le même menu s'ouvre en **sidebar coulissante** (offcanvas)
   plutôt que replié en ligne sous la barre — plus confortable à parcourir sur petit
   écran ; mêmes regroupements/permissions, seule la présentation change selon la taille
@@ -513,7 +618,7 @@ client, réglé plus tard.
 
 - **activitylog** sur entités sensibles (produits, prix, mouvements, ventes, sessions,
   utilisateurs, rôles, **clients, limites de crédit, règlements, devis, fournisseurs,
-  règlements fournisseurs, taxes**) : auteur, date, avant/après.
+  règlements fournisseurs, taxes, comptes de trésorerie**) : auteur, date, avant/après.
 - **Historique connexions** : login/logout, date, utilisateur, IP (écouter les événements d'auth).
 
 ---
@@ -522,9 +627,9 @@ client, réglé plus tard.
 
 - Terminologie métier en **français** (magasin, caisse, mouvement, unité de vente,
   client, règlement…).
-- Écritures stock/vente/**compte client**/**compte fournisseur** **uniquement via une
-  couche service** encapsulant la transaction ; pas d'écriture directe depuis les
-  contrôleurs.
+- Écritures stock/vente/**compte client**/**compte fournisseur**/**compte de trésorerie**
+  **uniquement via une couche service** encapsulant la transaction ; pas d'écriture
+  directe depuis les contrôleurs.
 - Rapports = agrégats/vues, sans dupliquer la logique métier.
 
 ---
@@ -533,7 +638,10 @@ client, réglé plus tard.
 
 - Hors-ligne, base locale, synchronisation.
 - Facture normalisée FNE — mais **structurer la vente** pour la brancher plus tard.
-- Fidélité, promotions avancées, comptabilité, paie.
+- Fidélité, promotions avancées, paie.
+- **Comptabilité générale** (plan comptable, journal général, bilan, liasse fiscale) —
+  seul un périmètre de **trésorerie** est couvert (Caisse Générale, comptes bancaires/
+  autres, virements internes, voir « Trésorerie »), pas une comptabilité complète.
 - **Taxes côté vente** — aucun taux, aucune ligne taxe sur le ticket (les taxes existent
   côté achat, voir « Achat à crédit et comptes fournisseurs »).
 - **Annulation ou modification d'un retour** — un retour, une fois enregistré, est
@@ -578,6 +686,23 @@ principe avoir crédité/ligne par ligne/immuable que le reste des écritures de
 ajoutés (identifiant type SKU, saisi ou généré) ; **bug corrigé** : l'annulation d'une
 vente/d'un achat à crédit reverse désormais la dette posée à la validation (nouveaux
 types d'écriture `annulation_vente`/`annulation_achat`), qui restait auparavant gonflée
-indéfiniment ; **mouvements de caisse manuels** (entrée/sortie) ajoutés, avec sortie de
-caisse automatique liée à un règlement fournisseur payé en espèces — seule exception
-ciblée à la règle 17, qui reste vraie pour tout paiement non-espèces.
+indéfiniment ; **mouvements de caisse manuels** (entrée/sortie) ajoutés pour les
+caissiers.
+
+Nouvelle extension (trésorerie) : une **Caisse Générale** (compte de trésorerie
+permanent, solde dérivé d'écritures immuables, sans session ni caissier assigné — voir
+« Trésorerie ») remplace désormais les caisses de caissier comme source/destination de
+la part espèces d'un règlement fournisseur et d'un remboursement d'avoir (règle 17/20
+amendées en conséquence : ces trois flux n'exigent plus aucune session de caisse
+ouverte, contrairement à avant) ; elle reçoit aussi automatiquement le montant compté de
+chaque session de caissier clôturée (règle 21). Des **Comptes** (banque/autre)
+s'alimentent par virement depuis la Caisse Générale, sans aucun lien avec les moyens de
+paiement de la vente. Nouvel écran **Trésorerie** (`tresorerie.voir`/`tresorerie.gerer`,
+Gérant/Superadmin uniquement, entrée dédiée du menu horizontal) : répertoire listant
+Caisse Générale + Comptes + **toutes** les caisses de vente (pas seulement celles
+ouvertes), chacune menant à son propre rapport historique ; et un rapport dédié
+(`rapports.tresorerie`) séparé de `rapports.mouvements-caisse`. L'ancien onglet « Mes
+caisses » (écran séparé pour saisir un mouvement de tiroir) a été retiré : redondant
+avec `sessions.show` qui affichait déjà l'essentiel des mêmes informations pour une
+session de caissier, le formulaire entrée/sortie et le solde théorique temps réel ont
+été fusionnés directement dans `/sessions/{session}` (voir « Mouvements de caisse »).

@@ -144,7 +144,16 @@ class DashboardController extends Controller
             'avoirAppliqueMois' => (int) (clone $ventesMois)->sum('avoir_applique'),
             'totalEspecesMois' => $this->totalEspecesMois($magasinId, $debutMois),
             'ecartsCaisse' => $this->ecartsCaisseRecents($magasinId),
-            'caissesOuvertes' => $this->caissesOuvertes($magasinId),
+            'caissesOuvertes' => $caissesOuvertes = $this->caissesOuvertes($magasinId),
+            // Rappel non bloquant (voir x-alerte-sessions-anciennes) : contrairement
+            // au dashboard caissier (qui ne montre QUE sa propre session), le
+            // gérant/superadmin doit voir TOUTE session encore ouverte depuis un
+            // jour précédent dans son périmètre — il a l'autorité pour la
+            // clôturer même s'il ne l'a pas ouverte lui-même (règle caisse.gerer).
+            'sessionsAnciennes' => $caissesOuvertes
+                ->map(fn (Caisse $c) => $c->sessionCaisses->first())
+                ->filter(fn (?SessionCaisse $s) => $s?->estOuverteDepuisJourPrecedent())
+                ->values(),
             'evolutionVentes' => $this->evolutionVentes($magasinId),
             'repartitionMoyens' => $this->repartitionMoyensPaiement($magasinId, $debutMois),
             'mouvementsCaisseJour' => $this->mouvementsCaisseParMotif($magasinId, $debutJour),

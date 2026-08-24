@@ -9,9 +9,13 @@
             <a href="{{ route('sessions.show', $session) }}" class="btn btn-link">
                 <i class="bi bi-arrow-left me-1"></i>Retour à la session
             </a>
-            <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
-                <i class="bi bi-printer me-1"></i>Imprimer
-            </button>
+            <x-bouton-imprimer :pdf-route="route('sessions.rapport.pdf', $session)" />
+            <a href="{{ route('sessions.rapport.pdf', $session) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+            </a>
+            <a href="{{ route('sessions.rapport.excel', $session) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+            </a>
         </div>
     </div>
 

@@ -40,11 +40,6 @@
                         @endif
                     </a>
                 @endcan
-                @if ($peutMouvementer)
-                    <a href="{{ route('caisse.show', $session) }}" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left-right me-1"></i>Mouvements de caisse
-                    </a>
-                @endif
                 @can('vente.creer')
                     <a href="{{ route('ventes.create', $session) }}" class="btn btn-primary">
                         <i class="bi bi-cart-plus me-1"></i>Vendre
@@ -94,6 +89,12 @@
             <x-kpi-card compact label="Chiffre d'affaires" icon="bi-graph-up-arrow" color="success"
                 :value="number_format($totalVentes, 0, ',', ' ') . ' F'" />
         </div>
+        @if ($soldeTheorique !== null)
+            <div class="col-6 col-md-3">
+                <x-kpi-card compact label="Solde théorique du tiroir" icon="bi-wallet2" color="secondary"
+                    :value="number_format($soldeTheorique, 0, ',', ' ') . ' F'" />
+            </div>
+        @endif
     </div>
 
     {{-- Décompose le chiffre d'affaires ci-dessus : dû (crédit encore
@@ -170,6 +171,70 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($peutMouvementer && ! $session->date_cloture)
+        <div class="card mb-2 shadow-sm" x-data="{ ouvert: false }">
+            <div class="card-body p-2 px-3">
+                <div class="d-flex align-items-start justify-content-between gap-2">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 fw-semibold">
+                            <i class="bi bi-arrow-left-right me-1"></i>Mouvement de caisse
+                        </div>
+                        <div class="small text-secondary">
+                            Entrée (appoint…) ou sortie (paiement fournisseur en espèces, dépense diverse…) du tiroir.
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" @click="ouvert = !ouvert" x-show="!ouvert">
+                        <i class="bi bi-plus-lg me-1"></i>Enregistrer
+                    </button>
+                </div>
+
+                <form method="POST" action="{{ route('sessions.mouvements.store', $session) }}" x-show="ouvert" x-cloak class="mt-2">
+                    @csrf
+                    <div class="row g-2 align-items-end">
+                        <div class="col-6 col-md-3">
+                            <label for="type" class="form-label small mb-1">Type</label>
+                            <select name="type" id="type" class="form-select form-select-sm" required>
+                                <option value="sortie">Sortie</option>
+                                <option value="entree">Entrée</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="montant" class="form-label small mb-1">Montant (F)</label>
+                            <input type="number" name="montant" id="montant" min="1" class="form-control form-control-sm" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label for="motif" class="form-label small mb-1">Motif</label>
+                            <input type="text" name="motif" id="motif" maxlength="255" class="form-control form-control-sm"
+                                   placeholder="Ex. paiement fournisseur en espèces, achat de fournitures…" required>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-2">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">Enregistrer le mouvement</button>
+                        <button type="button" class="btn btn-link btn-sm" @click="ouvert = false">Fermer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    @if ($session->mouvementCaisses->isNotEmpty())
+        <div class="card mb-2">
+            <div class="card-body p-2 px-3">
+                <div class="text-secondary small mb-1">Historique des mouvements de caisse</div>
+                @foreach ($session->mouvementCaisses as $mouvement)
+                    <div class="d-flex justify-content-between small border-bottom py-1">
+                        <span>
+                            <span class="badge {{ $mouvement->type->classeBadge() }} me-1">{{ $mouvement->type->libelle() }}</span>
+                            {{ $mouvement->motif }}
+                            <span class="text-secondary">— {{ $mouvement->auteur->name ?? 'utilisateur supprimé' }}, {{ $mouvement->created_at->format('d/m/Y H:i') }}</span>
+                        </span>
+                        <span class="fw-medium">{{ $mouvement->type->value === 'entree' ? '+ ' : '− ' }}{{ number_format($mouvement->montant, 0, ',', ' ') }} F</span>
+                    </div>
+                @endforeach
             </div>
         </div>
     @endif

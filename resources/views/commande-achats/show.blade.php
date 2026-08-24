@@ -187,23 +187,8 @@
                                     <i class="bi bi-plus-lg"></i> Ajouter un paiement
                                 </button>
 
-                                <div class="mb-2" x-show="contientEspeces" x-cloak>
-                                    @if ($sessionsOuvertes->isEmpty())
-                                        <div class="alert alert-warning small mb-0">
-                                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                                            Paiement en espèces : aucune session de caisse ouverte pour y enregistrer la sortie.
-                                        </div>
-                                    @else
-                                        <label for="session_caisse_id_achat" class="form-label small mb-1">
-                                            Session de caisse (le tiroir d'où sort l'argent)<span class="required-marker">*</span>
-                                        </label>
-                                        <select name="session_caisse_id" id="session_caisse_id_achat" class="form-select form-select-sm" :required="contientEspeces">
-                                            <option value="">Choisir une session ouverte…</option>
-                                            @foreach ($sessionsOuvertes as $s)
-                                                <option value="{{ $s->id }}">{{ $s->caisse->nom }} — {{ $s->caisse->magasin->nom }} ({{ $s->caissier->name ?? '' }})</option>
-                                            @endforeach
-                                        </select>
-                                    @endif
+                                <div class="mb-2 small text-secondary" x-show="contientEspeces" x-cloak>
+                                    <i class="bi bi-safe me-1"></i>Paiement en espèces : sort de la Caisse Générale.
                                 </div>
 
                                 <div class="d-flex gap-2">

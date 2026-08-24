@@ -18,6 +18,8 @@
             </div>
         </div>
     @else
+        <x-alerte-session-ancienne :session="$session" />
+
         <div class="d-flex justify-content-between align-items-center mb-3">
             <p class="text-secondary mb-0">Session ouverte sur {{ $session->caisse->nom }} — {{ $session->caisse->magasin->nom }}</p>
             <div class="d-flex gap-2">

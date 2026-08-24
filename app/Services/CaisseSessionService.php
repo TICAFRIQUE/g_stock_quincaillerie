@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\EcritureCompteTresorerieType;
 use App\Enums\MouvementCaisseType;
 use App\Exceptions\CaisseNonLibreException;
 use App\Exceptions\CaissierDejaEnSessionException;
@@ -26,6 +27,8 @@ use RuntimeException;
  */
 class CaisseSessionService
 {
+    public function __construct(private readonly CompteTresorerieService $compteTresorerieService) {}
+
     public function ouvrir(Caisse $caisse, User $caissier, int $fondDeCaisse): SessionCaisse
     {
         return DB::transaction(function () use ($caisse, $caissier, $fondDeCaisse) {
@@ -86,6 +89,23 @@ class CaisseSessionService
                 'date_cloture' => now(),
                 'cloture_by' => $auteur->id,
             ]);
+
+            // Dépôt automatique dans la Caisse Générale : modélise le geste
+            // physique de vider le tiroir dans le coffre à la clôture — la
+            // Caisse Générale n'a rien à voir avec les caisses des caissiers
+            // (voir CLAUDE.md, Trésorerie), c'est le montant réellement
+            // compté (pas le théorique) qui y entre.
+            if ($montantCompte > 0) {
+                $session->loadMissing('caisse');
+                $this->compteTresorerieService->crediter(
+                    $this->compteTresorerieService->caisseGenerale(),
+                    $montantCompte,
+                    EcritureCompteTresorerieType::DepotSessionCloturee,
+                    $auteur,
+                    reference: $session,
+                    motif: "Recette {$session->caisse->nom} — session #{$session->id}",
+                );
+            }
 
             return $session->refresh();
         });

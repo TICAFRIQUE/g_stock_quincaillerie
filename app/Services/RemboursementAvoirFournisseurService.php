@@ -2,11 +2,10 @@
 
 namespace App\Services;
 
-use App\Enums\MouvementCaisseType;
+use App\Enums\EcritureCompteTresorerieType;
 use App\Models\Fournisseur;
 use App\Models\MoyenPaiement;
 use App\Models\RemboursementAvoirFournisseur;
-use App\Models\SessionCaisse;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -14,15 +13,16 @@ use InvalidArgumentException;
 /**
  * Rembourse (tout ou partie) l'avoir qu'un fournisseur nous doit — le
  * fournisseur nous reverse cet argent. Symétrique de
- * RemboursementAvoirClientService : la part reçue en espèces exige une
- * session ouverte et génère une ENTRÉE de caisse liée (l'argent rentre dans
- * le tiroir, contrairement au remboursement client qui en sort).
+ * RemboursementAvoirClientService : la part reçue en espèces entre
+ * directement dans la Caisse Générale (voir CLAUDE.md, Trésorerie), jamais
+ * dans le tiroir d'un caissier — une ENTRÉE (l'argent rentre, contrairement
+ * au remboursement client qui en sort).
  */
 class RemboursementAvoirFournisseurService
 {
     public function __construct(
         private readonly CompteFournisseurService $compteFournisseurService,
-        private readonly CaisseMouvementService $caisseMouvementService,
+        private readonly CompteTresorerieService $compteTresorerieService,
     ) {}
 
     /**
@@ -32,7 +32,6 @@ class RemboursementAvoirFournisseurService
         Fournisseur $fournisseur,
         User $auteur,
         array $paiements,
-        ?SessionCaisse $session = null,
     ): RemboursementAvoirFournisseur {
         if (empty($paiements)) {
             throw new InvalidArgumentException('Un remboursement doit comporter au moins un paiement.');
@@ -49,16 +48,9 @@ class RemboursementAvoirFournisseurService
             $paiements
         ));
 
-        if ($montantEspeces > 0 && $session === null) {
-            throw new InvalidArgumentException(
-                'Une session de caisse est requise : une partie du remboursement entre en espèces dans le tiroir.'
-            );
-        }
-
-        return DB::transaction(function () use ($fournisseur, $auteur, $paiements, $montant, $session, $montantEspeces) {
+        return DB::transaction(function () use ($fournisseur, $auteur, $paiements, $montant, $montantEspeces) {
             $remboursement = RemboursementAvoirFournisseur::create([
                 'fournisseur_id' => $fournisseur->id,
-                'session_caisse_id' => $session?->id,
                 'created_by' => $auteur->id,
                 'montant' => $montant,
             ]);
@@ -75,14 +67,13 @@ class RemboursementAvoirFournisseurService
             $this->compteFournisseurService->rembourserAvoir($fournisseur, $montant, $remboursement, $auteur);
 
             if ($montantEspeces > 0) {
-                // Peut lever SoldeCaisseInsuffisantException — annule tout.
-                $this->caisseMouvementService->enregistrer(
-                    session: $session,
-                    type: MouvementCaisseType::Entree,
-                    montant: $montantEspeces,
-                    motif: "Remboursement avoir fournisseur {$fournisseur->nom}",
-                    auteur: $auteur,
+                $this->compteTresorerieService->crediter(
+                    $this->compteTresorerieService->caisseGenerale(),
+                    $montantEspeces,
+                    EcritureCompteTresorerieType::RemboursementAvoirFournisseur,
+                    $auteur,
                     reference: $remboursement,
+                    motif: "Remboursement avoir fournisseur {$fournisseur->nom}",
                 );
             }
 

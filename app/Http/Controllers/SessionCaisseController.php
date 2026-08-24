@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\MouvementCaisseType;
 use App\Exceptions\CaisseNonLibreException;
 use App\Exceptions\CaissierDejaEnSessionException;
+use App\Exceptions\SoldeCaisseInsuffisantException;
 use App\Exceptions\VentesEnAttentePresentesException;
 use App\Http\Controllers\Concerns\AutoriseMagasin;
+use App\Http\Controllers\Concerns\ExporteListe;
 use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\Caisse;
 use App\Models\MoyenPaiement;
@@ -13,15 +16,20 @@ use App\Models\Paiement;
 use App\Models\ReglementPaiement;
 use App\Models\SessionCaisse;
 use App\Models\Vente;
+use App\Services\CaisseMouvementService;
 use App\Services\CaisseSessionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use InvalidArgumentException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use RuntimeException;
 
 class SessionCaisseController extends Controller
 {
-    use TrieListe, AutoriseMagasin;
+    use TrieListe, AutoriseMagasin, ExporteListe;
 
     public function index(Request $request): View
     {
@@ -44,6 +52,16 @@ class SessionCaisseController extends Controller
             'caissesOccupees' => $caissesOccupees,
             'caissesLibres' => $caissesLibres,
             'sessionCaissierOuverte' => $sessionCaissierOuverte,
+            // Rappel non bloquant (voir x-alerte-sessions-anciennes, même
+            // logique que DashboardController::donneesMagasin()) : cette page
+            // liste déjà l'occupation de toutes les caisses du périmètre
+            // (magasin, ou tous magasins pour le superadmin), donc pas besoin
+            // du pendant singulier ici — la session du caissier connecté, si
+            // ancienne, apparaît simplement dans cette même liste.
+            'sessionsAnciennes' => $caissesOccupees
+                ->map(fn (Caisse $c) => $c->sessionCaisses->first())
+                ->filter(fn (?SessionCaisse $s) => $s?->estOuverteDepuisJourPrecedent())
+                ->values(),
         ]);
     }
 
@@ -71,11 +89,17 @@ class SessionCaisseController extends Controller
         return redirect()->route('sessions.show', $session)->with('succes', 'Session ouverte.');
     }
 
-    public function show(Request $request, SessionCaisse $session): View
+    public function show(Request $request, SessionCaisse $session, CaisseSessionService $caisseSessionService): View
     {
         $this->assurerMagasin($session->caisse->magasin_id);
 
-        $session->load(['caisse.magasin', 'caissier']);
+        $session->load(['caisse.magasin', 'caissier', 'mouvementCaisses.auteur']);
+
+        // Solde théorique du tiroir en temps réel : uniquement pour une
+        // session encore ouverte (une fois clôturée, les totaux figés
+        // sont ceux du bloc "Clôture" plus bas, calculés une fois pour
+        // toutes à la clôture — voir CaisseSessionService::cloturer()).
+        $detailTheorique = $session->date_cloture === null ? $caisseSessionService->calculerTheorique($session) : null;
         // vente_en_attentes_count : total de la caisse, sert au blocage de
         // clôture (règle 8 — bloque tant qu'il en reste, peu importe qui les
         // a créées). venteEnAttentesVisibles : ce que CE caissier peut
@@ -132,7 +156,59 @@ class SessionCaisseController extends Controller
             'ventes' => $ventes,
             'sessionsAujourdhui' => $sessionsAujourdhui,
             'peutMouvementer' => $request->user()->can('caisse.mouvement'),
+            'soldeTheorique' => $detailTheorique['theorique'] ?? null,
+            'totalEntreesCaisse' => $detailTheorique['entrees'] ?? $session->total_entrees_especes,
+            'totalSortiesCaisse' => $detailTheorique['sorties'] ?? $session->total_sorties_especes,
         ]);
+    }
+
+    /**
+     * Mouvement de caisse manuel (entrée/sortie) — désormais enregistré
+     * directement depuis l'écran de session (voir CLAUDE.md, Mouvements de
+     * caisse) : plus d'onglet séparé, une session de caisse ouverte reste
+     * l'unique pré-requis (règle 19).
+     */
+    public function storeMouvement(Request $request, SessionCaisse $session, CaisseMouvementService $mouvementService): RedirectResponse
+    {
+        $this->assurerMagasin($session->caisse->magasin_id);
+        $this->assurerProprietaireOuGerant($session);
+
+        $donnees = $request->validate([
+            'type' => ['required', Rule::in(['entree', 'sortie'])],
+            'montant' => ['required', 'integer', 'min:1'],
+            'motif' => ['required', 'string', 'max:255'],
+        ]);
+
+        try {
+            $mouvementService->enregistrer(
+                session: $session,
+                type: MouvementCaisseType::from($donnees['type']),
+                montant: $donnees['montant'],
+                motif: $donnees['motif'],
+                auteur: $request->user(),
+            );
+        } catch (SoldeCaisseInsuffisantException|InvalidArgumentException|RuntimeException $e) {
+            return redirect()->route('sessions.show', $session)->with('erreur', $e->getMessage());
+        }
+
+        return redirect()->route('sessions.show', $session)->with('succes', 'Mouvement de caisse enregistré.');
+    }
+
+    /**
+     * Bloque l'accès direct par URL à la session d'un autre caissier pour
+     * l'action d'enregistrer un mouvement — même principe que
+     * AutoriseVenteEnAttente::assurerProprietaireOuGerant() (voir CLAUDE.md).
+     * show()/index() restent ouverts à tout le magasin (assurerMagasin
+     * suffit), seule l'écriture d'un mouvement est réservée au propriétaire
+     * de la session ou à un gérant.
+     */
+    private function assurerProprietaireOuGerant(SessionCaisse $session): void
+    {
+        abort_if(
+            $session->caissier_id !== request()->user()->id && ! request()->user()->can('caisse.gerer'),
+            403,
+            'Cette caisse est tenue par un autre caissier.'
+        );
     }
 
     public function cloturerForm(SessionCaisse $session, CaisseSessionService $caisseSessionService): View|RedirectResponse
@@ -206,6 +282,84 @@ class SessionCaisseController extends Controller
             'paiementsParMoyen' => $this->paiementsParMoyen($session),
             'ventes' => $session->ventes()->orderBy('created_at')->get(),
         ]);
+    }
+
+    public function rapportPdf(SessionCaisse $session): Response
+    {
+        $this->assurerMagasin($session->caisse->magasin_id);
+        $session->load(['caisse.magasin', 'caissier']);
+
+        return $this->pdfDepuisListe(
+            "Rapport de caisse — {$session->caisse->nom}",
+            ['Numéro', 'Date et heure', 'Total net'],
+            $session->ventes()->orderBy('created_at')->get()->map(fn (Vente $v) => [
+                $v->numero,
+                $v->created_at->format('d/m/Y H:i'),
+                number_format($v->total_net, 0, ',', ' ').' F',
+            ]),
+            'rapport-caisse.pdf',
+            'Caissier : '.$session->caissier->name.' — Ouverte le '.$session->date_ouverture->format('d/m/Y à H:i'),
+            $this->bilanRapportSession($session),
+        );
+    }
+
+    public function rapportExcel(SessionCaisse $session): StreamedResponse
+    {
+        $this->assurerMagasin($session->caisse->magasin_id);
+        $session->load(['caisse.magasin', 'caissier']);
+
+        return $this->excelDepuisListe(
+            "Rapport de caisse — {$session->caisse->nom}",
+            ['Numéro', 'Date et heure', 'Total net'],
+            $session->ventes()->orderBy('created_at')->get()->map(fn (Vente $v) => [
+                $v->numero,
+                $v->created_at->format('d/m/Y H:i'),
+                $v->total_net,
+            ]),
+            'rapport-caisse.xlsx',
+            $this->bilanRapportSession($session),
+        );
+    }
+
+    /**
+     * Mêmes chiffres que les blocs compacts de sessions/rapport.blade.php
+     * (voir rapport() ci-dessus) — jamais un nouveau calcul recopié.
+     *
+     * @return array<string, string>
+     */
+    private function bilanRapportSession(SessionCaisse $session): array
+    {
+        $bilan = [
+            'Fond de caisse' => number_format($session->fond_de_caisse, 0, ',', ' ').' F',
+            'Nombre de ventes' => (string) $session->ventes()->count(),
+            'Total net' => number_format((int) $session->ventes()->sum('total_net'), 0, ',', ' ').' F',
+        ];
+
+        foreach ($this->paiementsParMoyen($session) as $paiement) {
+            $bilan[$paiement->moyenPaiement->nom] = number_format($paiement->total, 0, ',', ' ').' F';
+        }
+
+        if ($session->date_cloture) {
+            $theorique = $session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes
+                + $session->total_entrees_especes - $session->total_sorties_especes;
+
+            $bilan += [
+                'Théorique' => number_format($theorique, 0, ',', ' ').' F',
+            ];
+
+            if ($session->total_reglements_especes > 0) {
+                $bilan['Règlements clients (espèces)'] = number_format($session->total_reglements_especes, 0, ',', ' ').' F';
+            }
+
+            $bilan += [
+                'Entrées de caisse' => number_format($session->total_entrees_especes, 0, ',', ' ').' F',
+                'Sorties de caisse' => number_format($session->total_sorties_especes, 0, ',', ' ').' F',
+                'Compté' => number_format($session->montant_compte, 0, ',', ' ').' F',
+                'Écart' => ($session->ecart > 0 ? '+' : '').number_format($session->ecart, 0, ',', ' ').' F',
+            ];
+        }
+
+        return $bilan;
     }
 
     /**

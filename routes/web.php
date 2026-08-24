@@ -2,10 +2,10 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\CaisseController;
-use App\Http\Controllers\CaisseMouvementController;
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CommandeAchatController;
+use App\Http\Controllers\ComptabiliteController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DevisController;
 use App\Http\Controllers\FournisseurController;
@@ -211,6 +211,8 @@ Route::middleware('auth')->group(function () {
         Route::post('caisses/{caisse}/ouvrir', [SessionCaisseController::class, 'store'])->name('sessions.store');
         Route::get('sessions/{session}', [SessionCaisseController::class, 'show'])->name('sessions.show');
         Route::get('sessions/{session}/rapport', [SessionCaisseController::class, 'rapport'])->name('sessions.rapport');
+        Route::get('sessions/{session}/rapport/pdf', [SessionCaisseController::class, 'rapportPdf'])->name('sessions.rapport.pdf');
+        Route::get('sessions/{session}/rapport/excel', [SessionCaisseController::class, 'rapportExcel'])->name('sessions.rapport.excel');
     });
 
     Route::middleware('can:caisse.cloturer')->group(function () {
@@ -219,9 +221,29 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('can:caisse.mouvement')->group(function () {
-        Route::get('caisse', [CaisseMouvementController::class, 'index'])->name('caisse.index');
-        Route::get('caisse/{session}', [CaisseMouvementController::class, 'show'])->name('caisse.show');
-        Route::post('caisse/{session}/mouvements', [CaisseMouvementController::class, 'store'])->name('caisse.mouvements.store');
+        Route::post('sessions/{session}/mouvements', [SessionCaisseController::class, 'storeMouvement'])->name('sessions.mouvements.store');
+    });
+
+    // Trésorerie (Caisse Générale + comptes bancaires/autres) : indépendante
+    // des caisses de vente des caissiers ci-dessus (voir CLAUDE.md,
+    // Trésorerie) — jamais gardée par caisse.*, toujours tresorerie.*.
+    Route::middleware('can:tresorerie.voir')->group(function () {
+        Route::get('comptabilite/caisses', [ComptabiliteController::class, 'index'])->name('comptabilite.caisses.index');
+        Route::get('comptabilite/caisses-vente/{caisse}', [ComptabiliteController::class, 'showCaisseVente'])->name('comptabilite.caisses-vente.show');
+        Route::get('comptabilite/caisses/{compte}', [ComptabiliteController::class, 'show'])->name('comptabilite.caisses.show');
+        Route::get('comptabilite/caisses/{compte}/pdf', [ComptabiliteController::class, 'showPdf'])->name('comptabilite.caisses.show.pdf');
+        Route::get('comptabilite/caisses/{compte}/excel', [ComptabiliteController::class, 'showExcel'])->name('comptabilite.caisses.show.excel');
+
+        Route::get('rapports/tresorerie', [RapportController::class, 'tresorerie'])->name('rapports.tresorerie');
+        Route::get('rapports/tresorerie/pdf', [RapportController::class, 'tresoreriePdf'])->name('rapports.tresorerie.pdf');
+        Route::get('rapports/tresorerie/excel', [RapportController::class, 'tresorerieExcel'])->name('rapports.tresorerie.excel');
+    });
+
+    Route::middleware('can:tresorerie.gerer')->group(function () {
+        Route::post('comptabilite/caisses/{compte}/mouvements', [ComptabiliteController::class, 'storeMouvement'])->name('comptabilite.mouvements.store');
+        Route::post('comptabilite/caisses/{compte}/virement', [ComptabiliteController::class, 'virer'])->name('comptabilite.virement.store');
+        Route::post('comptabilite/comptes', [ComptabiliteController::class, 'storeCompte'])->name('comptabilite.comptes.store');
+        Route::put('comptabilite/comptes/{compte}', [ComptabiliteController::class, 'updateCompte'])->name('comptabilite.comptes.update');
     });
 
     Route::middleware('can:caisse.fermer')->group(function () {

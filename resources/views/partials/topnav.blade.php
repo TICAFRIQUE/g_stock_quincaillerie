@@ -115,10 +115,11 @@
     @endcanany
 
 
-    @can('caisse.mouvement')
+    @can('tresorerie.voir')
         <li class="nav-item">
-            <a href="{{ route('caisse.index') }}" class="nav-link {{ request()->routeIs('caisse.*') ? 'active' : '' }}">
-                <i class="bi bi-wallet2 me-1"></i>Caisse
+            <a href="{{ route('comptabilite.caisses.index') }}"
+                class="nav-link {{ request()->routeIs('comptabilite.*') ? 'active' : '' }}">
+                <i class="bi bi-bank me-1"></i>Trésorerie
             </a>
         </li>
     @endcan

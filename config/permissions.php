@@ -53,6 +53,8 @@ return [
         'caisse.fermer',
         'caisse.gerer',
         'caisse.mouvement',
+        'tresorerie.voir',
+        'tresorerie.gerer',
         'rapport.voir',
         'utilisateur.gerer',
         'role.gerer',

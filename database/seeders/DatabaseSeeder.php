@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             ParametreSeeder::class,
             UniteSeeder::class,
             TaxeSeeder::class,
+            CompteTresorerieSeeder::class,
         ]);
 
         if (app()->environment('local')) {

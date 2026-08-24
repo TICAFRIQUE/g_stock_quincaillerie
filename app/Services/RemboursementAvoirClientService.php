@@ -2,11 +2,10 @@
 
 namespace App\Services;
 
-use App\Enums\MouvementCaisseType;
+use App\Enums\EcritureCompteTresorerieType;
 use App\Models\Client;
 use App\Models\MoyenPaiement;
 use App\Models\RemboursementAvoirClient;
-use App\Models\SessionCaisse;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -15,15 +14,15 @@ use InvalidArgumentException;
  * Rembourse (tout ou partie) l'avoir d'un client — voir CLAUDE.md, section
  * Retours : un retour ne rembourse jamais directement en espèces, il crédite
  * un avoir ; ce service est l'action séparée qui vient régler cet avoir plus
- * tard. La part payée en espèces exige une session ouverte et génère une
- * sortie de caisse liée (symétrique de ReglementFournisseurService pour la
- * part espèces d'un règlement).
+ * tard. La part payée en espèces sort directement de la Caisse Générale
+ * (voir CLAUDE.md, Trésorerie), jamais du tiroir d'un caissier — symétrique
+ * de ReglementFournisseurService pour la part espèces d'un règlement.
  */
 class RemboursementAvoirClientService
 {
     public function __construct(
         private readonly CompteClientService $compteClientService,
-        private readonly CaisseMouvementService $caisseMouvementService,
+        private readonly CompteTresorerieService $compteTresorerieService,
     ) {}
 
     /**
@@ -33,7 +32,6 @@ class RemboursementAvoirClientService
         Client $client,
         User $auteur,
         array $paiements,
-        ?SessionCaisse $session = null,
     ): RemboursementAvoirClient {
         if (empty($paiements)) {
             throw new InvalidArgumentException('Un remboursement doit comporter au moins un paiement.');
@@ -50,16 +48,9 @@ class RemboursementAvoirClientService
             $paiements
         ));
 
-        if ($montantEspeces > 0 && $session === null) {
-            throw new InvalidArgumentException(
-                'Une session de caisse est requise : une partie du remboursement sort en espèces du tiroir.'
-            );
-        }
-
-        return DB::transaction(function () use ($client, $auteur, $paiements, $montant, $session, $montantEspeces) {
+        return DB::transaction(function () use ($client, $auteur, $paiements, $montant, $montantEspeces) {
             $remboursement = RemboursementAvoirClient::create([
                 'client_id' => $client->id,
-                'session_caisse_id' => $session?->id,
                 'created_by' => $auteur->id,
                 'montant' => $montant,
             ]);
@@ -76,15 +67,15 @@ class RemboursementAvoirClientService
             $this->compteClientService->rembourserAvoir($client, $montant, $remboursement, $auteur);
 
             if ($montantEspeces > 0) {
-                // Peut lever SoldeCaisseInsuffisantException si le tiroir
-                // n'a théoriquement pas assez d'espèces — annule tout.
-                $this->caisseMouvementService->enregistrer(
-                    session: $session,
-                    type: MouvementCaisseType::Sortie,
-                    montant: $montantEspeces,
-                    motif: "Remboursement avoir client {$client->nom}",
-                    auteur: $auteur,
+                // Peut lever SoldeTresorerieInsuffisantException si la
+                // Caisse Générale n'a pas assez d'espèces — annule tout.
+                $this->compteTresorerieService->debiter(
+                    $this->compteTresorerieService->caisseGenerale(),
+                    $montantEspeces,
+                    EcritureCompteTresorerieType::RemboursementAvoirClient,
+                    $auteur,
                     reference: $remboursement,
+                    motif: "Remboursement avoir client {$client->nom}",
                 );
             }
 

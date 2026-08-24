@@ -5,6 +5,8 @@
 @section('content')
     <h2 class="h4 mb-3">Caisses</h2>
 
+    <x-alerte-sessions-anciennes :sessions="$sessionsAnciennes" />
+
     @if ($caissesOccupees->isEmpty() && $caissesLibres->isEmpty())
         <p class="text-secondary">Aucune caisse disponible.</p>
     @endif

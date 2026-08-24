@@ -10,7 +10,6 @@ use App\Models\Magasin;
 use App\Models\MoyenPaiement;
 use App\Models\Parametre;
 use App\Models\Produit;
-use App\Models\SessionCaisse;
 use App\Models\Taxe;
 use App\Models\UniteVente;
 use App\Services\AchatService;
@@ -193,25 +192,7 @@ class CommandeAchatController extends Controller
             'peutRetourner' => request()->user()->can('achat.retour'),
             'dejaRetourneParLigne' => $dejaRetourneParLigne,
             'moyensPaiement' => MoyenPaiement::actifs(),
-            'sessionsOuvertes' => $this->sessionsOuvertes(),
         ]);
-    }
-
-    /**
-     * Sessions de caisse ouvertes, pour le sélecteur du formulaire de
-     * règlement fournisseur (voir FournisseurController::sessionsOuvertes(),
-     * même logique dupliquée volontairement — pas de trait pour 6 lignes).
-     */
-    private function sessionsOuvertes(): \Illuminate\Support\Collection
-    {
-        return SessionCaisse::whereNull('date_fermeture')
-            ->whereNull('date_cloture')
-            ->when(
-                request()->user()->magasin_id,
-                fn ($q, $magasinId) => $q->whereHas('caisse', fn ($qc) => $qc->where('magasin_id', $magasinId))
-            )
-            ->with('caisse.magasin', 'caissier')
-            ->get();
     }
 
     public function facture(CommandeAchat $commandeAchat): View

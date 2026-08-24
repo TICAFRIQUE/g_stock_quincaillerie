@@ -1,4 +1,6 @@
 {{-- Partagé entre dashboard.gerant et dashboard.superadmin (voir DashboardController::donneesMagasin) --}}
+<x-alerte-sessions-anciennes :sessions="$sessionsAnciennes" />
+
 <div class="row g-3 mb-3">
     <div class="col-6 col-md-3">
         <div class="card h-100">

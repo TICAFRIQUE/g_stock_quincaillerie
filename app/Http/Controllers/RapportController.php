@@ -6,6 +6,8 @@ use App\Enums\MouvementStockType;
 use App\Http\Controllers\Concerns\ExporteListe;
 use App\Http\Controllers\Concerns\JournalCaisse;
 use App\Models\Caisse;
+use App\Models\CompteTresorerie;
+use App\Models\EcritureCompteTresorerie;
 use App\Models\Inventaire;
 use App\Models\Magasin;
 use App\Models\MouvementStock;
@@ -131,6 +133,7 @@ class RapportController extends Controller
             ]),
             'rapport-ventes.pdf',
             'Du '.$debut->format('d/m/Y').' au '.$fin->format('d/m/Y'),
+            $this->bilanVentes($request, $debut, $fin, $magasinId),
         );
     }
 
@@ -152,6 +155,7 @@ class RapportController extends Controller
                 $v->avoir_applique,
             ]),
             'rapport-ventes.xlsx',
+            $this->bilanVentes($request, $debut, $fin, $magasinId),
         );
     }
 
@@ -164,6 +168,33 @@ class RapportController extends Controller
             ->when($request->filled('caisse_id'), fn ($q) => $q->whereHas('sessionCaisse', fn ($sc) => $sc->where('caisse_id', $request->integer('caisse_id'))))
             ->whereBetween('created_at', [$debut, $fin])
             ->orderByDesc('created_at');
+    }
+
+    /**
+     * Mêmes chiffres que les KPI de rapports/ventes.blade.php (voir ventes()
+     * ci-dessus) — jamais un nouveau calcul recopié, pour ne jamais laisser
+     * le PDF/Excel afficher un bilan différent de l'écran.
+     *
+     * @return array<string, string>
+     */
+    private function bilanVentes(Request $request, Carbon $debut, Carbon $fin, ?int $magasinId): array
+    {
+        $requeteTotaux = Vente::query()
+            ->when($magasinId, fn ($q) => $q->where('magasin_id', $magasinId))
+            ->when($request->filled('caissier_id'), fn ($q) => $q->where('caissier_id', $request->integer('caissier_id')))
+            ->when($request->filled('caisse_id'), fn ($q) => $q->whereHas('sessionCaisse', fn ($sc) => $sc->where('caisse_id', $request->integer('caisse_id'))))
+            ->whereBetween('created_at', [$debut, $fin]);
+
+        $totalDu = (int) (clone $requeteTotaux)->with('paiements', 'reglementsClient')->get()
+            ->sum(fn (Vente $v) => $v->soldeDuReel());
+
+        return [
+            'Nombre de ventes' => (string) (clone $requeteTotaux)->count(),
+            'Total net' => number_format((int) (clone $requeteTotaux)->sum('total_net'), 0, ',', ' ').' F',
+            'Total dû (crédit)' => number_format($totalDu, 0, ',', ' ').' F',
+            'Avoirs appliqués' => number_format((int) (clone $requeteTotaux)->sum('avoir_applique'), 0, ',', ' ').' F',
+            'Total en caisse (espèces)' => number_format($this->totalEspecesFiltre($request, $debut, $fin, $magasinId), 0, ',', ' ').' F',
+        ];
     }
 
     public function marge(Request $request): View
@@ -416,6 +447,7 @@ class RapportController extends Controller
             ]),
             'rapport-mouvements-caisse.pdf',
             'Du '.$debut->format('d/m/Y').' au '.$fin->format('d/m/Y'),
+            $this->bilanMouvementsCaisse($request, $debut, $fin, $magasinId),
         );
     }
 
@@ -437,6 +469,7 @@ class RapportController extends Controller
                 $l->auteur_nom ?? 'Utilisateur supprimé',
             ]),
             'rapport-mouvements-caisse.xlsx',
+            $this->bilanMouvementsCaisse($request, $debut, $fin, $magasinId),
         );
     }
 
@@ -449,6 +482,133 @@ class RapportController extends Controller
             caissierId: $request->filled('caissier_id') ? $request->integer('caissier_id') : null,
             type: $request->filled('type') ? $request->string('type')->toString() : null,
         )->get();
+    }
+
+    /**
+     * Mêmes chiffres que les KPI de rapports/mouvements-caisse.blade.php (voir
+     * mouvementsCaisse() ci-dessus, toujours tous types confondus) — jamais
+     * un nouveau calcul recopié.
+     *
+     * @return array<string, string>
+     */
+    private function bilanMouvementsCaisse(Request $request, Carbon $debut, Carbon $fin, ?int $magasinId): array
+    {
+        $toutesLesLignes = $this->requeteJournalCaisse(
+            $debut, $fin,
+            magasinId: $magasinId,
+            caisseId: $request->filled('caisse_id') ? $request->integer('caisse_id') : null,
+            caissierId: $request->filled('caissier_id') ? $request->integer('caissier_id') : null,
+        )->get();
+
+        return [
+            'Ventes en espèces' => number_format((int) $toutesLesLignes->where('type', 'vente')->sum('montant'), 0, ',', ' ').' F',
+            'Total entrées' => number_format((int) $toutesLesLignes->where('type', 'entree')->sum('montant'), 0, ',', ' ').' F',
+            'Total sorties' => number_format((int) $toutesLesLignes->where('type', 'sortie')->sum('montant'), 0, ',', ' ').' F',
+        ];
+    }
+
+    /**
+     * Mouvements de la trésorerie de l'entreprise (Caisse Générale + comptes
+     * bancaires/autres — voir CLAUDE.md, Trésorerie) : univers volontairement
+     * séparé de mouvementsCaisse() ci-dessus, qui reste scopé aux tiroirs des
+     * caissiers.
+     */
+    public function tresorerie(Request $request): View
+    {
+        [$debut, $fin] = $this->periode($request);
+
+        $requeteEcritures = $this->requeteTresorerieFiltree($request, $debut, $fin);
+
+        $ecritures = $request->boolean('tout')
+            ? $requeteEcritures->get()
+            : $requeteEcritures->paginate(25)->withQueryString();
+
+        // KPI sur le même périmètre filtré, mais toujours tous types
+        // confondus (voir mouvementsCaisse(), même raisonnement).
+        $requeteTotaux = $this->requeteTresorerieFiltree($request, $debut, $fin, avecType: false);
+        $totalEntrees = (int) (clone $requeteTotaux)->where('montant', '>', 0)->sum('montant');
+        $totalSorties = (int) (clone $requeteTotaux)->where('montant', '<', 0)->sum('montant');
+
+        return view('rapports.tresorerie', [
+            'ecritures' => $ecritures,
+            'comptes' => CompteTresorerie::orderByRaw("type != 'caisse_generale'")->orderBy('nom')->get(),
+            'debut' => $debut,
+            'fin' => $fin,
+            'nombre' => $request->boolean('tout') ? $ecritures->count() : $ecritures->total(),
+            'totalEntrees' => $totalEntrees,
+            'totalSorties' => abs($totalSorties),
+            'soldeNet' => $totalEntrees + $totalSorties,
+        ]);
+    }
+
+    public function tresoreriePdf(Request $request): Response
+    {
+        [$debut, $fin] = $this->periode($request);
+
+        return $this->pdfDepuisListe(
+            'Mouvements de trésorerie',
+            ['Date', 'Compte', 'Type', 'Motif', 'Montant', 'Auteur'],
+            $this->requeteTresorerieFiltree($request, $debut, $fin)->get()->map(fn (EcritureCompteTresorerie $e) => [
+                $e->created_at->format('d/m/Y H:i'),
+                $e->compteTresorerie->nom,
+                $e->type->libelle(),
+                $e->motif ?? '—',
+                ($e->montant >= 0 ? '+ ' : '− ').number_format(abs($e->montant), 0, ',', ' ').' F',
+                $e->auteur?->name ?? 'Utilisateur supprimé',
+            ]),
+            'rapport-tresorerie.pdf',
+            'Du '.$debut->format('d/m/Y').' au '.$fin->format('d/m/Y'),
+            $this->bilanTresorerie($request, $debut, $fin),
+        );
+    }
+
+    public function tresorerieExcel(Request $request): StreamedResponse
+    {
+        [$debut, $fin] = $this->periode($request);
+
+        return $this->excelDepuisListe(
+            'Mouvements de trésorerie',
+            ['Date', 'Compte', 'Type', 'Motif', 'Montant', 'Auteur'],
+            $this->requeteTresorerieFiltree($request, $debut, $fin)->get()->map(fn (EcritureCompteTresorerie $e) => [
+                $e->created_at->format('d/m/Y H:i'),
+                $e->compteTresorerie->nom,
+                $e->type->libelle(),
+                $e->motif ?? '—',
+                $e->montant,
+                $e->auteur?->name ?? 'Utilisateur supprimé',
+            ]),
+            'rapport-tresorerie.xlsx',
+            $this->bilanTresorerie($request, $debut, $fin),
+        );
+    }
+
+    /**
+     * Mêmes chiffres que les KPI de rapports/tresorerie.blade.php (voir
+     * tresorerie() ci-dessus, toujours tous types confondus).
+     *
+     * @return array<string, string>
+     */
+    private function bilanTresorerie(Request $request, Carbon $debut, Carbon $fin): array
+    {
+        $requeteTotaux = $this->requeteTresorerieFiltree($request, $debut, $fin, avecType: false);
+        $totalEntrees = (int) (clone $requeteTotaux)->where('montant', '>', 0)->sum('montant');
+        $totalSorties = (int) (clone $requeteTotaux)->where('montant', '<', 0)->sum('montant');
+
+        return [
+            'Total entrées' => number_format($totalEntrees, 0, ',', ' ').' F',
+            'Total sorties' => number_format(abs($totalSorties), 0, ',', ' ').' F',
+            'Solde net' => number_format($totalEntrees + $totalSorties, 0, ',', ' ').' F',
+        ];
+    }
+
+    private function requeteTresorerieFiltree(Request $request, Carbon $debut, Carbon $fin, bool $avecType = true): \Illuminate\Database\Eloquent\Builder
+    {
+        return EcritureCompteTresorerie::query()
+            ->with(['compteTresorerie', 'auteur'])
+            ->when($request->filled('compte_tresorerie_id'), fn ($q) => $q->where('compte_tresorerie_id', $request->integer('compte_tresorerie_id')))
+            ->when($avecType && $request->filled('type'), fn ($q) => $q->where('type', $request->string('type')->toString()))
+            ->whereBetween('created_at', [$debut, $fin])
+            ->orderByDesc('created_at');
     }
 
     public function inventaires(Request $request): View

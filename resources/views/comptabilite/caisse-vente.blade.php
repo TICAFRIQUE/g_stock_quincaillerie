@@ -1,26 +1,32 @@
 @extends('layouts.app')
 
-@section('title', 'Mouvements de caisse')
+@section('title', "Caisse — {$caisse->nom}")
 
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-1">
-        <h2 class="h4 mb-0">Mouvements de caisse</h2>
-        <div class="d-flex gap-2 flex-wrap">
-            <x-bouton-imprimer :pdf-route="route('rapports.mouvements-caisse.pdf', request()->query())" />
-            <a href="{{ route('rapports.mouvements-caisse.pdf', request()->query()) }}" class="btn btn-outline-secondary d-print-none">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <div>
+            <h2 class="h4 mb-1">{{ $caisse->nom }} — {{ $caisse->magasin->nom }}</h2>
+            <p class="text-secondary small mb-0">
+                Ventes en espèces et mouvements manuels de cette caisse, toutes sessions confondues.
+            </p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap flex-shrink-0">
+            <a href="{{ route('comptabilite.caisses.index') }}" class="btn btn-link">
+                <i class="bi bi-arrow-left me-1"></i>Retour
+            </a>
+            <x-bouton-imprimer :pdf-route="route('rapports.mouvements-caisse.pdf', array_merge(request()->query(), ['caisse_id' => $caisse->id]))" />
+            <a href="{{ route('rapports.mouvements-caisse.pdf', array_merge(request()->query(), ['caisse_id' => $caisse->id])) }}" class="btn btn-outline-secondary d-print-none">
                 <i class="bi bi-file-earmark-pdf me-1"></i>PDF
             </a>
-            <a href="{{ route('rapports.mouvements-caisse.excel', request()->query()) }}" class="btn btn-outline-secondary d-print-none">
+            <a href="{{ route('rapports.mouvements-caisse.excel', array_merge(request()->query(), ['caisse_id' => $caisse->id])) }}" class="btn btn-outline-secondary d-print-none">
                 <i class="bi bi-file-earmark-excel me-1"></i>Excel
             </a>
         </div>
     </div>
+
     @php
-        $magasinIdActif = auth()->user()->magasin_id ?: request('magasin_id');
         $filtresActifs = collect([
-            $magasinIdActif ? 'Magasin : ' . $magasins->firstWhere('id', (int) $magasinIdActif)?->nom : null,
-            request('caisse_id') ? 'Caisse : ' . $caisses->firstWhere('id', (int) request('caisse_id'))?->nom : null,
-            request('caissier_id') ? 'Auteur : ' . $caissiers->firstWhere('id', (int) request('caissier_id'))?->name : null,
+            request('caissier_id') ? 'Caissier : ' . $caissiers->firstWhere('id', (int) request('caissier_id'))?->name : null,
             request('type') ? 'Type : ' . match (request('type')) {
                 'sortie' => 'Sortie',
                 'vente' => 'Vente / Facture',
@@ -35,39 +41,23 @@
         @endif
     </p>
 
-    <form method="GET" action="{{ route('rapports.mouvements-caisse') }}" class="row g-2 mb-3 d-print-none">
+    <form method="GET" action="{{ route('comptabilite.caisses-vente.show', $caisse) }}" class="row g-2 mb-3 d-print-none">
         <div class="col-auto">
             <input type="date" name="debut" value="{{ $debut->toDateString() }}" class="form-control form-control-sm">
         </div>
         <div class="col-auto">
             <input type="date" name="fin" value="{{ $fin->toDateString() }}" class="form-control form-control-sm">
         </div>
-        @unless (auth()->user()->magasin_id)
+        @if ($caissiers->isNotEmpty())
             <div class="col-auto">
-                <select name="magasin_id" class="form-select form-select-sm">
-                    <option value="">Tous les magasins</option>
-                    @foreach ($magasins as $magasin)
-                        <option value="{{ $magasin->id }}" @selected(request('magasin_id') == $magasin->id)>{{ $magasin->nom }}</option>
+                <select name="caissier_id" class="form-select form-select-sm">
+                    <option value="">Tous les caissiers</option>
+                    @foreach ($caissiers as $caissier)
+                        <option value="{{ $caissier->id }}" @selected(request('caissier_id') == $caissier->id)>{{ $caissier->name }}</option>
                     @endforeach
                 </select>
             </div>
-        @endunless
-        <div class="col-auto">
-            <select name="caisse_id" class="form-select form-select-sm">
-                <option value="">Toutes les caisses</option>
-                @foreach ($caisses as $caisse)
-                    <option value="{{ $caisse->id }}" @selected(request('caisse_id') == $caisse->id)>{{ $caisse->nom }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="col-auto">
-            <select name="caissier_id" class="form-select form-select-sm">
-                <option value="">Tous les auteurs</option>
-                @foreach ($caissiers as $caissier)
-                    <option value="{{ $caissier->id }}" @selected(request('caissier_id') == $caissier->id)>{{ $caissier->name }}</option>
-                @endforeach
-            </select>
-        </div>
+        @endif
         <div class="col-auto">
             <select name="type" class="form-select form-select-sm">
                 <option value="">Tous les types</option>
@@ -79,9 +69,9 @@
         <div class="col-auto">
             <button type="submit" class="btn btn-sm btn-primary">Filtrer</button>
         </div>
-        @if (request()->hasAny(['debut', 'fin', 'magasin_id', 'caisse_id', 'caissier_id', 'type']))
+        @if (request()->hasAny(['debut', 'fin', 'caissier_id', 'type']))
             <div class="col-auto">
-                <a href="{{ route('rapports.mouvements-caisse') }}" class="btn btn-sm btn-outline-danger" title="Réinitialiser les filtres">
+                <a href="{{ route('comptabilite.caisses-vente.show', $caisse) }}" class="btn btn-sm btn-outline-danger" title="Réinitialiser les filtres">
                     <i class="bi bi-x-circle me-1"></i>Réinitialiser
                 </a>
             </div>
@@ -113,8 +103,6 @@
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Caisse</th>
-                        <th>Magasin</th>
                         <th>Type</th>
                         <th>Motif</th>
                         <th class="text-end">Montant</th>
@@ -125,8 +113,6 @@
                     @forelse ($mouvements as $mouvement)
                         <tr>
                             <td>{{ \Illuminate\Support\Carbon::parse($mouvement->created_at)->format('d/m/Y H:i') }}</td>
-                            <td>{{ $mouvement->caisse_nom }}</td>
-                            <td>{{ $mouvement->magasin_nom }}</td>
                             <td><span class="badge {{ $mouvement->type_badge }}">{{ $mouvement->type_libelle }}</span></td>
                             <td>{{ $mouvement->motif }}</td>
                             <td class="text-end fw-medium">
@@ -136,7 +122,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center text-secondary py-4">Aucun mouvement de caisse sur cette période.</td>
+                            <td colspan="5" class="text-center text-secondary py-4">Aucun mouvement sur cette période.</td>
                         </tr>
                     @endforelse
                 </tbody>

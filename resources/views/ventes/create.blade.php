@@ -163,7 +163,7 @@
                 <div style="position: sticky; top: 1rem;">
                     <div class="card mb-3">
                         <div class="card-body">
-                            <h3 class="h6">Comptabilité</h3>
+                            <h3 class="h6">Récapitulatif</h3>
 
                             @can('vente.remise')
                                 <div class="mb-2">

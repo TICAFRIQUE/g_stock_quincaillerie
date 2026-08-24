@@ -11,11 +11,9 @@ use App\Models\MoyenPaiement;
 use App\Models\ReglementFournisseur;
 use App\Models\RemboursementAvoirFournisseur;
 use App\Models\RetourAchat;
-use App\Models\SessionCaisse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -137,27 +135,7 @@ class FournisseurController extends Controller
             'ecritures' => $ecritures,
             'commandes' => $commandes,
             'moyensPaiement' => MoyenPaiement::actifs(),
-            'sessionsOuvertes' => $this->sessionsOuvertes(),
         ]);
-    }
-
-    /**
-     * Sessions de caisse actuellement ouvertes, scopées au magasin du
-     * gérant (Superadmin/gérant multi-magasin voit tout) — pour le
-     * sélecteur "session de caisse" du formulaire de règlement fournisseur,
-     * requis seulement si une partie du paiement est en espèces (voir
-     * ReglementFournisseurService).
-     */
-    private function sessionsOuvertes(): Collection
-    {
-        return SessionCaisse::whereNull('date_fermeture')
-            ->whereNull('date_cloture')
-            ->when(
-                request()->user()->magasin_id,
-                fn ($q, $magasinId) => $q->whereHas('caisse', fn ($qc) => $qc->where('magasin_id', $magasinId))
-            )
-            ->with('caisse.magasin', 'caissier')
-            ->get();
     }
 
     public function create(): View

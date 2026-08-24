@@ -6,7 +6,7 @@
     <div class="d-flex justify-content-between align-items-center mb-1">
         <h2 class="h4 mb-0">Rapport de marge</h2>
         <div class="d-flex gap-2 flex-wrap">
-            <x-bouton-imprimer />
+            <x-bouton-imprimer :pdf-route="route('rapports.marge.pdf', request()->query())" />
             <a href="{{ route('rapports.marge.pdf', request()->query()) }}" class="btn btn-outline-secondary d-print-none">
                 <i class="bi bi-file-earmark-pdf me-1"></i>PDF
             </a>

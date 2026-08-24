@@ -81,4 +81,17 @@ class SessionCaisse extends Model
     {
         return $this->hasMany(MouvementCaisse::class);
     }
+
+    /**
+     * Une session peut légitimement s'étendre sur plusieurs jours (règle 9 :
+     * la clôture se calcule par session, jamais par jour) — ceci sert
+     * uniquement à un rappel non bloquant côté caissier (voir dashboard),
+     * distinct de l'alerte gérant/superadmin après 12h (voir
+     * AlerterSessionsOuvertesTropLongtemps, basée sur une durée, pas le
+     * jour calendaire).
+     */
+    public function estOuverteDepuisJourPrecedent(): bool
+    {
+        return $this->date_cloture === null && ! $this->date_ouverture->isToday();
+    }
 }

@@ -82,7 +82,13 @@
                                 return taxe ? taxe.taux : 0;
                             },
                             montantHtLigne(ligne) {
-                                return (Number(ligne.quantite) || 0) * (Number(ligne.prix_achat) || 0);
+                                // Arrondi immédiat : sans lui, une quantité/un prix saisi
+                                // en décimal (que step/min n'empêchent pas de taper, seule
+                                // la soumission le rejette) laisse un HT fractionnaire dans
+                                // totalHt alors que totalTtc est déjà arrondi ligne par
+                                // ligne (voir montantTtcLigne) — totalTaxes = totalTtc −
+                                // totalHt affichait alors un reste non nul même à taux 0%.
+                                return Math.round((Number(ligne.quantite) || 0) * (Number(ligne.prix_achat) || 0));
                             },
                             montantTtcLigne(ligne) {
                                 const ht = this.montantHtLigne(ligne);
@@ -203,11 +209,11 @@
                                 <div class="row g-2 align-items-end mb-2">
                                     <div class="col-4">
                                         <label class="form-label small" x-text="'Quantité (' + uniteChoisie(ligne).libelle + ') *'"></label>
-                                        <input type="number" :name="'lignes['+index+'][quantite]'" x-model="ligne.quantite" class="form-control form-control-sm" min="1" required>
+                                        <input type="number" :name="'lignes['+index+'][quantite]'" x-model="ligne.quantite" class="form-control form-control-sm" min="1" step="1" required>
                                     </div>
                                     <div class="col-4">
                                         <label class="form-label small" x-text="'Prix d\'achat HT (' + uniteChoisie(ligne).libelle + ', F) *'"></label>
-                                        <input type="number" :name="'lignes['+index+'][prix_achat]'" x-model="ligne.prix_achat" class="form-control form-control-sm" min="0" required>
+                                        <input type="number" :name="'lignes['+index+'][prix_achat]'" x-model="ligne.prix_achat" class="form-control form-control-sm" min="0" step="1" required>
                                     </div>
                                     <div class="col-4">
                                         <label class="form-label small">Qté en pièces (stock)</label>

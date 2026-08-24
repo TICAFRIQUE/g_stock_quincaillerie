@@ -58,72 +58,6 @@
 
     <div class="card mb-3">
         <div class="card-body">
-            <h3 class="h6">Historique du compte</h3>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Type</th>
-                        <th>Référence</th>
-                        <th>Auteur</th>
-                        <th class="text-end">Montant</th>
-                        <th class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($ecritures as $ecriture)
-                        <tr class="{{ $ecriture->type->classeLigne() }}">
-                            <td>{{ $ecriture->created_at->format('d/m/Y H:i') }}</td>
-                            <td><span class="badge {{ $ecriture->type->classeBadge() }}">{{ $ecriture->type->libelle() }}</span></td>
-                            @php
-                                $commandeLiee = match (true) {
-                                    $ecriture->reference instanceof \App\Models\CommandeAchat => $ecriture->reference,
-                                    $ecriture->reference instanceof \App\Models\ReglementFournisseur => $ecriture->reference->commandeAchat,
-                                    $ecriture->reference instanceof \App\Models\RetourAchat => $ecriture->reference->commandeAchat,
-                                    default => null,
-                                };
-                            @endphp
-                            <td>
-                                @if ($commandeLiee)
-                                    <a href="{{ route('commande-achats.show', $commandeLiee) }}">{{ $commandeLiee->numero }}</a>
-                                @elseif ($ecriture->reference instanceof \App\Models\ReglementFournisseur)
-                                    <span class="text-secondary fst-italic">Règlement général</span>
-                                @else
-                                    —
-                                @endif
-                            </td>
-                            <td>{{ $ecriture->auteur?->name ?? 'Utilisateur supprimé' }}</td>
-                            <td class="text-end fw-medium {{ $ecriture->montant > 0 ? 'text-danger' : 'text-success' }}">
-                                {{ $ecriture->montant > 0 ? '+' : '' }}{{ number_format($ecriture->montant, 0, ',', ' ') }} F
-                            </td>
-                            <td class="text-end">
-                                @if ($commandeLiee)
-                                    <a href="{{ route('commande-achats.show', $commandeLiee) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Voir le détail du bon d'achat">
-                                        <i class="bi bi-eye"></i>
-                                        <span class="visually-hidden">Détail</span>
-                                    </a>
-                                @endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="text-center text-secondary py-4">Aucun mouvement sur ce compte.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        @if ($ecritures->hasPages())
-            <div class="card-body">
-                {{ $ecritures->onEachSide(1)->links() }}
-            </div>
-        @endif
-    </div>
-
-    <div class="card mb-3">
-        <div class="card-body">
             <h3 class="h6 mb-0">Bons d'achat</h3>
         </div>
         <div class="table-responsive">
@@ -197,6 +131,72 @@
         @endif
     </div>
 
+    <div class="card mb-3">
+        <div class="card-body">
+            <h3 class="h6">Historique du compte</h3>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Référence</th>
+                        <th>Auteur</th>
+                        <th class="text-end">Montant</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($ecritures as $ecriture)
+                        <tr class="{{ $ecriture->type->classeLigne() }}">
+                            <td>{{ $ecriture->created_at->format('d/m/Y H:i') }}</td>
+                            <td><span class="badge {{ $ecriture->type->classeBadge() }}">{{ $ecriture->type->libelle() }}</span></td>
+                            @php
+                                $commandeLiee = match (true) {
+                                    $ecriture->reference instanceof \App\Models\CommandeAchat => $ecriture->reference,
+                                    $ecriture->reference instanceof \App\Models\ReglementFournisseur => $ecriture->reference->commandeAchat,
+                                    $ecriture->reference instanceof \App\Models\RetourAchat => $ecriture->reference->commandeAchat,
+                                    default => null,
+                                };
+                            @endphp
+                            <td>
+                                @if ($commandeLiee)
+                                    <a href="{{ route('commande-achats.show', $commandeLiee) }}">{{ $commandeLiee->numero }}</a>
+                                @elseif ($ecriture->reference instanceof \App\Models\ReglementFournisseur)
+                                    <span class="text-secondary fst-italic">Règlement général</span>
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td>{{ $ecriture->auteur?->name ?? 'Utilisateur supprimé' }}</td>
+                            <td class="text-end fw-medium {{ $ecriture->montant > 0 ? 'text-danger' : 'text-success' }}">
+                                {{ $ecriture->montant > 0 ? '+' : '' }}{{ number_format($ecriture->montant, 0, ',', ' ') }} F
+                            </td>
+                            <td class="text-end">
+                                @if ($commandeLiee)
+                                    <a href="{{ route('commande-achats.show', $commandeLiee) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Voir le détail du bon d'achat">
+                                        <i class="bi bi-eye"></i>
+                                        <span class="visually-hidden">Détail</span>
+                                    </a>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="text-center text-secondary py-4">Aucun mouvement sur ce compte.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @if ($ecritures->hasPages())
+            <div class="card-body">
+                {{ $ecritures->onEachSide(1)->links() }}
+            </div>
+        @endif
+    </div>
+
     <div class="mt-3">
         <a href="{{ route('fournisseurs.index') }}" class="btn btn-link ps-0">Retour à la liste</a>
     </div>
@@ -212,13 +212,25 @@
                      especeIds: @json($moyensPaiement->where('est_espece', true)->pluck('id')->values()),
                      get totalPaiements() { return this.paiements.reduce((total, p) => total + (Number(p.montant) || 0), 0); },
                      get contientEspeces() { return this.paiements.some(p => this.especeIds.includes(Number(p.moyen_paiement_id))); },
+                     // Un règlement ciblant une commande précise reste partiel
+                     // (totalPaiements <= detteAffichee suffit) ; un règlement
+                     // global (aucune commande ciblée) doit couvrir le solde à
+                     // l'exact franc près — voir ReglementFournisseurService::
+                     // reglerIntegralite(), qui répartit automatiquement sur
+                     // chaque commande due et refuse tout écart.
+                     get montantValide() { return this.commandeAchatId ? this.totalPaiements <= this.detteAffichee : this.totalPaiements === this.detteAffichee; },
                      ajouterPaiement() { this.paiements.push({ moyen_paiement_id: '', montant: null }); },
                      retirerPaiement(index) { if (this.paiements.length > 1) this.paiements.splice(index, 1); },
                      onModalShow(event) {
                          this.commandeAchatId = event.relatedTarget?.dataset.commande || null;
                          this.commandeNumero = event.relatedTarget?.dataset.numero || null;
                          const montant = event.relatedTarget?.dataset.montant ? Number(event.relatedTarget.dataset.montant) : null;
-                         this.paiements = [{ moyen_paiement_id: '', montant: montant }];
+                         // Réglement global : un seul paiement, pré-rempli au
+                         // solde entier — pour un paiement mixte (plusieurs
+                         // moyens), le bouton d'ajout de paiement reste
+                         // possible, mais la somme doit toujours retomber
+                         // exactement sur le solde (montantValide ci-dessus).
+                         this.paiements = [{ moyen_paiement_id: '', montant: this.commandeAchatId ? montant : {{ $solde }} }];
                          this.detteAffichee = this.commandeAchatId ? montant : {{ $solde }};
                      },
                  }"
@@ -240,7 +252,11 @@
                                         <span>Reste dû sur le bon d'achat <strong x-text="commandeNumero"></strong> : <strong x-text="detteAffichee.toLocaleString('fr-FR')"></strong> F</span>
                                     </template>
                                     <template x-if="!commandeNumero">
-                                        <span>Dette totale du fournisseur : <strong>{{ number_format($solde, 0, ',', ' ') }} F</strong></span>
+                                        <span>
+                                            Dette totale du fournisseur : <strong>{{ number_format($solde, 0, ',', ' ') }} F</strong> — ce règlement
+                                            soldera l'intégralité de la dette, répartie automatiquement sur chaque bon d'achat encore dû
+                                            (le plus ancien d'abord). Pour un paiement partiel, réglez un bon d'achat précis depuis la liste ci-dessous.
+                                        </span>
                                     </template>
                                 </p>
 
@@ -269,34 +285,23 @@
                                     <i class="bi bi-plus-lg"></i> Ajouter un moyen de paiement
                                 </button>
 
-                                <div class="mt-3" x-show="contientEspeces" x-cloak>
-                                    @if ($sessionsOuvertes->isEmpty())
-                                        <div class="alert alert-warning small mb-0">
-                                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                                            Paiement en espèces : aucune session de caisse ouverte pour y enregistrer la sortie.
-                                            Ouvrez une caisse d'abord, ou choisissez un autre moyen de paiement.
-                                        </div>
-                                    @else
-                                        <label for="session_caisse_id" class="form-label small mb-1">
-                                            Session de caisse (le tiroir d'où sort l'argent)<span class="required-marker">*</span>
-                                        </label>
-                                        <select name="session_caisse_id" id="session_caisse_id" class="form-select form-select-sm" :required="contientEspeces">
-                                            <option value="">Choisir une session ouverte…</option>
-                                            @foreach ($sessionsOuvertes as $s)
-                                                <option value="{{ $s->id }}">{{ $s->caisse->nom }} — {{ $s->caisse->magasin->nom }} ({{ $s->caissier->name ?? '' }})</option>
-                                            @endforeach
-                                        </select>
-                                    @endif
+                                <div class="mt-3 small text-secondary" x-show="contientEspeces" x-cloak>
+                                    <i class="bi bi-safe me-1"></i>Paiement en espèces : sort de la Caisse Générale.
                                 </div>
 
-                                <div class="mt-3 small" :class="totalPaiements > detteAffichee ? 'text-danger' : 'text-secondary'">
+                                <div class="mt-3 small" :class="!montantValide ? 'text-danger' : 'text-secondary'">
                                     Total réglé : <span x-text="totalPaiements"></span> F
-                                    <span x-show="totalPaiements > detteAffichee">— dépasse le montant dû.</span>
+                                    <template x-if="commandeAchatId">
+                                        <span x-show="totalPaiements > detteAffichee">— dépasse le montant dû.</span>
+                                    </template>
+                                    <template x-if="!commandeAchatId">
+                                        <span x-show="!montantValide">— un règlement global doit couvrir exactement la dette totale ({{ number_format($solde, 0, ',', ' ') }} F).</span>
+                                    </template>
                                 </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-link" data-bs-dismiss="modal">Annuler</button>
-                                <button type="submit" class="btn btn-reglement" :disabled="totalPaiements <= 0">
+                                <button type="submit" class="btn btn-reglement" :disabled="totalPaiements <= 0 || !montantValide">
                                     <i class="bi bi-check-circle me-1"></i>Enregistrer le règlement
                                 </button>
                             </div>
@@ -360,24 +365,8 @@
                                     <i class="bi bi-plus-lg"></i> Ajouter un moyen de paiement
                                 </button>
 
-                                <div class="mt-3" x-show="contientEspeces" x-cloak>
-                                    @if ($sessionsOuvertes->isEmpty())
-                                        <div class="alert alert-warning small mb-0">
-                                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                                            Encaissement en espèces : aucune session de caisse ouverte pour y enregistrer l'entrée.
-                                            Ouvrez une caisse d'abord, ou choisissez un autre moyen.
-                                        </div>
-                                    @else
-                                        <label for="session_caisse_id_remb_fournisseur" class="form-label small mb-1">
-                                            Session de caisse (le tiroir où entre l'argent)<span class="required-marker">*</span>
-                                        </label>
-                                        <select name="session_caisse_id" id="session_caisse_id_remb_fournisseur" class="form-select form-select-sm" :required="contientEspeces">
-                                            <option value="">Choisir une session ouverte…</option>
-                                            @foreach ($sessionsOuvertes as $s)
-                                                <option value="{{ $s->id }}">{{ $s->caisse->nom }} — {{ $s->caisse->magasin->nom }} ({{ $s->caissier->name ?? '' }})</option>
-                                            @endforeach
-                                        </select>
-                                    @endif
+                                <div class="mt-3 small text-secondary" x-show="contientEspeces" x-cloak>
+                                    <i class="bi bi-safe me-1"></i>Encaissement en espèces : entre dans la Caisse Générale.
                                 </div>
 
                                 <div class="mt-3 small" :class="totalPaiements > avoirDisponible ? 'text-danger' : 'text-secondary'">
