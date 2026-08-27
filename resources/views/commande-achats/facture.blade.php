@@ -90,7 +90,7 @@
 <body>
     @unless ($pourPdf ?? false)
         <div class="actions">
-            <button type="button" onclick="window.print()">Imprimer</button>
+            <button type="button" onclick="(window.gstock && window.gstock.print) ? window.gstock.print() : window.print()">Imprimer</button>
             <a href="{{ route('commande-achats.pdf', $commande) }}">Télécharger en PDF</a>
             <a href="{{ route('commande-achats.excel', $commande) }}">Télécharger en Excel</a>
             <a href="{{ route('commande-achats.show', $commande) }}">Voir le détail</a>

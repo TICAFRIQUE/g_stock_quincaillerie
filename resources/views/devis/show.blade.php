@@ -255,7 +255,16 @@
         // le ticket de vente).
         function imprimerDevis() {
             document.body.classList.add('impression-facture');
-            window.print();
+            // Coquille desktop (Electron) : window.gstock.print() ne déclenche
+            // jamais 'afterprint' (appelé depuis le process principal) — on
+            // retire la classe nous-même une fois l'impression terminée.
+            if (window.gstock && window.gstock.print) {
+                window.gstock.print().finally(() => {
+                    document.body.classList.remove('impression-facture');
+                });
+            } else {
+                window.print();
+            }
         }
         window.addEventListener('afterprint', () => {
             document.body.classList.remove('impression-facture');

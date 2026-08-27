@@ -9,7 +9,8 @@
             <a href="{{ route('sessions.show', $vente->sessionCaisse) }}" class="btn btn-link">
                 <i class="bi bi-arrow-left me-1"></i>Retour à la session
             </a>
-            <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
+            <button type="button" class="btn btn-outline-secondary"
+                onclick="(window.gstock && window.gstock.print) ? window.gstock.print() : window.print()">
                 <i class="bi bi-printer me-1"></i>Ticket caisse
             </button>
             <button type="button" class="btn btn-outline-secondary" onclick="imprimerFacture()">
@@ -684,7 +685,17 @@
         // l'état par défaut (voir resources/sass/app.scss, .impression-facture).
         function imprimerFacture() {
             document.body.classList.add('impression-facture');
-            window.print();
+            // Coquille desktop (Electron) : window.print() n'affiche pas
+            // d'aperçu et ne déclenche jamais 'afterprint' via window.gstock.print()
+            // (appelé depuis le process principal, pas la fenêtre) — on retire
+            // la classe nous-même une fois l'impression terminée dans ce cas.
+            if (window.gstock && window.gstock.print) {
+                window.gstock.print().finally(() => {
+                    document.body.classList.remove('impression-facture');
+                });
+            } else {
+                window.print();
+            }
         }
         window.addEventListener('afterprint', () => {
             document.body.classList.remove('impression-facture');

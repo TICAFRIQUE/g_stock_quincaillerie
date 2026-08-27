@@ -90,7 +90,7 @@
 <body>
     @unless ($pourPdf ?? false)
         <div class="actions">
-            <button type="button" onclick="window.print()">Imprimer</button>
+            <button type="button" onclick="(window.gstock && window.gstock.print) ? window.gstock.print() : window.print()">Imprimer</button>
             <a href="{{ route('ventes.pdf', $vente) }}">Télécharger en PDF</a>
             <a href="{{ route('ventes.excel', $vente) }}">Télécharger en Excel</a>
             <a href="{{ route('ventes.ticket', $vente) }}">Voir le ticket de caisse</a>
@@ -98,7 +98,9 @@
         <script>
             // Le bouton "Facture" du détail vente ouvre directement cette page :
             // déclenche l'impression immédiatement, sans clic supplémentaire.
-            window.addEventListener('load', () => setTimeout(() => window.print(), 200));
+            window.addEventListener('load', () => setTimeout(() => {
+                (window.gstock && window.gstock.print) ? window.gstock.print() : window.print();
+            }, 200));
         </script>
     @endunless
 

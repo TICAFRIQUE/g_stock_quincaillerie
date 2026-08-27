@@ -24,7 +24,14 @@
             iframe.onload = function () {
                 setTimeout(() => {
                     iframe.contentWindow.focus();
-                    iframe.contentWindow.print();
+                    // Coquille desktop (Electron) : window.print() n'affiche pas
+                    // d'aperçu (non supporté par Electron) — window.gstock.print()
+                    // ouvre directement la boîte d'impression native de Windows.
+                    if (window.gstock && window.gstock.print) {
+                        window.gstock.print();
+                    } else {
+                        iframe.contentWindow.print();
+                    }
                 }, 200);
             };
             iframe.src = url;
@@ -41,11 +48,14 @@
             window.location.href = url.toString();
         };
         @if (request()->boolean('tout'))
-            window.addEventListener('load', () => setTimeout(() => window.print(), 200));
+            window.addEventListener('load', () => setTimeout(() => {
+                (window.gstock && window.gstock.print) ? window.gstock.print() : window.print();
+            }, 200));
         @endif
     </script>
 @else
-    <button type="button" class="btn btn-outline-secondary d-print-none" onclick="window.print()">
+    <button type="button" class="btn btn-outline-secondary d-print-none"
+        onclick="(window.gstock && window.gstock.print) ? window.gstock.print() : window.print()">
         <i class="bi bi-printer me-1"></i>Imprimer
     </button>
 @endif

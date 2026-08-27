@@ -243,6 +243,14 @@ ipcMain.handle('gstock:defaults', () => ({
   serverUrl: DEFAULT_SERVER_URL,
 }));
 ipcMain.handle('gstock:open-settings', () => openSetupWindow());
+ipcMain.handle('gstock:print', () => {
+  if (!mainWindow) return { success: false, reason: 'no-window' };
+  return new Promise((resolve) => {
+    mainWindow.webContents.print({ silent: false, printBackground: true }, (success, failureReason) => {
+      resolve({ success, reason: failureReason });
+    });
+  });
+});
 ipcMain.handle('gstock:save-config', async (_event, config) => {
   saveConfig(config);
   if (setupWindow) {
