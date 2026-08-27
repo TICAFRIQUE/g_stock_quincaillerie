@@ -1,6 +1,7 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { execFile, spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 
@@ -243,13 +244,27 @@ ipcMain.handle('gstock:defaults', () => ({
   serverUrl: DEFAULT_SERVER_URL,
 }));
 ipcMain.handle('gstock:open-settings', () => openSetupWindow());
-ipcMain.handle('gstock:print', () => {
+ipcMain.handle('gstock:print', async () => {
   if (!mainWindow) return { success: false, reason: 'no-window' };
-  return new Promise((resolve) => {
-    mainWindow.webContents.print({ silent: false, printBackground: true }, (success, failureReason) => {
-      resolve({ success, reason: failureReason });
+  // webContents.print() ouvre bien le dialogue Windows natif, mais son
+  // panneau d'aperçu reste vide (Electron ne fournit pas les données que
+  // Windows attend pour le générer — limitation connue, sans correctif côté
+  // application). On génère donc un PDF et on l'ouvre dans le lecteur PDF
+  // par défaut (Edge, en général), qui a un vrai aperçu et sa propre
+  // impression.
+  try {
+    const pdfBuffer = await mainWindow.webContents.printToPDF({
+      printBackground: true,
+      preferCSSPageSize: true,
     });
-  });
+    const filePath = path.join(os.tmpdir(), `gstock-impression-${Date.now()}.pdf`);
+    fs.writeFileSync(filePath, pdfBuffer);
+    await shell.openPath(filePath);
+    return { success: true };
+  } catch (err) {
+    dialog.showErrorBox('Impression', `Impossible de générer l'aperçu : ${err.message}`);
+    return { success: false, reason: err.message };
+  }
 });
 ipcMain.handle('gstock:save-config', async (_event, config) => {
   saveConfig(config);
