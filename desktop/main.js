@@ -189,7 +189,7 @@ async function openMainWindow(config) {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    autoHideMenuBar: true,
+    autoHideMenuBar: false,
     icon: APP_ICON,
     title: 'G-Stock Quincaillerie',
     show: false,
