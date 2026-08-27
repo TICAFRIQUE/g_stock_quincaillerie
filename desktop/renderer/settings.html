@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>G-Stock — Configuration du poste</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", sans-serif;
+    background: #f4f1ec;
+    color: #2b2b2b;
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.hint { color: #666; font-size: 13px; margin: 0 0 20px; }
+  fieldset {
+    border: 1px solid #d8d2c6;
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+  legend { font-weight: 600; font-size: 13px; padding: 0 6px; }
+  label { display: block; font-size: 13px; margin: 10px 0 4px; }
+  input[type="text"] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #c9c2b3;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  .role-choice { display: flex; gap: 16px; }
+  .role-choice label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 14px; font-weight: 500; margin: 0;
+  }
+  .role-desc { font-size: 12px; color: #777; margin: 2px 0 0 22px; }
+  .actions { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+  button {
+    padding: 9px 18px;
+    font-size: 14px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+  }
+  #save { background: #c1621a; color: #fff; }
+  #test { background: #e9e3d6; color: #2b2b2b; }
+  #status { font-size: 12px; margin-top: 8px; min-height: 16px; }
+  #status.ok { color: #2f7d3a; }
+  #status.err { color: #b3261e; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+  <h1>Configuration du poste</h1>
+  <p class="hint">À faire une seule fois, au premier lancement. Modifiable ensuite via le menu Fichier → Paramètres du poste.</p>
+
+  <fieldset>
+    <legend>Rôle de ce poste</legend>
+    <div class="role-choice">
+      <label><input type="radio" name="role" value="server" checked /> Poste serveur</label>
+      <label><input type="radio" name="role" value="client" /> Poste caisse</label>
+    </div>
+    <p class="role-desc" id="role-desc">Ce poste héberge Laragon (Apache/MySQL) et l'application.</p>
+  </fieldset>
+
+  <fieldset id="server-fields">
+    <legend>Poste serveur</legend>
+    <label for="laragonPath">Chemin de Laragon</label>
+    <input type="text" id="laragonPath" />
+    <label for="serverUrlServer">Adresse de l'application (APP_URL)</label>
+    <input type="text" id="serverUrlServer" />
+  </fieldset>
+
+  <fieldset id="client-fields" class="hidden">
+    <legend>Poste caisse</legend>
+    <label for="serverUrlClient">Adresse du poste serveur</label>
+    <input type="text" id="serverUrlClient" placeholder="http://192.168.1.10" />
+  </fieldset>
+
+  <div class="actions">
+    <button id="test" type="button">Tester la connexion</button>
+    <button id="save" type="button">Enregistrer et démarrer</button>
+  </div>
+  <div id="status"></div>
+
+  <script>
+    const roleInputs = document.querySelectorAll('input[name="role"]');
+    const serverFields = document.getElementById('server-fields');
+    const clientFields = document.getElementById('client-fields');
+    const roleDesc = document.getElementById('role-desc');
+    const laragonPathInput = document.getElementById('laragonPath');
+    const serverUrlServerInput = document.getElementById('serverUrlServer');
+    const serverUrlClientInput = document.getElementById('serverUrlClient');
+    const statusEl = document.getElementById('status');
+
+    const descriptions = {
+      server: "Ce poste héberge Laragon (Apache/MySQL) et l'application.",
+      client: "Ce poste se connecte à l'application d'un autre poste du réseau (le serveur).",
+    };
+
+    function currentRole() {
+      return document.querySelector('input[name="role"]:checked').value;
+    }
+
+    function updateVisibility() {
+      const role = currentRole();
+      serverFields.classList.toggle('hidden', role !== 'server');
+      clientFields.classList.toggle('hidden', role !== 'client');
+      roleDesc.textContent = descriptions[role];
+      statusEl.textContent = '';
+      statusEl.className = '';
+    }
+
+    roleInputs.forEach((input) => input.addEventListener('change', updateVisibility));
+
+    async function init() {
+      const [defaults, existing] = await Promise.all([
+        window.gstock.getDefaults(),
+        window.gstock.getConfig(),
+      ]);
+      laragonPathInput.value = (existing && existing.laragonPath) || defaults.laragonPath;
+      if (existing && existing.role === 'client') {
+        document.querySelector('input[name="role"][value="client"]').checked = true;
+        serverUrlClientInput.value = existing.url || '';
+      } else {
+        serverUrlServerInput.value = (existing && existing.url) || defaults.serverUrl;
+      }
+      updateVisibility();
+    }
+
+    function targetUrl() {
+      return currentRole() === 'server' ? serverUrlServerInput.value.trim() : serverUrlClientInput.value.trim();
+    }
+
+    document.getElementById('test').addEventListener('click', async () => {
+      const url = targetUrl();
+      if (!url) {
+        statusEl.textContent = "Saisissez d'abord une adresse.";
+        statusEl.className = 'err';
+        return;
+      }
+      statusEl.textContent = 'Test en cours…';
+      statusEl.className = '';
+      try {
+        await fetch(url, { mode: 'no-cors' });
+        statusEl.textContent = 'Adresse joignable.';
+        statusEl.className = 'ok';
+      } catch (e) {
+        statusEl.textContent = 'Adresse injoignable — vérifiez le réseau.';
+        statusEl.className = 'err';
+      }
+    });
+
+    document.getElementById('save').addEventListener('click', async () => {
+      const role = currentRole();
+      const url = targetUrl();
+      if (!url) {
+        statusEl.textContent = "Saisissez d'abord une adresse.";
+        statusEl.className = 'err';
+        return;
+      }
+      const config = { role, url };
+      if (role === 'server') {
+        config.laragonPath = laragonPathInput.value.trim();
+      }
+      await window.gstock.saveConfig(config);
+    });
+
+    init();
+  </script>
+</body>
+</html>

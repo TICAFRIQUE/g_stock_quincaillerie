@@ -1,0 +1,44 @@
+{
+  "name": "gstock-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Application desktop (coquille Electron) pour G-Stock Quincaillerie — poste serveur ou poste caisse.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.gstock.quincaillerie.desktop",
+    "productName": "G-Stock Quincaillerie",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "http://localhost/desktop-updates/"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  }
+}

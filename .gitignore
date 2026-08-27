@@ -14,7 +14,10 @@
 /.zed
 /auth.json
 /node_modules
+/desktop/node_modules
+/desktop/dist
 /public/build
+/public/desktop-updates
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage

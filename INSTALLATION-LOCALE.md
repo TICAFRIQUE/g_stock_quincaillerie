@@ -95,6 +95,17 @@ navigateur s'ouvre directement sur l'application.
 pour déboguer depuis le Terminal Laragon si jamais ça ne s'ouvre pas — c'est
 la version que `demarrer-silencieux.vbs` exécute en coulisses.
 
+### Alternative : application desktop native (multi-poste réseau)
+
+Pour donner une vraie icône/fenêtre d'application (au lieu d'un raccourci
+`.vbs` + onglet de navigateur), et pour équiper plusieurs postes caisse en
+réseau local qui se connectent tous au même poste serveur : voir
+`desktop/README.md`. C'est une coquille Electron, pas une réécriture — le
+poste serveur continue de tourner sur Laragon exactement comme décrit
+ci-dessus (`installer.bat` reste l'étape d'installation initiale), les
+postes caisse n'installent ni PHP ni MySQL, juste cette coquille pointée sur
+l'adresse réseau du serveur.
+
 ## 5. Installer sans connexion internet du tout
 
 Si le poste client n'a pas internet, ou pour ne pas en dépendre le jour de
