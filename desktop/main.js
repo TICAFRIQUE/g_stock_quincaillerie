@@ -151,15 +151,27 @@ async function ensureLaragonRunning(laragonPath) {
   return false;
 }
 
-function showMessage(win, title, message, { showSettingsHint = true } = {}) {
+function showMessage(win, title, message, { showSettingsButton = true } = {}) {
   const html = `
     <html>
       <head><meta charset="utf-8" /></head>
       <body style="font-family:Segoe UI,sans-serif;text-align:center;margin-top:18vh;background:#1e1e1e;color:#eee;">
         <h2>${title}</h2>
         <p style="max-width:480px;margin:0 auto 20px;color:#ccc;">${message}</p>
-        <button onclick="location.reload()" style="padding:10px 20px;font-size:14px;cursor:pointer;">Réessayer</button>
-        ${showSettingsHint ? '<p style="margin-top:24px;font-size:12px;color:#888;">Menu Fichier → Paramètres du poste, pour corriger l\'adresse.</p>' : ''}
+        <div style="display:flex;gap:12px;justify-content:center;">
+          <button onclick="location.reload()" style="padding:10px 20px;font-size:14px;cursor:pointer;">Réessayer</button>
+          ${
+            showSettingsButton
+              ? '<button id="gstock-settings-btn" style="padding:10px 20px;font-size:14px;cursor:pointer;background:#e8590c;color:#fff;border:none;border-radius:4px;">Modifier l\'adresse du serveur</button>'
+              : ''
+          }
+        </div>
+        <script>
+          const btn = document.getElementById('gstock-settings-btn');
+          if (btn && window.gstock) {
+            btn.addEventListener('click', () => window.gstock.openSettings());
+          }
+        </script>
       </body>
     </html>
   `;
@@ -182,6 +194,7 @@ async function openMainWindow(config) {
     title: 'G-Stock Quincaillerie',
     show: false,
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -229,6 +242,7 @@ ipcMain.handle('gstock:defaults', () => ({
   laragonPath: DEFAULT_LARAGON_PATH,
   serverUrl: DEFAULT_SERVER_URL,
 }));
+ipcMain.handle('gstock:open-settings', () => openSetupWindow());
 ipcMain.handle('gstock:save-config', async (_event, config) => {
   saveConfig(config);
   if (setupWindow) {

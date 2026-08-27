@@ -1,6 +1,6 @@
 {
   "name": "gstock-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Application desktop (coquille Electron) pour G-Stock Quincaillerie — poste serveur ou poste caisse.",
   "main": "main.js",
