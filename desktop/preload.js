@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('gstock', {
   saveConfig: (config) => ipcRenderer.invoke('gstock:save-config', config),
   openSettings: () => ipcRenderer.invoke('gstock:open-settings'),
   print: () => ipcRenderer.invoke('gstock:print'),
+  printPdfUrl: (url) => ipcRenderer.invoke('gstock:print-pdf-url', url),
 });

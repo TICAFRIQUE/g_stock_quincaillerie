@@ -680,12 +680,17 @@
 
 @push('scripts')
     <script>
-        // Imprime le PDF réel (dompdf, route ventes.pdf) dans un iframe caché,
-        // plutôt que de basculer l'affichage sur #factureImprimable et
-        // d'imprimer cette page HTML : rendu garanti identique à
-        // "Télécharger en PDF" (dompdf a un support CSS différent d'un
-        // navigateur/Electron — voir x-bouton-imprimer pour le même mécanisme).
+        // Imprime le PDF réel (dompdf, route ventes.pdf), plutôt que de
+        // basculer l'affichage sur #factureImprimable et d'imprimer cette
+        // page HTML : rendu garanti identique à "Télécharger en PDF" (dompdf
+        // a un support CSS différent d'un navigateur/Electron — voir
+        // x-bouton-imprimer pour le même mécanisme).
         function imprimerFacture() {
+            const url = '{{ route('ventes.pdf', $vente) }}?imprimer=1';
+            if (window.gstock && window.gstock.printPdfUrl) {
+                window.gstock.printPdfUrl(url);
+                return;
+            }
             let iframe = document.getElementById('__iframeFacturePdf');
             if (! iframe) {
                 iframe = document.createElement('iframe');
@@ -696,14 +701,10 @@
             iframe.onload = function () {
                 setTimeout(() => {
                     iframe.contentWindow.focus();
-                    if (window.gstock && window.gstock.print) {
-                        window.gstock.print();
-                    } else {
-                        iframe.contentWindow.print();
-                    }
+                    iframe.contentWindow.print();
                 }, 200);
             };
-            iframe.src = '{{ route('ventes.pdf', $vente) }}?imprimer=1';
+            iframe.src = url;
         }
     </script>
 @endpush

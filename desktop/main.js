@@ -200,6 +200,11 @@ async function openMainWindow(config) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Sans ça, un <iframe> caché pointé sur une URL PDF (impression
+      // "Facture"/devis, voir bouton-imprimer.blade.php) ne peut pas
+      // afficher le PDF — l'impression retombait alors sur la page visible
+      // derrière au lieu du PDF réel.
+      plugins: true,
     },
   });
 
@@ -247,7 +252,7 @@ ipcMain.handle('gstock:defaults', () => ({
 ipcMain.handle('gstock:open-settings', () => openSetupWindow());
 let previewWindow = null;
 
-function openPdfPreview(filePath, title) {
+function openPdfPreview(url, title) {
   if (previewWindow && !previewWindow.isDestroyed()) {
     previewWindow.close();
   }
@@ -267,11 +272,22 @@ function openPdfPreview(filePath, title) {
     },
   });
   previewWindow.setMenuBarVisibility(false);
-  previewWindow.loadURL(pathToFileURL(filePath).toString());
+  previewWindow.loadURL(url);
   previewWindow.on('closed', () => {
     previewWindow = null;
   });
 }
+
+ipcMain.handle('gstock:print-pdf-url', (_event, url) => {
+  // Facture/devis/bon d'achat : on affiche directement le PDF déjà généré
+  // par le serveur (dompdf, route .pdf) dans sa propre fenêtre — plus fiable
+  // qu'un <iframe> caché + printToPDF() de la fenêtre principale, qui ne
+  // ciblait pas correctement le cadre du PDF (l'impression retombait sur la
+  // page visible derrière au lieu du PDF réel).
+  if (!url) return { success: false, reason: 'no-url' };
+  openPdfPreview(url, mainWindow ? mainWindow.getTitle() : undefined);
+  return { success: true };
+});
 
 ipcMain.handle('gstock:print', async () => {
   if (!mainWindow) return { success: false, reason: 'no-window' };
@@ -293,7 +309,7 @@ ipcMain.handle('gstock:print', async () => {
     });
     const filePath = path.join(os.tmpdir(), `gstock-impression-${Date.now()}.pdf`);
     fs.writeFileSync(filePath, pdfBuffer);
-    openPdfPreview(filePath, mainWindow.getTitle());
+    openPdfPreview(pathToFileURL(filePath).toString(), mainWindow.getTitle());
     return { success: true };
   } catch (err) {
     dialog.showErrorBox('Impression', `Impossible de générer l'aperçu : ${err.message}`);
