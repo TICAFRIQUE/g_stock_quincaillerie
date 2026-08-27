@@ -14,11 +14,11 @@
         </div>
         <div class="d-flex gap-2">
             @can('fournisseur.reglement')
-                @if ($solde > 0)
-                    <button type="button" class="btn btn-reglement" data-bs-toggle="modal" data-bs-target="#reglerFournisseurModal">
-                        <i class="bi bi-cash-coin me-1"></i>Régler
-                    </button>
-                @endif
+                {{-- Règlement global (solde total) volontairement masqué pour
+                     l'instant : on règle d'abord par bon d'achat précis (bouton
+                     dédié dans le tableau ci-dessous, voir resterFournisseurModal
+                     en mode ciblé) — reglerIntegralite() reste fonctionnel côté
+                     serveur, seule cette entrée est retirée de l'écran. --}}
                 @if ($solde < 0)
                     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#rembourserAvoirFournisseurModal">
                         <i class="bi bi-arrow-return-left me-1"></i>Encaisser l'avoir
@@ -34,25 +34,21 @@
     </div>
 
     <div class="row g-3 mb-3">
-        <div class="col-6 col-md-4 col-lg-2">
+        <div class="col-6 col-md-3">
             <x-kpi-card label="Solde du compte" icon="bi-cash-stack" :color="$solde > 0 ? 'danger' : 'success'"
                 :value="number_format($solde, 0, ',', ' ') . ' F' . ($solde < 0 ? ' (avoir)' : '')" />
         </div>
-        <div class="col-6 col-md-4 col-lg-2">
+        <div class="col-6 col-md-3">
             <x-kpi-card label="Total achats" icon="bi-graph-up-arrow" color="info"
                 :value="number_format($totalAchats, 0, ',', ' ') . ' F'" />
         </div>
-        <div class="col-6 col-md-4 col-lg-2">
+        <div class="col-6 col-md-3">
             <x-kpi-card label="Bons d'achat" icon="bi-truck" color="primary"
                 :value="$fournisseur->commande_achats_count" />
         </div>
-        <div class="col-6 col-md-4 col-lg-2">
+        <div class="col-6 col-md-3">
             <x-kpi-card label="Total réglé" icon="bi-check2-circle" color="success"
                 :value="number_format($totalRegle, 0, ',', ' ') . ' F'" />
-        </div>
-        <div class="col-6 col-md-4 col-lg-2">
-            <x-kpi-card label="Panier moyen" icon="bi-basket" color="warning"
-                :value="number_format($nombreAchats > 0 ? intdiv($totalAchats, $nombreAchats) : 0, 0, ',', ' ') . ' F'" />
         </div>
     </div>
 

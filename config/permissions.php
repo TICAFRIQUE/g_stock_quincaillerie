@@ -55,6 +55,7 @@ return [
         'caisse.mouvement',
         'tresorerie.voir',
         'tresorerie.gerer',
+        'motif.gerer',
         'rapport.voir',
         'utilisateur.gerer',
         'role.gerer',

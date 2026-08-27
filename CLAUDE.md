@@ -289,6 +289,18 @@ client, réglé plus tard.
   motif (libre, obligatoire), une session de caisse, un auteur — utilisable pour
   n'importe quelle raison (appoint, prélèvement, dépense diverse, paiement fournisseur en
   espèces…). Immuable comme tout mouvement (règle 2/19) : correction = mouvement inverse.
+- **Motif saisi via un `<select>`**, alimenté par un référentiel géré en Administration
+  (`MotifMouvement`, permission `motif.gerer`) — jamais une contrainte stricte : le champ
+  `motif` reste une chaîne libre sur `MouvementCaisse`/`EcritureCompteTresorerie` (ce
+  référentiel ne fait qu'harmoniser les libellés déjà proposés). Un bouton "+" à côté du
+  select permet de créer un motif à la volée sans quitter le formulaire de mouvement
+  (`motifs-mouvement.rapide`, accessible à tout utilisateur connecté — pas seulement
+  `motif.gerer` — puisque quiconque peut déjà soumettre un mouvement) : le nouveau motif
+  s'insère en tête de liste (juste après le placeholder) et se sélectionne aussitôt, sans
+  recharger la page ni perdre le montant/type déjà saisis. Utilisé par les deux
+  formulaires d'entrée/sortie existants (`sessions/{session}` pour une caisse de
+  caissier, `comptabilite/caisses/{compte}` pour la trésorerie) — même référentiel
+  partagé entre les deux, un seul endroit à administrer.
 - **Session de caisse ouverte obligatoire** (règle 19), comme une vente. Le montant
   impacte directement le solde théorique du tiroir de cette session, en temps réel — pas
   seulement au moment de la clôture.
@@ -434,7 +446,7 @@ client, réglé plus tard.
   `caisse.cloturer`, `caisse.mouvement`, `tresorerie.voir`, `tresorerie.gerer`,
   `client.gerer`, `client.reglement`, `client.depasser_limite`, `fournisseur.voir`,
   `fournisseur.gerer`, `fournisseur.reglement`, `taxe.gerer`, `typeclient.gerer`,
-  `rapport.voir`, `utilisateur.gerer`, `role.gerer`, `parametre.gerer`.
+  `motif.gerer`, `rapport.voir`, `utilisateur.gerer`, `role.gerer`, `parametre.gerer`.
 - **Superadmin** : bypass total via `Gate::before` (ne reçoit pas de permissions).
 - **Noyau de permissions système protégé** : non attribuable aux rôles créés à la volée.
 - Rôles par défaut seedés : Superadmin, Gérant, Caissier — **modifiables**.
@@ -631,6 +643,15 @@ client, réglé plus tard.
   **uniquement via une couche service** encapsulant la transaction ; pas d'écriture
   directe depuis les contrôleurs.
 - Rapports = agrégats/vues, sans dupliquer la logique métier.
+- **`nom`/`libellé` mis en forme automatiquement à la casse "phrase"** (première lettre
+  en majuscule, reste en minuscule — ex. `"VIS À BOIS"` → `"Vis à bois"`) sur tous les
+  référentiels simples : `Categorie`, `Produit` (`nom` et `libelle_distinctif`),
+  `Fournisseur`, `Client`, `MotifMouvement`, `Caisse`, `Magasin`, `Taxe`, `TypeClient`,
+  `Unite`, `MoyenPaiement`. Via un mutator d'attribut Eloquent partagé
+  (`App\Models\Concerns\MetEnFormePhrase`), donc appliqué uniformément à la création et
+  à la modification, quel que soit le point d'entrée (formulaire, tinker, seeder) —
+  jamais une transformation dupliquée par contrôleur. Volontairement absent des noms de
+  personnes (`Utilisateur`, `Role`) où une casse imposée serait déplacée.
 
 ---
 

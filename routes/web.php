@@ -12,6 +12,7 @@ use App\Http\Controllers\FournisseurController;
 use App\Http\Controllers\InventaireController;
 use App\Http\Controllers\JournalActiviteController;
 use App\Http\Controllers\MagasinController;
+use App\Http\Controllers\MotifMouvementController;
 use App\Http\Controllers\MoyenPaiementController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ParametreController;
@@ -123,6 +124,21 @@ Route::middleware('auth')->group(function () {
         Route::resource('type-clients', TypeClientController::class)
             ->except(['show'])
             ->parameters(['type-clients' => 'typeClient']);
+    });
+
+    // motifs-mouvement/rapide avant le resource() ci-dessous : sinon "rapide"
+    // serait capturé comme un {motifMouvement} par la route show/edit.
+    // Accessible à tout utilisateur connecté (pas seulement motif.gerer) :
+    // quiconque peut déjà soumettre un mouvement de caisse/trésorerie doit
+    // pouvoir y ajouter un nouveau motif à la volée (voir CLAUDE.md,
+    // Mouvements de caisse) — seule la gestion complète (modifier/supprimer)
+    // reste réservée à motif.gerer.
+    Route::post('motifs-mouvement/rapide', [MotifMouvementController::class, 'storeRapide'])->name('motifs-mouvement.rapide');
+
+    Route::middleware('can:motif.gerer')->group(function () {
+        Route::resource('motifs-mouvement', MotifMouvementController::class)
+            ->except(['show'])
+            ->parameters(['motifs-mouvement' => 'motifMouvement']);
     });
 
     Route::middleware('can:client.voir')->group(function () {

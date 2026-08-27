@@ -7,21 +7,25 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
-#[Fillable(['magasin_id', 'nom', 'sequence_ventes', 'actif'])]
-class Caisse extends Model
+/**
+ * Référentiel des motifs proposés pour un mouvement d'entrée/sortie —
+ * caisse de caissier (MouvementCaisse) ou trésorerie (EcritureCompteTresorerie).
+ * N'est jamais une contrainte stricte : les deux modèles gardent leur propre
+ * colonne `motif` en texte libre (règle 19 — "motif (libre, obligatoire)"),
+ * ce référentiel ne fait que suggérer/harmoniser les libellés déjà utilisés.
+ */
+#[Fillable(['nom', 'actif'])]
+class MotifMouvement extends Model
 {
-    use HasFactory, SoftDeletes, LogsActivity, MetEnFormePhrase;
+    use HasFactory, LogsActivity, SoftDeletes, MetEnFormePhrase;
 
     protected function casts(): array
     {
         return [
-            'sequence_ventes' => 'integer',
             'actif' => 'boolean',
         ];
     }
@@ -34,19 +38,5 @@ class Caisse extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()->logFillable()->logOnlyDirty();
-    }
-
-    /**
-     * withTrashed() : évite un crash d'affichage si le magasin a été
-     * supprimé (soft delete) alors que la caisse le référence encore.
-     */
-    public function magasin(): BelongsTo
-    {
-        return $this->belongsTo(Magasin::class)->withTrashed();
-    }
-
-    public function sessionCaisses(): HasMany
-    {
-        return $this->hasMany(SessionCaisse::class);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\MetEnFormePhrase;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,13 +19,18 @@ use Illuminate\Support\Facades\Cache;
 #[Fillable(['nom', 'abbreviation', 'actif'])]
 class Unite extends Model
 {
-    use HasFactory;
+    use HasFactory, MetEnFormePhrase;
 
     protected function casts(): array
     {
         return [
             'actif' => 'boolean',
         ];
+    }
+
+    protected function nom(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value) => static::casseEnPhrase($value));
     }
 
     /**

@@ -200,11 +200,17 @@ class CommandeAchatController extends Controller
         return view('commande-achats.facture', $this->chargerDonneesFacture($commandeAchat));
     }
 
-    public function pdf(CommandeAchat $commandeAchat): Response
+    public function pdf(Request $request, CommandeAchat $commandeAchat): Response
     {
         $pdf = Pdf::loadView('commande-achats.facture', $this->chargerDonneesFacture($commandeAchat) + ['pourPdf' => true]);
 
-        return $pdf->download("bon-d-achat-{$commandeAchat->numero}.pdf");
+        // ?imprimer=1 (voir x-bouton-imprimer) : ouvre le PDF dans l'onglet
+        // au lieu de forcer un téléchargement, pour que le bouton "Imprimer"
+        // du détail du bon d'achat ne fasse jamais naviguer vers une autre
+        // page (même mécanisme que ExporteListe::pdfDepuisListe()).
+        $nomFichier = "bon-d-achat-{$commandeAchat->numero}.pdf";
+
+        return $request->boolean('imprimer') ? $pdf->stream($nomFichier) : $pdf->download($nomFichier);
     }
 
     public function excel(CommandeAchat $commandeAchat): StreamedResponse

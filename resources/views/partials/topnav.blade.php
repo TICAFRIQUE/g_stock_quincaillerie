@@ -134,11 +134,11 @@
         </li>
     @endcan
 
-    @canany(['administration.gerer', 'taxe.gerer', 'typeclient.gerer', 'parametre.gerer', 'utilisateur.gerer',
+    @canany(['administration.gerer', 'taxe.gerer', 'typeclient.gerer', 'motif.gerer', 'parametre.gerer', 'utilisateur.gerer',
         'role.gerer'])
         <li class="nav-item dropdown">
             <a href="#"
-                class="nav-link dropdown-toggle {{ request()->routeIs('magasins.*', 'caisses.*', 'moyens-paiement.*', 'unites.*', 'taxes.*', 'type-clients.*', 'parametres.*', 'utilisateurs.*', 'roles.*') ? 'active' : '' }}"
+                class="nav-link dropdown-toggle {{ request()->routeIs('magasins.*', 'caisses.*', 'moyens-paiement.*', 'unites.*', 'taxes.*', 'type-clients.*', 'motifs-mouvement.*', 'parametres.*', 'utilisateurs.*', 'roles.*') ? 'active' : '' }}"
                 data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="bi bi-gear-wide-connected me-1"></i>Administration
             </a>
@@ -184,6 +184,15 @@
                         <a href="{{ route('type-clients.index') }}"
                             class="dropdown-item {{ request()->routeIs('type-clients.*') ? 'active' : '' }}">
                             <i class="bi bi-person-badge me-2"></i>Types de client
+                        </a>
+                    </li>
+                @endcan
+
+                @can('motif.gerer')
+                    <li>
+                        <a href="{{ route('motifs-mouvement.index') }}"
+                            class="dropdown-item {{ request()->routeIs('motifs-mouvement.*') ? 'active' : '' }}">
+                            <i class="bi bi-tag me-2"></i>Motifs de mouvement
                         </a>
                     </li>
                 @endcan

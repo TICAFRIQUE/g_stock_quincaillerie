@@ -11,6 +11,7 @@ use App\Http\Controllers\Concerns\AutoriseMagasin;
 use App\Http\Controllers\Concerns\ExporteListe;
 use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\Caisse;
+use App\Models\MotifMouvement;
 use App\Models\MoyenPaiement;
 use App\Models\Paiement;
 use App\Models\ReglementPaiement;
@@ -159,6 +160,7 @@ class SessionCaisseController extends Controller
             'soldeTheorique' => $detailTheorique['theorique'] ?? null,
             'totalEntreesCaisse' => $detailTheorique['entrees'] ?? $session->total_entrees_especes,
             'totalSortiesCaisse' => $detailTheorique['sorties'] ?? $session->total_sorties_especes,
+            'motifs' => MotifMouvement::where('actif', true)->orderBy('nom')->get(),
         ]);
     }
 

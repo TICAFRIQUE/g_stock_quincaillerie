@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\MetEnFormePhrase;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,13 +16,18 @@ use Spatie\Activitylog\Traits\LogsActivity;
 #[Fillable(['nom', 'code', 'telephone', 'email', 'adresse', 'actif'])]
 class Fournisseur extends Model
 {
-    use HasFactory, LogsActivity, SoftDeletes;
+    use HasFactory, LogsActivity, SoftDeletes, MetEnFormePhrase;
 
     protected function casts(): array
     {
         return [
             'actif' => 'boolean',
         ];
+    }
+
+    protected function nom(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value) => static::casseEnPhrase($value));
     }
 
     public function getActivitylogOptions(): LogOptions

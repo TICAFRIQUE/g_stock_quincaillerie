@@ -108,8 +108,10 @@
                                             </td>
                                             <td>
                                                 <div class="d-flex align-items-center gap-1">
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" @click="changerQuantite(ligne, -1)">−</button>
-                                                    <span x-text="ligne.quantite"></span>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" :disabled="atteintMin(ligne)" @click="changerQuantite(ligne, -1)">−</button>
+                                                    <input type="number" class="form-control form-control-sm text-center p-1" style="width: 3.5rem;" min="1"
+                                                           :value="ligne.quantite" @input="definirQuantite(ligne, $event.target.value, $event.target)"
+                                                           @blur="validerQuantite(ligne, $event.target.value, $event.target)">
                                                     <button type="button" class="btn btn-sm btn-outline-secondary btn-icon" :disabled="atteintMaxStock(ligne)" @click="changerQuantite(ligne, 1)">+</button>
                                                 </div>
                                             </td>

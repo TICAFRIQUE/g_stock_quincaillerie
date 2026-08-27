@@ -16,8 +16,9 @@
         </div>
 
         <div class="d-flex gap-2">
-            <a href="{{ route('commande-achats.facture', $commande) }}" class="btn btn-outline-secondary" target="_blank" rel="noopener">
-                <i class="bi bi-file-earmark-text me-1"></i>Voir le bon d'achat
+            <x-bouton-imprimer :pdf-route="route('commande-achats.pdf', $commande)" />
+            <a href="{{ route('commande-achats.pdf', $commande) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
             </a>
             @if (! $commande->trashed() && $commande->statut === 'brouillon' && $peutAnnuler)
                 <x-delete-button :action="route('commande-achats.destroy', $commande)" :label="'la commande « '.$commande->numero.' »'" />

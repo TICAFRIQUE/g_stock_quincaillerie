@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\MetEnFormePhrase;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,7 +22,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 ])]
 class Produit extends Model implements HasMedia
 {
-    use HasFactory, SoftDeletes, LogsActivity, InteractsWithMedia;
+    use HasFactory, SoftDeletes, LogsActivity, InteractsWithMedia, MetEnFormePhrase;
 
     /**
      * Clé de cache du catalogue de vente (voir catalogueVente()) — publique
@@ -42,6 +43,16 @@ class Produit extends Model implements HasMedia
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()->logFillable()->logOnlyDirty();
+    }
+
+    protected function nom(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value) => static::casseEnPhrase($value));
+    }
+
+    protected function libelleDistinctif(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value) => static::casseEnPhrase($value));
     }
 
     /**

@@ -127,16 +127,27 @@ class QuincaillerieTestSeeder extends Seeder
         ];
 
         foreach ($definitions as [$nom, $libelle, $categorieNom, $uniteBaseNom, $prixPiece, $seuil, $unitesVente]) {
-            $produit = Produit::create([
-                'sku' => $this->genererSku(),
-                'nom' => $nom,
-                'libelle_distinctif' => $libelle,
-                'categorie_id' => $this->categories[$categorieNom]->id,
-                'prix_piece' => $prixPiece,
-                'unite_base_id' => $this->unites[$uniteBaseNom]->id,
-                'seuil_alerte' => $seuil,
-                'actif' => true,
-            ]);
+            // firstOrCreate(['nom' => ...]) : relancer ce seeder (ex. par
+            // erreur) ne doit jamais recréer le catalogue de démo en double —
+            // un produit "réel" peut légitimement partager un nom avec un
+            // autre (règle 4, SKU seul identifiant), mais CE seeder ne
+            // représente jamais qu'UN seul produit par nom de sa propre liste.
+            $produit = Produit::firstOrCreate(
+                ['nom' => $nom],
+                [
+                    'sku' => $this->genererSku(),
+                    'libelle_distinctif' => $libelle,
+                    'categorie_id' => $this->categories[$categorieNom]->id,
+                    'prix_piece' => $prixPiece,
+                    'unite_base_id' => $this->unites[$uniteBaseNom]->id,
+                    'seuil_alerte' => $seuil,
+                    'actif' => true,
+                ]
+            );
+
+            if (! $produit->wasRecentlyCreated) {
+                continue;
+            }
 
             foreach ($unitesVente as [$uniteNom, $facteur, $prix]) {
                 $produit->uniteVentes()->create([

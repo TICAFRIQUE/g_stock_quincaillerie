@@ -9,6 +9,7 @@ use App\Http\Controllers\Concerns\JournalCaisse;
 use App\Models\Caisse;
 use App\Models\CompteTresorerie;
 use App\Models\EcritureCompteTresorerie;
+use App\Models\MotifMouvement;
 use App\Models\User;
 use App\Services\CaisseSessionService;
 use App\Services\CompteTresorerieService;
@@ -92,6 +93,7 @@ class ComptabiliteController extends Controller
             'totalSorties' => (int) abs((clone $requeteFiltree)->where('montant', '<', 0)->sum('montant')),
             'ecritures' => $ecritures,
             'autresComptes' => $autresComptes,
+            'motifs' => MotifMouvement::where('actif', true)->orderBy('nom')->get(),
         ]);
     }
 

@@ -176,7 +176,7 @@
     @endif
 
     @if ($peutMouvementer && ! $session->date_cloture)
-        <div class="card mb-2 shadow-sm" x-data="{ ouvert: false }">
+        <div class="card mb-2 shadow-sm" x-data="{ ouvert: false, ajoutMotifOuvert: false }">
             <div class="card-body p-2 px-3">
                 <div class="d-flex align-items-start justify-content-between gap-2">
                     <div>
@@ -208,8 +208,26 @@
                         </div>
                         <div class="col-12 col-md-6">
                             <label for="motif" class="form-label small mb-1">Motif</label>
-                            <input type="text" name="motif" id="motif" maxlength="255" class="form-control form-control-sm"
-                                   placeholder="Ex. paiement fournisseur en espèces, achat de fournitures…" required>
+                            <div class="d-flex gap-1">
+                                <select name="motif" id="motif" x-ref="motifSelect" class="form-select form-select-sm" required>
+                                    <option value="">— Choisir —</option>
+                                    @foreach ($motifs as $m)
+                                        <option value="{{ $m->nom }}">{{ $m->nom }}</option>
+                                    @endforeach
+                                </select>
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" title="Nouveau motif"
+                                        @click="ajoutMotifOuvert = !ajoutMotifOuvert">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+                            <div class="input-group input-group-sm mt-1" x-show="ajoutMotifOuvert" x-cloak>
+                                <input type="text" x-ref="motifNouveau" class="form-control" placeholder="Nouveau motif…" maxlength="255"
+                                       @keydown.enter.prevent="window.ajouterMotifRapide($refs.motifSelect, $refs.motifNouveau, () => ajoutMotifOuvert = false)">
+                                <button type="button" class="btn btn-outline-primary"
+                                        @click="window.ajouterMotifRapide($refs.motifSelect, $refs.motifNouveau, () => ajoutMotifOuvert = false)">
+                                    Ajouter
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div class="d-flex gap-2 mt-2">

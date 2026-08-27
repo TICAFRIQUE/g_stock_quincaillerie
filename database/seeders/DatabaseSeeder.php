@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             UniteSeeder::class,
             TaxeSeeder::class,
             CompteTresorerieSeeder::class,
+            MotifMouvementSeeder::class,
         ]);
 
         if (app()->environment('local')) {

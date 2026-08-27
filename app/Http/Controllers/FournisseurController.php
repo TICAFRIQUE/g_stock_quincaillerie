@@ -130,7 +130,6 @@ class FournisseurController extends Controller
             'fournisseur' => $fournisseur,
             'solde' => $fournisseur->solde(),
             'totalAchats' => $fournisseur->totalAchats(),
-            'nombreAchats' => $fournisseur->nombreAchats(),
             'totalRegle' => $fournisseur->totalRegle(),
             'ecritures' => $ecritures,
             'commandes' => $commandes,

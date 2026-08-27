@@ -384,18 +384,65 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
             ligne.prixUnitaire = unite ? unite.prix : produit.prix_piece;
         },
 
+        // À 1, "−" ne fait plus rien (bouton désactivé côté vue, voir
+        // atteintMin ci-dessous) : retirer une ligne est un geste séparé et
+        // explicite (bouton corbeille, retirerLigne()), jamais une
+        // conséquence accidentelle d'un clic de trop sur "−".
         changerQuantite(ligne, delta) {
             const nouvelle = ligne.quantite + delta;
-            if (nouvelle < 1) {
-                this.panier.splice(this.panier.indexOf(ligne), 1);
-                return;
-            }
+            if (nouvelle < 1) return;
             const dispo = this.stockDisponible(ligne);
             if (dispo !== null) {
                 const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * (ligne.facteur || 0);
                 if (autresPieces + nouvelle * (ligne.facteur || 0) > dispo) return;
             }
             ligne.quantite = nouvelle;
+        },
+
+        atteintMin(ligne) {
+            return ligne.quantite <= 1;
+        },
+
+        // Saisie manuelle (en plus des boutons −/+), déclenchée à chaque
+        // frappe (@input) pour agir immédiatement, sans attendre un clic
+        // ailleurs — même plafond de stock que changerQuantite(), mais
+        // résolu directement en quantité maximale plutôt que testée un
+        // incrément à la fois (sinon taper une grande quantité, ex. 50,
+        // obligerait à cliquer "+" 50 fois). Un champ vide/en cours de
+        // frappe (parseInt non fini) ne force rien : on laisse taper plutôt
+        // que de faire sauter le champ à "1" à chaque touche effacée.
+        // `input` (l'élément DOM, passé par @input) est mis à jour
+        // explicitement : si la quantité tapée (ex. "0") retombe sur la
+        // MÊME valeur déjà en mémoire (ex. déjà 1), Alpine ne redéclenche
+        // pas la liaison :value (aucun changement détecté côté modèle) et
+        // le champ resterait visuellement sur "0" tapé alors que la
+        // quantité réelle est bien 1 — d'où ce forçage manuel.
+        definirQuantite(ligne, valeur, input = null) {
+            const nombre = parseInt(valeur, 10);
+            if (!Number.isFinite(nombre)) return;
+            let nouvelle = Math.max(1, nombre);
+
+            const dispo = this.stockDisponible(ligne);
+            if (dispo !== null) {
+                const facteur = ligne.facteur || 1;
+                const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * facteur;
+                const maxQuantite = Math.max(1, Math.floor((dispo - autresPieces) / facteur));
+                nouvelle = Math.min(nouvelle, maxQuantite);
+            }
+
+            ligne.quantite = nouvelle;
+            if (input) input.value = nouvelle;
+        },
+
+        // Filet de sécurité au blur (@blur) : un champ resté vide/invalide
+        // (tout effacé sans retaper) retombe sur 1, jamais une quantité
+        // indéfinie — definirQuantite() n'y touche pas tant qu'on tape.
+        // Même forçage explicite du DOM que definirQuantite() ci-dessus.
+        validerQuantite(ligne, valeur, input = null) {
+            if (!Number.isFinite(parseInt(valeur, 10))) {
+                ligne.quantite = 1;
+                if (input) input.value = 1;
+            }
         },
 
         // Désactive le bouton "+" une fois le stock du lieu choisi atteint —
@@ -608,13 +655,41 @@ window.devisApp = function (produits, panierInitial = []) {
             ligne.prixUnitaire = unite ? unite.prix : produit.prix_piece;
         },
 
+        // À 1, "−" ne fait plus rien (voir atteintMin) : retirer une ligne
+        // reste un geste séparé et explicite (bouton corbeille).
         changerQuantite(ligne, delta) {
             const nouvelle = ligne.quantite + delta;
-            if (nouvelle < 1) {
-                this.panier.splice(this.panier.indexOf(ligne), 1);
-                return;
-            }
+            if (nouvelle < 1) return;
             ligne.quantite = nouvelle;
+        },
+
+        atteintMin(ligne) {
+            return ligne.quantite <= 1;
+        },
+
+        // Saisie manuelle (en plus des boutons −/+), déclenchée à chaque
+        // frappe (@input) pour agir immédiatement — un devis ne vérifie
+        // jamais le stock (montants indicatifs, hors caisse — voir
+        // CLAUDE.md), donc juste un plancher à 1, pas de plafond. Un champ
+        // vide/en cours de frappe ne force rien (voir validerQuantite()).
+        // `input` forcé explicitement : si la valeur clampée (ex. "0" → 1)
+        // égale la quantité déjà en mémoire, Alpine ne redéclenche pas la
+        // liaison :value et le champ resterait visuellement sur "0" tapé.
+        definirQuantite(ligne, valeur, input = null) {
+            const nombre = parseInt(valeur, 10);
+            if (!Number.isFinite(nombre)) return;
+            ligne.quantite = Math.max(1, nombre);
+            if (input) input.value = ligne.quantite;
+        },
+
+        // Filet de sécurité au blur (@blur) : un champ resté vide/invalide
+        // retombe sur 1, jamais une quantité indéfinie. Même forçage du DOM
+        // que definirQuantite() ci-dessus.
+        validerQuantite(ligne, valeur, input = null) {
+            if (!Number.isFinite(parseInt(valeur, 10))) {
+                ligne.quantite = 1;
+                if (input) input.value = 1;
+            }
         },
 
         retirerLigne(index) {
@@ -908,4 +983,47 @@ window.soumettreClientRapide = function () {
         .finally(() => {
             bouton.disabled = false;
         });
+};
+
+// --- Ajout rapide d'un motif de mouvement (caisse ou trésorerie) ---
+//
+// Insère le nouveau motif tout en haut du <select> (juste après le
+// placeholder "— Choisir —") et le sélectionne directement — le formulaire
+// de mouvement en cours (type/montant déjà saisis) n'est jamais perdu ni
+// rechargé. Le motif reste une chaîne libre côté MouvementCaisse/
+// EcritureCompteTresorerie (règle 19) : ce référentiel ne fait qu'alimenter
+// le <select>, la valeur soumise est le nom, jamais un identifiant.
+window.ajouterMotifRapide = function (selectEl, inputEl, fermerCallback) {
+    const nom = inputEl.value.trim();
+    if (!nom) {
+        inputEl.focus();
+        return;
+    }
+
+    fetch('/motifs-mouvement/rapide', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+        },
+        body: JSON.stringify({ nom }),
+    })
+        .then(async (response) => {
+            const data = await response.json();
+
+            if (!response.ok) {
+                afficherToastErreur(data.errors?.nom?.[0] ?? data.message ?? 'Impossible de créer le motif.');
+                return;
+            }
+
+            const option = new Option(data.nom, data.nom, true, true);
+            selectEl.add(option, selectEl.options.length > 0 ? 1 : null);
+            selectEl.value = data.nom;
+            selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+
+            inputEl.value = '';
+            if (fermerCallback) fermerCallback();
+        })
+        .catch(() => afficherToastErreur('Impossible de créer le motif. Vérifiez votre connexion.'));
 };
