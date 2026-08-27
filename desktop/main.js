@@ -1,7 +1,8 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { pathToFileURL } = require('url');
 const { execFile, spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 
@@ -244,14 +245,42 @@ ipcMain.handle('gstock:defaults', () => ({
   serverUrl: DEFAULT_SERVER_URL,
 }));
 ipcMain.handle('gstock:open-settings', () => openSetupWindow());
+let previewWindow = null;
+
+function openPdfPreview(filePath, title) {
+  if (previewWindow && !previewWindow.isDestroyed()) {
+    previewWindow.close();
+  }
+  previewWindow = new BrowserWindow({
+    width: 900,
+    height: 1000,
+    icon: APP_ICON,
+    title: title || 'Aperçu avant impression',
+    webPreferences: {
+      // Active le lecteur PDF intégré de Chromium (aperçu + son propre
+      // bouton Imprimer/Télécharger), pour rester dans l'application au
+      // lieu d'ouvrir un programme externe.
+      plugins: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  previewWindow.setMenuBarVisibility(false);
+  previewWindow.loadURL(pathToFileURL(filePath).toString());
+  previewWindow.on('closed', () => {
+    previewWindow = null;
+  });
+}
+
 ipcMain.handle('gstock:print', async () => {
   if (!mainWindow) return { success: false, reason: 'no-window' };
   // webContents.print() ouvre bien le dialogue Windows natif, mais son
   // panneau d'aperçu reste vide (Electron ne fournit pas les données que
   // Windows attend pour le générer — limitation connue, sans correctif côté
-  // application). On génère donc un PDF et on l'ouvre dans le lecteur PDF
-  // par défaut (Edge, en général), qui a un vrai aperçu et sa propre
-  // impression.
+  // application). On génère donc un PDF et on l'affiche dans une fenêtre de
+  // l'app via le lecteur PDF intégré de Chromium : vrai aperçu, sans quitter
+  // l'application.
   try {
     const pdfBuffer = await mainWindow.webContents.printToPDF({
       printBackground: true,
@@ -259,7 +288,7 @@ ipcMain.handle('gstock:print', async () => {
     });
     const filePath = path.join(os.tmpdir(), `gstock-impression-${Date.now()}.pdf`);
     fs.writeFileSync(filePath, pdfBuffer);
-    await shell.openPath(filePath);
+    openPdfPreview(filePath, mainWindow.getTitle());
     return { success: true };
   } catch (err) {
     dialog.showErrorBox('Impression', `Impossible de générer l'aperçu : ${err.message}`);
