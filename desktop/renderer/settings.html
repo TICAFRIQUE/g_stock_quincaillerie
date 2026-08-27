@@ -75,7 +75,13 @@
   <fieldset id="client-fields" class="hidden">
     <legend>Poste caisse</legend>
     <label for="serverUrlClient">Adresse du poste serveur</label>
-    <input type="text" id="serverUrlClient" placeholder="http://192.168.1.10" />
+    <input type="text" id="serverUrlClient" placeholder="http://g_stock_quincaillerie.test" />
+    <p class="role-desc" style="margin-top:8px;">
+      Utiliser le nom du site (ex. <code>g_stock_quincaillerie.test</code>),
+      pas l'IP brute — sinon Apache affiche la liste des dossiers au lieu de
+      l'application. Ce nom doit être ajouté dans le fichier <code>hosts</code>
+      de ce poste, pointant vers l'IP du serveur (voir INSTALLATION-LOCALE.md).
+    </p>
   </fieldset>
 
   <div class="actions">

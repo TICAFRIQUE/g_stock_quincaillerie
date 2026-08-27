@@ -106,6 +106,26 @@ ci-dessus (`installer.bat` reste l'étape d'installation initiale), les
 postes caisse n'installent ni PHP ni MySQL, juste cette coquille pointée sur
 l'adresse réseau du serveur.
 
+⚠️ **Ne jamais pointer un poste caisse sur l'IP brute du serveur**
+(ex. `http://192.168.1.10`). Les virtual hosts Laragon sont **basés sur le
+nom** (`g_stock_quincaillerie.test`), pas sur l'IP : Apache ne reconnaît le
+projet que si la requête arrive avec ce nom, sinon il retombe sur sa page
+par défaut, qui liste tous les dossiers de `C:\laragon\www\` (« Index of / »)
+— symptôme déjà rencontré. Pour qu'un poste caisse résolve ce nom vers le
+poste serveur :
+
+1. Sur le poste caisse, ouvrir le Bloc-notes **en tant qu'administrateur**,
+   ouvrir `C:\Windows\System32\drivers\etc\hosts`.
+2. Ajouter une ligne (IP réelle du poste serveur) :
+   ```
+   192.168.1.10    g_stock_quincaillerie.test
+   ```
+3. Dans la coquille (Fichier → Paramètres du poste), utiliser
+   `http://g_stock_quincaillerie.test` comme adresse — jamais l'IP brute.
+
+Réserver l'IP du poste serveur côté routeur (bail DHCP fixe) évite d'avoir à
+refaire cette entrée `hosts` si l'IP change.
+
 ## 5. Installer sans connexion internet du tout
 
 Si le poste client n'a pas internet, ou pour ne pas en dépendre le jour de
