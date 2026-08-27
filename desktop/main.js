@@ -285,6 +285,11 @@ ipcMain.handle('gstock:print', async () => {
     const pdfBuffer = await mainWindow.webContents.printToPDF({
       printBackground: true,
       preferCSSPageSize: true,
+      // Sans ça, Electron ajoute ses propres marges par défaut (~2,5 cm) et
+      // ignore le `@page { margin: 5mm }` du CSS d'impression (ticket 80mm,
+      // resources/sass/app.scss) : la mise en forme ressemblait alors à un
+      // export PDF générique au lieu du ticket/facture prévu.
+      margins: { marginType: 'none' },
     });
     const filePath = path.join(os.tmpdir(), `gstock-impression-${Date.now()}.pdf`);
     fs.writeFileSync(filePath, pdfBuffer);
