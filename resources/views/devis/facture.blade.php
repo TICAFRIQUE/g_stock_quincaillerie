@@ -84,7 +84,9 @@
 <body>
     @unless ($pourPdf ?? false)
         <div class="actions">
-            <button type="button" onclick="(window.gstock && window.gstock.print) ? window.gstock.print() : window.print()">Imprimer</button>
+            {{-- Imprime le PDF réel (dompdf) plutôt que cette page HTML :
+                 rendu garanti identique à "Télécharger en PDF". --}}
+            <x-bouton-imprimer :pdf-route="route('devis.pdf', $devis)" />
             <a href="{{ route('devis.pdf', $devis) }}">Télécharger en PDF</a>
             <a href="{{ route('devis.excel', $devis) }}">Télécharger en Excel</a>
             <a href="{{ route('devis.show', $devis) }}">Retour au devis</a>

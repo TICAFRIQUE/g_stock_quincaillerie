@@ -680,25 +680,30 @@
 
 @push('scripts')
     <script>
-        // Bascule d'impression : affiche #factureImprimable et masque le
-        // reçu compact .recu-pos le temps de l'impression, puis revient à
-        // l'état par défaut (voir resources/sass/app.scss, .impression-facture).
+        // Imprime le PDF réel (dompdf, route ventes.pdf) dans un iframe caché,
+        // plutôt que de basculer l'affichage sur #factureImprimable et
+        // d'imprimer cette page HTML : rendu garanti identique à
+        // "Télécharger en PDF" (dompdf a un support CSS différent d'un
+        // navigateur/Electron — voir x-bouton-imprimer pour le même mécanisme).
         function imprimerFacture() {
-            document.body.classList.add('impression-facture');
-            // Coquille desktop (Electron) : window.print() n'affiche pas
-            // d'aperçu et ne déclenche jamais 'afterprint' via window.gstock.print()
-            // (appelé depuis le process principal, pas la fenêtre) — on retire
-            // la classe nous-même une fois l'impression terminée dans ce cas.
-            if (window.gstock && window.gstock.print) {
-                window.gstock.print().finally(() => {
-                    document.body.classList.remove('impression-facture');
-                });
-            } else {
-                window.print();
+            let iframe = document.getElementById('__iframeFacturePdf');
+            if (! iframe) {
+                iframe = document.createElement('iframe');
+                iframe.id = '__iframeFacturePdf';
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
             }
+            iframe.onload = function () {
+                setTimeout(() => {
+                    iframe.contentWindow.focus();
+                    if (window.gstock && window.gstock.print) {
+                        window.gstock.print();
+                    } else {
+                        iframe.contentWindow.print();
+                    }
+                }, 200);
+            };
+            iframe.src = '{{ route('ventes.pdf', $vente) }}?imprimer=1';
         }
-        window.addEventListener('afterprint', () => {
-            document.body.classList.remove('impression-facture');
-        });
     </script>
 @endpush

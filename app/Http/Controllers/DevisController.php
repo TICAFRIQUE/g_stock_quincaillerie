@@ -192,7 +192,13 @@ class DevisController extends Controller
     {
         $pdf = Pdf::loadView('devis.facture', $this->chargerDonneesFacture($devis) + ['pourPdf' => true]);
 
-        return $pdf->download("devis-{$devis->numero}.pdf");
+        // ?imprimer=1 (voir x-bouton-imprimer) : ouvre le PDF dans l'onglet
+        // au lieu de forcer un téléchargement, pour que le bouton "Imprimer"
+        // imprime exactement le même rendu que "Télécharger en PDF" (même
+        // mécanisme que CommandeAchatController::pdf()).
+        $nomFichier = "devis-{$devis->numero}.pdf";
+
+        return request()->boolean('imprimer') ? $pdf->stream($nomFichier) : $pdf->download($nomFichier);
     }
 
     public function excel(Devis $devis): StreamedResponse

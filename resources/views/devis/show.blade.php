@@ -249,25 +249,30 @@
 
 @push('scripts')
     <script>
-        // Bascule d'impression : affiche #factureImprimable le temps de
-        // l'impression, puis revient à l'état par défaut (voir
-        // resources/sass/app.scss, .impression-facture — même mécanisme que
-        // le ticket de vente).
+        // Imprime le PDF réel (dompdf, route devis.pdf) dans un iframe caché,
+        // plutôt que de basculer l'affichage sur #factureImprimable et
+        // d'imprimer cette page HTML : rendu garanti identique à
+        // "Télécharger en PDF" (dompdf a un support CSS différent d'un
+        // navigateur/Electron — voir x-bouton-imprimer pour le même mécanisme).
         function imprimerDevis() {
-            document.body.classList.add('impression-facture');
-            // Coquille desktop (Electron) : window.gstock.print() ne déclenche
-            // jamais 'afterprint' (appelé depuis le process principal) — on
-            // retire la classe nous-même une fois l'impression terminée.
-            if (window.gstock && window.gstock.print) {
-                window.gstock.print().finally(() => {
-                    document.body.classList.remove('impression-facture');
-                });
-            } else {
-                window.print();
+            let iframe = document.getElementById('__iframeDevisPdf');
+            if (! iframe) {
+                iframe = document.createElement('iframe');
+                iframe.id = '__iframeDevisPdf';
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
             }
+            iframe.onload = function () {
+                setTimeout(() => {
+                    iframe.contentWindow.focus();
+                    if (window.gstock && window.gstock.print) {
+                        window.gstock.print();
+                    } else {
+                        iframe.contentWindow.print();
+                    }
+                }, 200);
+            };
+            iframe.src = '{{ route('devis.pdf', $devis) }}?imprimer=1';
         }
-        window.addEventListener('afterprint', () => {
-            document.body.classList.remove('impression-facture');
-        });
     </script>
 @endpush

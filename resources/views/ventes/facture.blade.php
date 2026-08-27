@@ -90,7 +90,10 @@
 <body>
     @unless ($pourPdf ?? false)
         <div class="actions">
-            <button type="button" onclick="(window.gstock && window.gstock.print) ? window.gstock.print() : window.print()">Imprimer</button>
+            {{-- Imprime le PDF réel (dompdf) plutôt que cette page HTML :
+                 rendu garanti identique à "Télécharger en PDF" (dompdf a un
+                 support CSS différent d'un navigateur/Electron). --}}
+            <x-bouton-imprimer :pdf-route="route('ventes.pdf', $vente)" />
             <a href="{{ route('ventes.pdf', $vente) }}">Télécharger en PDF</a>
             <a href="{{ route('ventes.excel', $vente) }}">Télécharger en Excel</a>
             <a href="{{ route('ventes.ticket', $vente) }}">Voir le ticket de caisse</a>
@@ -99,7 +102,7 @@
             // Le bouton "Facture" du détail vente ouvre directement cette page :
             // déclenche l'impression immédiatement, sans clic supplémentaire.
             window.addEventListener('load', () => setTimeout(() => {
-                (window.gstock && window.gstock.print) ? window.gstock.print() : window.print();
+                window.__imprimerPdf('{{ route('ventes.pdf', $vente) }}?imprimer=1');
             }, 200));
         </script>
     @endunless
