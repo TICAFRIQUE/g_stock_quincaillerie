@@ -32,9 +32,12 @@ pas supprimer les entrées cochées (historique).
   fenêtre de l'app, identique au bouton "Télécharger en PDF".
 
 - [ ] **Nouveau : Guide d'utilisation** — page accessible via le menu
-  utilisateur (à côté de "Se déconnecter") → `/guide`. Rien à seeder, juste
-  le déploiement de code ci-dessus. À relire/compléter au fil de l'eau si
-  des sections manquent.
+  utilisateur (à côté de "Se déconnecter") → `/guide`. Chaque section n'est
+  visible que si l'utilisateur a la permission correspondante (un caissier
+  ne voit pas Trésorerie/Administration, par ex.) — vérifier après
+  déploiement avec un compte Caissier et un compte Gérant. Rien à seeder,
+  juste le déploiement de code ci-dessus. À relire/compléter au fil de l'eau
+  si des sections manquent.
 
 - [ ] `RolePermissionSeeder` corrigé pour ne plus écraser les permissions
   personnalisées de Gérant/Caissier — **aucune action requise
