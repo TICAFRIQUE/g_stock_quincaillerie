@@ -34,6 +34,19 @@ règles de gestion. **Uniquement sur le poste serveur** :
 dès la prochaine page chargée (au pire un Ctrl+R, déjà dans le menu Fichier
 de la coquille).
 
+### Nouvelle permission ajoutée (`config/permissions.php`)
+
+En plus des étapes ci-dessus, sur le poste serveur :
+```
+php artisan db:seed --class=RolePermissionSeeder --force
+```
+Sûr à relancer : les permissions déjà en base ne sont jamais dupliquées, et
+depuis le garde-fou `wasRecentlyCreated` dans `RolePermissionSeeder`, les
+rôles Gérant/Caissier (et tout rôle créé à la volée) ne sont **jamais**
+réinitialisés s'ils existent déjà — seule la nouvelle permission devient
+disponible à cocher manuellement sur `/roles`, rien n'est coché
+automatiquement.
+
 ## Cas 2 — Changement de la coquille desktop (`desktop/`)
 
 Rare : uniquement si le code de la coquille elle-même change (écran de
