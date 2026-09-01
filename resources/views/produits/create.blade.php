@@ -5,7 +5,7 @@
 @section('content')
     <h2 class="h4 mb-3">Nouveau produit</h2>
 
-    <div class="card" style="max-width: 760px;">
+    <div class="card mx-auto" style="max-width: 1000px;">
         <div class="card-body">
             <form method="POST" action="{{ route('produits.store') }}" enctype="multipart/form-data">
                 @csrf

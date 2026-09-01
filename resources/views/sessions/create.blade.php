@@ -5,7 +5,7 @@
 @section('content')
     <h2 class="h4 mb-3">Ouvrir une session — {{ $caisse->nom }}</h2>
 
-    <div class="card" style="max-width: 480px;">
+    <div class="card mx-auto" style="max-width: 480px;">
         <div class="card-body">
             <form method="POST" action="{{ route('sessions.store', $caisse) }}">
                 @csrf

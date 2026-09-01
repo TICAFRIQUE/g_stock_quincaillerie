@@ -87,7 +87,7 @@
             @endforeach
         </select>
         @error('unite_base_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-        <div class="form-text">La plus petite unité vendable de ce produit (Pièce, Litre, Mètre…). <a href="{{ route('unites.create') }}" target="_blank" rel="noopener">Ajouter une unité</a>.</div>
+        <div class="form-text">La plus petite unité vendable de ce produit (Pièce, Litre, Mètre…).</div>
     </div>
 
     <div class="col-md-3 mb-3">

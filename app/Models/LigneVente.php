@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'vente_id', 'produit_id', 'unite_vente_id', 'magasin_source_id', 'quantite', 'quantite_pieces',
     'prix_unitaire_applique', 'cout_applique', 'sous_total_ligne',
-    'remise_ligne_type', 'remise_ligne_valeur', 'remise_ligne_montant', 'total_ligne',
+    'remise_ligne_type', 'remise_ligne_valeur', 'remise_ligne_montant', 'prix_personnalise', 'total_ligne',
 ])]
 class LigneVente extends Model
 {
@@ -29,8 +29,25 @@ class LigneVente extends Model
             'sous_total_ligne' => 'integer',
             'remise_ligne_valeur' => 'integer',
             'remise_ligne_montant' => 'integer',
+            'prix_personnalise' => 'boolean',
             'total_ligne' => 'integer',
         ];
+    }
+
+    /**
+     * Prix affiché sur le ticket/la facture : le prix personnalisé saisi par
+     * le caissier (remise "montant" auto-calculée, jamais stockée comme un
+     * vrai changement de prix — voir migration 2026_09_01_100002) au lieu du
+     * prix catalogue, uniquement pour l'affichage. Rien d'autre (marge,
+     * total_ligne, activitylog) ne dépend de cette valeur.
+     */
+    public function prixUnitaireEffectif(): int
+    {
+        if (! $this->prix_personnalise || $this->quantite === 0) {
+            return $this->prix_unitaire_applique;
+        }
+
+        return $this->prix_unitaire_applique - intdiv($this->remise_ligne_montant, $this->quantite);
     }
 
     public function vente(): BelongsTo

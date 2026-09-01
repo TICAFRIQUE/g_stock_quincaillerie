@@ -40,6 +40,7 @@ trait ValideRemises
         $lignes = collect($request->input('lignes', []))->map(function (array $ligne) {
             $ligne['remise_type'] = null;
             $ligne['remise_valeur'] = null;
+            $ligne['prix_personnalise'] = false;
 
             return $ligne;
         })->all();

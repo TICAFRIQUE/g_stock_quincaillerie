@@ -129,15 +129,27 @@
                                             </td>
                                             @can('vente.remise')
                                                 <td>
-                                                    <div class="d-flex flex-column gap-1" style="min-width: 130px;">
-                                                        <select x-model="ligne.remise_type" class="form-select form-select-sm">
+                                                    <div class="d-flex flex-column gap-1" style="min-width: 150px;">
+                                                        <select :value="ligne.prixPersonnalise ? 'prix' : ligne.remise_type"
+                                                                @change="choisirTypeRemise(ligne, $event.target.value)" class="form-select form-select-sm">
                                                             <option value="">Sans remise</option>
                                                             <option value="montant">Remise (F)</option>
                                                             <option value="pourcentage">Remise (%)</option>
+                                                            <option value="prix">Prix personnalisé</option>
                                                         </select>
                                                         <input type="number" x-model.number="ligne.remise_valeur"
                                                                @input="if (ligne.remise_type === 'pourcentage' && ligne.remise_valeur > 100) ligne.remise_valeur = 100"
-                                                               x-show="ligne.remise_type" min="0" :max="ligne.remise_type === 'pourcentage' ? 100 : null" class="form-control form-control-sm" placeholder="Valeur">
+                                                               x-show="ligne.remise_type && !ligne.prixPersonnalise" min="0" :max="ligne.remise_type === 'pourcentage' ? 100 : null" class="form-control form-control-sm" placeholder="Valeur">
+                                                        <template x-if="ligne.prixPersonnalise">
+                                                            <div>
+                                                                <input type="number" x-model.number="ligne.prixSaisi"
+                                                                       @input="if (ligne.prixSaisi > ligne.prixUnitaire) ligne.prixSaisi = ligne.prixUnitaire"
+                                                                       min="0" :max="ligne.prixUnitaire" class="form-control form-control-sm" placeholder="Prix">
+                                                                <div class="text-secondary" style="font-size: .7rem;">
+                                                                    Catalogue : <span x-text="ligne.prixUnitaire"></span> F
+                                                                </div>
+                                                            </div>
+                                                        </template>
                                                     </div>
                                                 </td>
                                             @endcan
@@ -347,8 +359,9 @@
                                     <input type="hidden" :name="'lignes['+index+'][unite_vente_id]'" :value="ligne.unite_vente_id">
                                     <input type="hidden" :name="'lignes['+index+'][magasin_source_id]'" :value="ligne.magasin_source_id">
                                     <input type="hidden" :name="'lignes['+index+'][quantite]'" :value="ligne.quantite">
-                                    <input type="hidden" :name="'lignes['+index+'][remise_type]'" :value="ligne.remise_type">
-                                    <input type="hidden" :name="'lignes['+index+'][remise_valeur]'" :value="ligne.remise_valeur">
+                                    <input type="hidden" :name="'lignes['+index+'][remise_type]'" :value="ligne.prixPersonnalise ? 'montant' : ligne.remise_type">
+                                    <input type="hidden" :name="'lignes['+index+'][remise_valeur]'" :value="remiseValeurEffective(ligne)">
+                                    <input type="hidden" :name="'lignes['+index+'][prix_personnalise]'" :value="ligne.prixPersonnalise ? 1 : 0">
                                 </span>
                             </template>
                             <input type="hidden" name="remise_totale_type" :value="remiseTotaleType">

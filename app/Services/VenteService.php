@@ -133,6 +133,7 @@ class VenteService
                     'remise_ligne_type' => $l['remise_ligne_type'],
                     'remise_ligne_valeur' => $l['remise_ligne_valeur'],
                     'remise_ligne_montant' => $l['remise_ligne_montant'],
+                    'prix_personnalise' => $l['prix_personnalise'],
                     'total_ligne' => $l['total_ligne'],
                 ]);
 
@@ -236,6 +237,11 @@ class VenteService
                 'remise_ligne_type' => $ligne['remise_type'] ?? null,
                 'remise_ligne_valeur' => $ligne['remise_valeur'] ?? null,
                 'remise_ligne_montant' => $remiseLigneMontant,
+                // Uniquement informatif pour l'affichage (voir
+                // LigneVente::prixUnitaireEffectif()) : la remise a déjà été
+                // résolue ci-dessus exactement comme une remise "montant"
+                // classique, jamais un vrai changement de prix.
+                'prix_personnalise' => ! empty($ligne['prix_personnalise']),
                 'total_ligne' => $totalLigne,
             ];
         }

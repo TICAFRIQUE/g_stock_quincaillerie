@@ -228,6 +228,7 @@ class VenteController extends Controller
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
+            'lignes.*.prix_personnalise' => ['nullable', 'boolean'],
             'remise_totale_type' => ['nullable', 'in:montant,pourcentage'],
             'remise_totale_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
             'paiements' => ['present', 'array'],
@@ -280,6 +281,7 @@ class VenteController extends Controller
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
+            'lignes.*.prix_personnalise' => ['nullable', 'boolean'],
             'remise_totale_type' => ['nullable', 'in:montant,pourcentage'],
             'remise_totale_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
             // Un panier vendu à crédit à 100 % (aucun acompte) envoie un
@@ -450,8 +452,8 @@ class VenteController extends Controller
             $feuille->setCellValue("A{$ligne}", $ligneVente->produit->libelle_affichage);
             $feuille->setCellValue("B{$ligne}", $ligneVente->uniteVente->libelle ?? $ligneVente->produit->unite_base_libelle);
             $feuille->setCellValue("C{$ligne}", $ligneVente->quantite);
-            $feuille->setCellValue("D{$ligne}", $ligneVente->prix_unitaire_applique);
-            $feuille->setCellValue("E{$ligne}", $ligneVente->remise_ligne_montant);
+            $feuille->setCellValue("D{$ligne}", $ligneVente->prixUnitaireEffectif());
+            $feuille->setCellValue("E{$ligne}", $ligneVente->prix_personnalise ? 0 : $ligneVente->remise_ligne_montant);
             $feuille->setCellValue("F{$ligne}", $ligneVente->total_ligne);
             if ($livraisonEngagee) {
                 $feuille->setCellValue("G{$ligne}", ($dejaLivreParLigne[$ligneVente->id] ?? 0).'/'.$ligneVente->quantite_pieces);

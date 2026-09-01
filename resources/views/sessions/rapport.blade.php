@@ -39,66 +39,6 @@
 
             <hr>
 
-            {{-- Chaque chiffre dans son propre bloc compact (label au-dessus
-                 de la valeur), tous alignés sur la même ligne et repliés
-                 naturellement en flex-wrap — évite les rangées Bootstrap à
-                 largeur fixe (25%/33%) qui gaspillent l'espace dès qu'un
-                 bloc contient peu de texte. --}}
-            <div class="d-flex flex-wrap column-gap-4 row-gap-2 mb-3">
-                <div>
-                    <div class="text-secondary small">Fond de caisse</div>
-                    <div class="fw-medium">{{ number_format($session->fond_de_caisse, 0, ',', ' ') }} F</div>
-                </div>
-                <div>
-                    <div class="text-secondary small">Nombre de ventes</div>
-                    <div class="fw-medium">{{ $ventes->count() }}</div>
-                </div>
-                <div>
-                    <div class="text-secondary small">Total net</div>
-                    <div class="fw-medium">{{ number_format($totalVentes, 0, ',', ' ') }} F</div>
-                </div>
-                @foreach ($paiementsParMoyen as $paiement)
-                    <div>
-                        <div class="text-secondary small">{{ $paiement->moyenPaiement->nom }}</div>
-                        <div class="fw-medium">{{ number_format($paiement->total, 0, ',', ' ') }} F</div>
-                    </div>
-                @endforeach
-            </div>
-
-            @if ($session->date_cloture)
-                <p class="text-secondary small mb-1">Clôture</p>
-                <div class="d-flex flex-wrap column-gap-4 row-gap-2 mb-3">
-                    <div>
-                        <div class="text-secondary small">Théorique</div>
-                        <div class="fw-medium">{{ number_format($session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes + $session->total_entrees_especes - $session->total_sorties_especes, 0, ',', ' ') }} F</div>
-                    </div>
-                    @if ($session->total_reglements_especes > 0)
-                        <div>
-                            <div class="text-secondary small">Règlements clients (espèces)</div>
-                            <div class="fw-medium">{{ number_format($session->total_reglements_especes, 0, ',', ' ') }} F</div>
-                        </div>
-                    @endif
-                    <div>
-                        <div class="text-secondary small">Entrées de caisse</div>
-                        <div class="fw-medium text-success">{{ number_format($session->total_entrees_especes, 0, ',', ' ') }} F</div>
-                    </div>
-                    <div>
-                        <div class="text-secondary small">Sorties de caisse</div>
-                        <div class="fw-medium text-danger">{{ number_format($session->total_sorties_especes, 0, ',', ' ') }} F</div>
-                    </div>
-                    <div>
-                        <div class="text-secondary small">Compté</div>
-                        <div class="fw-medium">{{ number_format($session->montant_compte, 0, ',', ' ') }} F</div>
-                    </div>
-                    <div>
-                        <div class="text-secondary small">Écart</div>
-                        <div class="fw-medium {{ $session->ecart === 0 ? '' : ($session->ecart > 0 ? 'text-success' : 'text-danger') }}">
-                            {{ $session->ecart > 0 ? '+' : '' }}{{ number_format($session->ecart, 0, ',', ' ') }} F
-                        </div>
-                    </div>
-                </div>
-            @endif
-
             <h3 class="h6">Liste des ventes</h3>
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
@@ -123,6 +63,82 @@
                         @endforelse
                     </tbody>
                 </table>
+            </div>
+
+            {{-- Petits tableaux récap sous la liste des ventes, plutôt que --}}
+            {{-- de gros blocs de chiffres en haut de page — chaque carte a --}}
+            {{-- son propre accent de couleur (bordure gauche) pour se --}}
+            {{-- distinguer d'un coup d'œil, la carte Clôture reprenant la --}}
+            {{-- couleur de l'écart (neutre/positif/négatif). --}}
+            <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                    <div class="card h-100 shadow-sm border-0 border-start border-4 border-primary">
+                        <div class="card-header bg-white border-0 pb-0">
+                            <h4 class="h6 mb-0"><i class="bi bi-receipt me-1 text-primary"></i>Résumé</h4>
+                        </div>
+                        <div class="card-body pt-2">
+                            <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
+                                <span>Fond de caisse</span>
+                                <span>{{ number_format($session->fond_de_caisse, 0, ',', ' ') }} F</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
+                                <span>Nombre de ventes</span>
+                                <span>{{ $ventes->count() }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2 fw-semibold">
+                                <span>Total net</span>
+                                <span>{{ number_format($totalVentes, 0, ',', ' ') }} F</span>
+                            </div>
+                            @foreach ($paiementsParMoyen as $paiement)
+                                <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
+                                    <span>{{ $paiement->moyenPaiement->nom }}</span>
+                                    <span>{{ number_format($paiement->total, 0, ',', ' ') }} F</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                @if ($session->date_cloture)
+                    @php
+                        $couleurEcart = $session->ecart === 0 ? 'secondary' : ($session->ecart > 0 ? 'success' : 'danger');
+                    @endphp
+                    <div class="col-md-6">
+                        <div class="card h-100 shadow-sm border-0 border-start border-4 border-{{ $couleurEcart }}">
+                            <div class="card-header bg-white border-0 pb-0">
+                                <h4 class="h6 mb-0"><i class="bi bi-safe2 me-1 text-{{ $couleurEcart }}"></i>Clôture</h4>
+                            </div>
+                            <div class="card-body pt-2">
+                                <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
+                                    <span>Théorique</span>
+                                    <span>{{ number_format($session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes + $session->total_entrees_especes - $session->total_sorties_especes, 0, ',', ' ') }} F</span>
+                                </div>
+                                @if ($session->total_reglements_especes > 0)
+                                    <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
+                                        <span>Règlements clients (espèces)</span>
+                                        <span>{{ number_format($session->total_reglements_especes, 0, ',', ' ') }} F</span>
+                                    </div>
+                                @endif
+                                <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
+                                    <span>Entrées de caisse</span>
+                                    <span class="text-success">{{ number_format($session->total_entrees_especes, 0, ',', ' ') }} F</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
+                                    <span>Sorties de caisse</span>
+                                    <span class="text-danger">{{ number_format($session->total_sorties_especes, 0, ',', ' ') }} F</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2 fw-semibold">
+                                    <span>Compté</span>
+                                    <span>{{ number_format($session->montant_compte, 0, ',', ' ') }} F</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2 fw-bold text-{{ $couleurEcart }}">
+                                    <span>Écart</span>
+                                    <span>{{ $session->ecart > 0 ? '+' : '' }}{{ number_format($session->ecart, 0, ',', ' ') }} F</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     </div>

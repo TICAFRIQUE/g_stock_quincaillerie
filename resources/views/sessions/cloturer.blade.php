@@ -40,7 +40,7 @@
         </div>
     @endif
 
-    <div class="card" style="max-width: 480px;"
+    <div class="card mx-auto" style="max-width: 480px;"
          x-data="{
              montantCompte: {{ (int) old('montant_compte', $theorique) }},
              theorique: {{ (int) $theorique }},

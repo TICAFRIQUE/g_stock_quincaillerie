@@ -146,6 +146,19 @@ class InventaireController extends Controller
         return redirect()->route('inventaires.show', $inventaire)->with('succes', 'Comptage enregistré.');
     }
 
+    public function destroy(Request $request, Inventaire $inventaire): RedirectResponse
+    {
+        abort_unless($request->user()->can('inventaire.realiser'), 403);
+
+        if ($inventaire->statut !== 'brouillon') {
+            return redirect()->route('inventaires.index')->with('erreur', 'Seul un inventaire en brouillon peut être supprimé : un inventaire validé a déjà mis à jour le stock.');
+        }
+
+        $inventaire->delete();
+
+        return redirect()->route('inventaires.index')->with('succes', 'Inventaire supprimé.');
+    }
+
     public function valider(Request $request, Inventaire $inventaire, InventaireService $inventaireService): RedirectResponse
     {
         abort_unless($request->user()->can('inventaire.valider'), 403);

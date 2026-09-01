@@ -42,7 +42,7 @@
                                     <img src="{{ $produit->getFirstMediaUrl('image', 'thumb') ?: $produit->getFirstMediaUrl('image') }}" alt="" width="40" height="40" class="rounded object-fit-cover">
                                 @else
                                     <div class="bg-light rounded d-flex align-items-center justify-content-center text-secondary" style="width:40px;height:40px;">
-                                        <i class="bi bi-tools"></i>
+                                        <i class="bi bi-box-seam"></i>
                                     </div>
                                 @endif
                             </td>

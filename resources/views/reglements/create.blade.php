@@ -17,7 +17,7 @@
         @if ($clients->isEmpty())
             <div class="alert alert-secondary">Aucun client n'a de dette en cours pour le moment.</div>
         @else
-            <div class="card" style="max-width: 640px;">
+            <div class="card mx-auto" style="max-width: 640px;">
                 <div class="card-body">
                     <form id="formReglement" method="POST" action="{{ route('reglements.store', $session) }}">
                         @csrf

@@ -130,6 +130,7 @@ class VenteEnAttenteController extends Controller
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
+            'lignes.*.prix_personnalise' => ['nullable', 'boolean'],
             'remise_totale_type' => ['nullable', 'in:montant,pourcentage'],
             'remise_totale_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
             'paiements' => ['present', 'array'],

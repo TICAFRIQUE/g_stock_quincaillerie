@@ -208,7 +208,7 @@ Route::middleware('auth')->group(function () {
         // serait capturé comme un {inventaire} par la route de consultation.
         Route::get('inventaires/pdf', [InventaireController::class, 'pdf'])->name('inventaires.pdf');
         Route::get('inventaires/excel', [InventaireController::class, 'excel'])->name('inventaires.excel');
-        Route::resource('inventaires', InventaireController::class)->only(['index', 'create', 'store', 'show']);
+        Route::resource('inventaires', InventaireController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
         Route::post('inventaires/{inventaire}/saisir', [InventaireController::class, 'saisir'])->name('inventaires.saisir');
         Route::post('inventaires/{inventaire}/valider', [InventaireController::class, 'valider'])->name('inventaires.valider');
     });

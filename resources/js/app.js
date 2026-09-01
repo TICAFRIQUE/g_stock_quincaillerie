@@ -294,6 +294,8 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
                 prixUnitaire: null,
                 remise_type: '',
                 remise_valeur: null,
+                prixPersonnalise: false,
+                prixSaisi: null,
                 magasin_source_id: undefined,
                 magasinSourceNom: null,
             });
@@ -311,6 +313,8 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
                 prixUnitaire: null,
                 remise_type: '',
                 remise_valeur: null,
+                prixPersonnalise: false,
+                prixSaisi: null,
                 magasin_source_id: original.magasin_source_id,
                 magasinSourceNom: original.magasinSourceNom ?? null,
             });
@@ -367,6 +371,8 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
                 ligne.uniteLibelle = null;
                 ligne.facteur = null;
                 ligne.prixUnitaire = null;
+                ligne.prixPersonnalise = false;
+                ligne.prixSaisi = null;
                 return;
             }
 
@@ -382,6 +388,29 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
             ligne.uniteLibelle = unite ? unite.libelle : null;
             ligne.facteur = unite ? unite.facteur : 1;
             ligne.prixUnitaire = unite ? unite.prix : produit.prix_piece;
+            // Le prix personnalisé était relatif à l'ancien prix catalogue
+            // (pièce vs lot) : remis à zéro pour ne jamais garder une valeur
+            // devenue incohérente après un changement de variante.
+            ligne.prixPersonnalise = false;
+            ligne.prixSaisi = null;
+        },
+
+        // Le <select> Remise propose "Prix personnalisé" comme 4e option, aux
+        // côtés de Sans remise/Remise (F)/Remise (%) — un seul select pour
+        // les deux mécanismes, jamais deux champs concurrents à l'écran.
+        choisirTypeRemise(ligne, valeur) {
+            if (valeur === 'prix') {
+                ligne.prixPersonnalise = true;
+                ligne.remise_type = '';
+                ligne.remise_valeur = null;
+                // Pré-rempli avec le prix catalogue au premier choix, jamais
+                // écrasé si le caissier revient sur "Prix personnalisé" après
+                // avoir déjà tapé une valeur.
+                if (ligne.prixSaisi === null) ligne.prixSaisi = ligne.prixUnitaire;
+                return;
+            }
+            ligne.prixPersonnalise = false;
+            ligne.remise_type = valeur;
         },
 
         // À 1, "−" ne fait plus rien (bouton désactivé côté vue, voir
@@ -462,7 +491,27 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
         totalLigne(ligne) {
             if (ligne.prixUnitaire === null) return 0;
             const sousTotal = ligne.prixUnitaire * ligne.quantite;
+            if (ligne.prixPersonnalise) {
+                return this.prixPersonnaliseClamp(ligne) * ligne.quantite;
+            }
             return sousTotal - this.calculerRemise(ligne.remise_type, ligne.remise_valeur, sousTotal);
+        },
+
+        // Jamais plus cher que le prix catalogue (une remise ne peut pas être
+        // négative) — plafonné ici plutôt que dans l'input pour rester
+        // cohérent même si le champ affiche encore l'ancienne valeur tapée.
+        prixPersonnaliseClamp(ligne) {
+            const prix = Number(ligne.prixSaisi) || 0;
+            return Math.max(0, Math.min(prix, ligne.prixUnitaire));
+        },
+
+        // Remise "montant" équivalente au prix personnalisé, recalculée à
+        // chaque appel (donc toujours à jour si la quantité change) — envoyée
+        // au serveur exactement comme une remise classique (voir
+        // ventes/create.blade.php, hidden inputs remise_type/remise_valeur).
+        remiseValeurEffective(ligne) {
+            if (!ligne.prixPersonnalise) return ligne.remise_valeur;
+            return (ligne.prixUnitaire - this.prixPersonnaliseClamp(ligne)) * ligne.quantite;
         },
 
         calculerRemise(type, valeur, base) {

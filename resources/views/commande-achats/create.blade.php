@@ -5,7 +5,7 @@
 @section('content')
     <h2 class="h4 mb-3">Nouveau bon d'achat</h2>
 
-    <div class="row">
+    <div class="row justify-content-center">
         <div class="col-12 col-xl-10">
             <div class="card">
                 <div class="card-body">

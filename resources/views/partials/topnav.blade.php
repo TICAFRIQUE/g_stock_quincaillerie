@@ -5,7 +5,7 @@
         </a>
     </li>
 
-      @canany(['produit.voir', 'categorie.gerer'])
+    @canany(['produit.voir', 'categorie.gerer'])
         <li class="nav-item dropdown">
             <a href="#"
                 class="nav-link dropdown-toggle {{ request()->routeIs('categories.*', 'produits.*') ? 'active' : '' }}"
@@ -42,22 +42,6 @@
                 <i class="bi bi-boxes me-1"></i>Stock
             </a>
             <ul class="dropdown-menu">
-                @can('stock.voir')
-                    <li>
-                        <a href="{{ route('stock.index') }}"
-                            class="dropdown-item {{ request()->routeIs('stock.*', 'transferts.*') ? 'active' : '' }}">
-                            <i class="bi bi-boxes me-2"></i>État de stock
-                        </a>
-                    </li>
-                @endcan
-                @can('inventaire.voir')
-                    <li>
-                        <a href="{{ route('inventaires.index') }}"
-                            class="dropdown-item {{ request()->routeIs('inventaires.*') ? 'active' : '' }}">
-                            <i class="bi bi-clipboard-check me-2"></i>Inventaire
-                        </a>
-                    </li>
-                @endcan
                 @can('fournisseur.voir')
                     <li>
                         <a href="{{ route('fournisseurs.index') }}"
@@ -74,6 +58,45 @@
                         </a>
                     </li>
                 @endcan
+
+            @endcan
+            @can('stock.transferer')
+                <li>
+                    <a href="{{ route('transferts.create') }}"
+                        class="dropdown-item {{ request()->routeIs('transferts.*') ? 'active' : '' }}">
+                        <i class="bi bi-arrow-left-right me-2"></i>Transfert
+                    </a>
+                </li>
+            @endcan
+            @can('stock.ajuster')
+                <li>
+                    <a href="{{ route('stock.mouvements.create') }}"
+                        class="dropdown-item {{ request()->routeIs('stock.mouvements.create', 'stock.mouvements.store') ? 'active' : '' }}">
+                        <i class="bi bi-sliders me-2"></i>Casse / ajustement
+                    </a>
+                </li>
+            @endcan
+            @can('inventaire.voir')
+                <li>
+                    <a href="{{ route('inventaires.index') }}"
+                        class="dropdown-item {{ request()->routeIs('inventaires.*') ? 'active' : '' }}">
+                        <i class="bi bi-clipboard-check me-2"></i>Inventaire
+                    </a>
+                </li>
+            @endcan
+            @can('stock.voir')
+                <li>
+                    <a href="{{ route('stock.index') }}"
+                        class="dropdown-item {{ request()->routeIs('stock.index') ? 'active' : '' }}">
+                        <i class="bi bi-boxes me-2"></i>État de stock
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('stock.mouvements.index') }}"
+                        class="dropdown-item {{ request()->routeIs('stock.mouvements.index') ? 'active' : '' }}">
+                        <i class="bi bi-clock-history me-2"></i>Historique des mouvements
+                    </a>
+                </li>
             </ul>
         </li>
     @endcanany
@@ -134,8 +157,8 @@
         </li>
     @endcan
 
-    @canany(['administration.gerer', 'taxe.gerer', 'typeclient.gerer', 'motif.gerer', 'parametre.gerer', 'utilisateur.gerer',
-        'role.gerer'])
+    @canany(['administration.gerer', 'taxe.gerer', 'typeclient.gerer', 'motif.gerer', 'parametre.gerer',
+        'utilisateur.gerer', 'role.gerer'])
         <li class="nav-item dropdown">
             <a href="#"
                 class="nav-link dropdown-toggle {{ request()->routeIs('magasins.*', 'caisses.*', 'moyens-paiement.*', 'unites.*', 'taxes.*', 'type-clients.*', 'motifs-mouvement.*', 'parametres.*', 'utilisateurs.*', 'roles.*') ? 'active' : '' }}"

@@ -73,24 +73,24 @@
     </div>
 
     <div class="row g-2 mb-2">
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md">
             <x-kpi-card compact label="Fond de caisse" icon="bi-cash-stack" color="primary"
                 :value="number_format($session->fond_de_caisse, 0, ',', ' ') . ' F'" />
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md">
             <x-kpi-card compact label="Total ventes" icon="bi-receipt" color="info"
                 :value="$session->ventes_count" />
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md">
             <x-kpi-card compact label="Ventes en attente" icon="bi-hourglass-split" color="warning"
                 :value="$venteEnAttentesVisibles" />
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md">
             <x-kpi-card compact label="Chiffre d'affaires" icon="bi-graph-up-arrow" color="success"
                 :value="number_format($totalVentes, 0, ',', ' ') . ' F'" />
         </div>
         @if ($soldeTheorique !== null)
-            <div class="col-6 col-md-3">
+            <div class="col-6 col-md">
                 <x-kpi-card compact label="Solde théorique du tiroir" icon="bi-wallet2" color="secondary"
                     :value="number_format($soldeTheorique, 0, ',', ' ') . ' F'" />
             </div>

@@ -13,16 +13,24 @@
             @endif
         </div>
 
-        @if ($inventaire->statut === 'brouillon' && $peutValider)
-            @if ($inventaire->lignes->isEmpty())
-                <button type="button" class="btn btn-success" disabled>
-                    <i class="bi bi-check-circle me-1"></i>Valider l'inventaire
-                </button>
-            @else
-                <x-confirm-button :action="route('inventaires.valider', $inventaire)"
-                    message="Valider cet inventaire ? Les écarts seront appliqués au stock immédiatement et cette action est irréversible."
-                    button-label="Valider l'inventaire" button-class="btn-success" icon="bi-check-circle" />
-            @endif
+        @if ($inventaire->statut === 'brouillon')
+            <div class="d-flex gap-2">
+                @if ($peutValider)
+                    @if ($inventaire->lignes->isEmpty())
+                        <button type="button" class="btn btn-success" disabled>
+                            <i class="bi bi-check-circle me-1"></i>Valider l'inventaire
+                        </button>
+                    @else
+                        <x-confirm-button :action="route('inventaires.valider', $inventaire)"
+                            message="Valider cet inventaire ? Les écarts seront appliqués au stock immédiatement et cette action est irréversible."
+                            button-label="Valider l'inventaire" button-class="btn-success" icon="bi-check-circle" />
+                    @endif
+                @endif
+                @if ($peutRealiser)
+                    <x-delete-button :action="route('inventaires.destroy', $inventaire)"
+                        :label="'cet inventaire du '.$inventaire->date->format('d/m/Y').' ('.$inventaire->magasin->nom.')'" />
+                @endif
+            </div>
         @endif
     </div>
 
@@ -64,7 +72,7 @@
     </div>
 
     @if ($inventaire->statut === 'brouillon' && $peutRealiser)
-        <div class="card" style="max-width: 560px;">
+        <div class="card mx-auto" style="max-width: 800px;">
             <div class="card-body">
                 <h3 class="h6">Saisir un comptage</h3>
                 <p class="text-secondary small">Le théorique est capturé au moment de la saisie ; ressaisir un produit déjà compté met à jour sa ligne.</p>

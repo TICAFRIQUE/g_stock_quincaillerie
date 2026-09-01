@@ -141,7 +141,7 @@
                 <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#livraisonVenteModal"
                         @disabled($lignesLivrables->isEmpty())
                         title="{{ $lignesLivrables->isEmpty() ? 'Tous les articles ont déjà été livrés' : '' }}">
-                    <i class="bi bi-truck me-1"></i>Livrer
+                    <i class="bi bi-truck me-1"></i>Bon de livraison
                 </button>
             @endif
 
@@ -188,8 +188,8 @@
                                 <span class="text-secondary small">({{ $ligne->uniteVente?->libelle ?? $ligne->produit->unite_base_libelle }})</span>
                             </td>
                             <td>{{ $ligne->quantite }}</td>
-                            <td class="text-end">{{ number_format($ligne->prix_unitaire_applique, 0, ',', ' ') }} F</td>
-                            <td class="text-end text-danger">{{ $ligne->remise_ligne_montant > 0 ? '− '.number_format($ligne->remise_ligne_montant, 0, ',', ' ').' F' : '—' }}</td>
+                            <td class="text-end">{{ number_format($ligne->prixUnitaireEffectif(), 0, ',', ' ') }} F</td>
+                            <td class="text-end text-danger">{{ (! $ligne->prix_personnalise && $ligne->remise_ligne_montant > 0) ? '− '.number_format($ligne->remise_ligne_montant, 0, ',', ' ').' F' : '—' }}</td>
                             <td class="text-end fw-medium">{{ number_format($ligne->total_ligne, 0, ',', ' ') }} F</td>
                             @php $ligneDejaLivre = $dejaLivreParLigne[$ligne->id] ?? 0; @endphp
                             <td>
@@ -401,8 +401,8 @@
                                 {{ $ligne->produit->libelle_affichage }}
                                 <span class="text-secondary small">({{ $ligne->uniteVente?->libelle ?? $ligne->produit->unite_base_libelle }})</span>
                                 <br>
-                                <span class="text-secondary small">{{ $ligne->quantite }} × {{ number_format($ligne->prix_unitaire_applique, 0, ',', ' ') }} F</span>
-                                @if ($ligne->remise_ligne_montant > 0)
+                                <span class="text-secondary small">{{ $ligne->quantite }} × {{ number_format($ligne->prixUnitaireEffectif(), 0, ',', ' ') }} F</span>
+                                @if (! $ligne->prix_personnalise && $ligne->remise_ligne_montant > 0)
                                     <br><span class="text-danger small">Remise : − {{ number_format($ligne->remise_ligne_montant, 0, ',', ' ') }} F</span>
                                 @endif
                             </td>

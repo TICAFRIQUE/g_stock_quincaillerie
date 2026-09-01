@@ -26,24 +26,30 @@
 
                         <div class="mb-3">
                             <label class="form-label">Type de mouvement<span class="required-marker">*</span></label>
-                            <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="type" id="type-casse" value="casse" x-model="type" required>
-                                <label class="btn btn-outline-danger" for="type-casse"><i class="bi bi-x-octagon me-1"></i>Casse / perte</label>
-
-                                <input type="radio" class="btn-check" name="type" id="type-ajustement" value="ajustement" x-model="type">
-                                <label class="btn btn-outline-secondary" for="type-ajustement"><i class="bi bi-sliders me-1"></i>Ajustement</label>
+                            <div class="d-flex flex-wrap gap-3">
+                                <div class="form-check">
+                                    <input type="radio" class="form-check-input" name="type" id="type-casse" value="casse" x-model="type" required>
+                                    <label class="form-check-label text-danger" for="type-casse"><i class="bi bi-x-octagon me-1"></i>Casse / perte</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="radio" class="form-check-input" name="type" id="type-ajustement" value="ajustement" x-model="type">
+                                    <label class="form-check-label" for="type-ajustement"><i class="bi bi-sliders me-1"></i>Ajustement</label>
+                                </div>
                             </div>
                             @error('type') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
 
                         <div class="mb-3" x-show="type === 'ajustement'" x-cloak>
                             <label class="form-label">Sens de l'ajustement<span class="required-marker">*</span></label>
-                            <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="direction" id="direction-entree" value="entree" :required="type === 'ajustement'" @if (old('direction') === 'entree') checked @endif>
-                                <label class="btn btn-outline-success" for="direction-entree"><i class="bi bi-plus-lg me-1"></i>Entrée (+)</label>
-
-                                <input type="radio" class="btn-check" name="direction" id="direction-sortie" value="sortie" :required="type === 'ajustement'" @if (old('direction') === 'sortie') checked @endif>
-                                <label class="btn btn-outline-secondary" for="direction-sortie"><i class="bi bi-dash-lg me-1"></i>Sortie (−)</label>
+                            <div class="d-flex flex-wrap gap-3">
+                                <div class="form-check">
+                                    <input type="radio" class="form-check-input" name="direction" id="direction-entree" value="entree" :required="type === 'ajustement'" @if (old('direction') === 'entree') checked @endif>
+                                    <label class="form-check-label text-success" for="direction-entree"><i class="bi bi-plus-lg me-1"></i>Entrée (+)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="radio" class="form-check-input" name="direction" id="direction-sortie" value="sortie" :required="type === 'ajustement'" @if (old('direction') === 'sortie') checked @endif>
+                                    <label class="form-check-label" for="direction-sortie"><i class="bi bi-dash-lg me-1"></i>Sortie (−)</label>
+                                </div>
                             </div>
                             @error('direction') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
