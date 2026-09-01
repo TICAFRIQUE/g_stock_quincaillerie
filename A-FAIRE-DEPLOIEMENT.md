@@ -12,6 +12,22 @@ pas supprimer les entrées cochées (historique).
 
 ## 2026-09-01
 
+- [ ] **Nouveau : Prix personnalisé à la vente** — le caissier peut taper un
+  prix différent du catalogue sur une ligne (enregistré comme une remise
+  "montant" classique, permission `vente.remise` déjà existante). Déploiement
+  standard, plus :
+  ```
+  php artisan migrate --force
+  ```
+  Une seule migration (`add_prix_personnalise_to_ligne_ventes_table`), une
+  colonne booléenne `default(false)` — aucune donnée existante touchée,
+  aucune permission nouvelle, rien à cocher sur `/roles`.
+  **Tester après déploiement** : sur une vente, choisir "Prix personnalisé"
+  dans la colonne Remise du panier, taper un prix inférieur au catalogue →
+  vérifier que le ticket/la facture affichent ce prix sans mention de remise.
+  Egalement : `npm run build` (passe de style globale — fond blanc des
+  cartes, bordure orange des champs, formulaires centrés).
+
 - [ ] **Nouveau : Bon de livraison** (une vente peut être livrée en plusieurs
   fois, suivi ligne par ligne — voir `resources/views/ventes/ticket.blade.php`,
   carte "Livrer des articles"). Déploiement standard, plus :
