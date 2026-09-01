@@ -36,7 +36,11 @@ class CommandeAchatController extends Controller
         $fin = $request->filled('date_fin') ? Carbon::parse($request->string('date_fin')) : now()->endOfMonth();
 
         $query = CommandeAchat::query()
-            ->with('fournisseur')
+            // lignes.taxe/paiements/reglementsFournisseur : nécessaires à
+            // CommandeAchat::totalTtc()/montantRegle()/resteDu() (colonnes
+            // Montant dû/Déjà réglé/Reste à régler), chargées ici pour
+            // éviter un N+1 sur chaque ligne de la page.
+            ->with(['fournisseur', 'lignes.taxe', 'paiements', 'reglementsFournisseur'])
             ->whereBetween('date_commande', [$debut->toDateString(), $fin->toDateString()])
             ->when($request->filled('recherche'), function ($q) use ($request) {
                 $recherche = $request->string('recherche');
@@ -266,6 +270,11 @@ class CommandeAchatController extends Controller
         foreach ($commandeAchat->paiements as $paiement) {
             $feuille->setCellValue("F{$ligne}", $paiement->moyenPaiement->nom);
             $feuille->setCellValue("G{$ligne}", $paiement->montant);
+            $ligne++;
+        }
+        if ($commandeAchat->montantRegle() > 0) {
+            $feuille->setCellValue("F{$ligne}", 'Montant réglé');
+            $feuille->setCellValue("G{$ligne}", $commandeAchat->montantRegle());
             $ligne++;
         }
         if ($commandeAchat->resteDu() > 0) {

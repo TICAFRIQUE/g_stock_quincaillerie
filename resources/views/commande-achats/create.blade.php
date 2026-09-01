@@ -38,13 +38,16 @@
                             actionSoumission: {{ Js::from(old('action', 'brouillon')) }},
                             // Deux lignes du même produit ne sont un doublon que si
                             // elles partagent aussi la même unité d'achat (pièce vs
-                            // carton = légitimement deux lignes distinctes).
+                            // carton = légitimement deux lignes distinctes) ET la même
+                            // destination (une commande peut livrer plusieurs sites en
+                            // une fois — voir CLAUDE.md, section Achat à crédit).
                             estDoublon(index) {
                                 const ligne = this.lignes[index];
                                 if (!ligne.produit_id) return false;
                                 return this.lignes.some((l, i) => i !== index
                                     && l.produit_id === ligne.produit_id
-                                    && (l.unite_vente_id || '') === (ligne.unite_vente_id || ''));
+                                    && (l.unite_vente_id || '') === (ligne.unite_vente_id || '')
+                                    && (l.magasin_destination_id || '') === (ligne.magasin_destination_id || ''));
                             },
                             get aUnDoublon() {
                                 return this.lignes.some((l, i) => this.estDoublon(i));
@@ -173,95 +176,104 @@
                             </button>
                         </div>
 
+                        {{-- Fond gris clair pour le panneau : chaque ligne reste une --}}
+                        {{-- vraie carte blanche qui se détache nettement dessus, au --}}
+                        {{-- lieu de se fondre dans le blanc du formulaire (confusion --}}
+                        {{-- signalée quand plusieurs lignes sont dupliquées). --}}
+                        <div class="bg-light rounded p-2 p-md-3 mb-2">
                         <template x-for="(ligne, index) in lignes" :key="ligne._cle">
-                            <div class="border rounded p-2 mb-2">
-                                <div class="row g-2 align-items-end mb-2">
-                                    <div class="col-12 col-md-6">
-                                        <label class="form-label small">Produit<span class="required-marker">*</span></label>
-                                        <select :name="'lignes['+index+'][produit_id]'" x-model="ligne.produit_id" @change="ligne.unite_vente_id = ''"
-                                                class="form-select form-select-sm produit-ligne-select" :class="{ 'is-invalid': estDoublon(index) }"
-                                                x-init="$nextTick(() => window.initSelect2($el, { width: '100%' }))" required>
-                                            <option value="">— Choisir —</option>
-                                            @foreach ($produits as $produit)
-                                                <option value="{{ $produit->id }}">{{ $produit->sku }} — {{ $produit->libelle_affichage }}</option>
-                                            @endforeach
-                                        </select>
-                                        <div class="text-danger small mt-1" x-show="estDoublon(index)" x-cloak>Ce produit avec cette unité est déjà présent dans une autre ligne.</div>
-                                        <div class="text-danger small mt-1" x-show="erreurs['lignes.'+index+'.produit_id']" x-text="(erreurs['lignes.'+index+'.produit_id'] || [])[0]"></div>
-                                    </div>
-                                    <div class="col-6 col-md-5">
-                                        <label class="form-label small">Unité d'achat<span class="required-marker">*</span></label>
-                                        <select :name="'lignes['+index+'][unite_vente_id]'" x-model="ligne.unite_vente_id" class="form-select form-select-sm">
-                                            <option value="" :selected="!ligne.unite_vente_id" x-text="baseLibelle(ligne.produit_id)"></option>
-                                            <template x-for="option in unitesDisponibles(ligne.produit_id)" :key="option.id">
-                                                <option :value="option.id" :selected="String(option.id) === String(ligne.unite_vente_id)" x-text="option.libelle"></option>
-                                            </template>
-                                        </select>
-                                        <div class="text-danger small mt-1" x-show="erreurs['lignes.'+index+'.unite_vente_id']" x-text="(erreurs['lignes.'+index+'.unite_vente_id'] || [])[0]"></div>
-                                    </div>
-                                    <div class="col-md-1 text-md-end">
-                                        <button type="button" class="btn btn-sm btn-icon btn-outline-danger" title="Retirer" @click="lignes.length > 1 && lignes.splice(index, 1)">
+                            <div class="card bg-white shadow-sm mb-3" :class="{ 'border-danger': estDoublon(index) }">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                                        <span class="fw-semibold text-secondary">Ligne <span x-text="index + 1"></span></span>
+                                        <button type="button" class="btn btn-sm btn-icon btn-outline-danger" title="Retirer cette ligne" @click="lignes.length > 1 && lignes.splice(index, 1)">
                                             <i class="bi bi-x-lg"></i>
-                                            <span class="visually-hidden">Retirer</span>
+                                            <span class="visually-hidden">Retirer cette ligne</span>
                                         </button>
                                     </div>
-                                </div>
-                                <div class="row g-2 align-items-end mb-2">
-                                    <div class="col-4">
-                                        <label class="form-label small" x-text="'Quantité (' + uniteChoisie(ligne).libelle + ') *'"></label>
-                                        <input type="number" :name="'lignes['+index+'][quantite]'" x-model="ligne.quantite" class="form-control form-control-sm" min="1" step="1" required>
+                                    <div class="row g-2 align-items-end mb-2">
+                                        <div class="col-12 col-md-7">
+                                            <label class="form-label small">Produit<span class="required-marker">*</span></label>
+                                            <select :name="'lignes['+index+'][produit_id]'" x-model="ligne.produit_id" @change="ligne.unite_vente_id = ''"
+                                                    class="form-select form-select-sm produit-ligne-select" :class="{ 'is-invalid': estDoublon(index) }"
+                                                    x-init="$nextTick(() => window.initSelect2($el, { width: '100%' }))" required>
+                                                <option value="">— Choisir —</option>
+                                                @foreach ($produits as $produit)
+                                                    <option value="{{ $produit->id }}">{{ $produit->sku }} — {{ $produit->libelle_affichage }}</option>
+                                                @endforeach
+                                            </select>
+                                            <div class="text-danger small mt-1" x-show="estDoublon(index)" x-cloak>Ce produit, avec la même unité et la même destination, est déjà présent dans une autre ligne.</div>
+                                            <div class="text-danger small mt-1" x-show="erreurs['lignes.'+index+'.produit_id']" x-text="(erreurs['lignes.'+index+'.produit_id'] || [])[0]"></div>
+                                        </div>
+                                        <div class="col-12 col-md-5">
+                                            <label class="form-label small">Unité d'achat<span class="required-marker">*</span></label>
+                                            <select :name="'lignes['+index+'][unite_vente_id]'" x-model="ligne.unite_vente_id" class="form-select form-select-sm">
+                                                <option value="" :selected="!ligne.unite_vente_id" x-text="baseLibelle(ligne.produit_id)"></option>
+                                                <template x-for="option in unitesDisponibles(ligne.produit_id)" :key="option.id">
+                                                    <option :value="option.id" :selected="String(option.id) === String(ligne.unite_vente_id)" x-text="option.libelle"></option>
+                                                </template>
+                                            </select>
+                                            <div class="text-danger small mt-1" x-show="erreurs['lignes.'+index+'.unite_vente_id']" x-text="(erreurs['lignes.'+index+'.unite_vente_id'] || [])[0]"></div>
+                                        </div>
                                     </div>
-                                    <div class="col-4">
-                                        <label class="form-label small" x-text="'Prix d\'achat HT (' + uniteChoisie(ligne).libelle + ', F) *'"></label>
-                                        <input type="number" :name="'lignes['+index+'][prix_achat]'" x-model="ligne.prix_achat" class="form-control form-control-sm" min="0" step="1" required>
+                                    <div class="row g-2 align-items-end mb-2">
+                                        <div class="col-4">
+                                            <label class="form-label small" x-text="'Quantité (' + uniteChoisie(ligne).libelle + ') *'"></label>
+                                            <input type="number" :name="'lignes['+index+'][quantite]'" x-model="ligne.quantite" class="form-control form-control-sm" min="1" step="1" required>
+                                        </div>
+                                        <div class="col-4">
+                                            <label class="form-label small" x-text="'Prix d\'achat HT (' + uniteChoisie(ligne).libelle + ', F) *'"></label>
+                                            <input type="number" :name="'lignes['+index+'][prix_achat]'" x-model="ligne.prix_achat" class="form-control form-control-sm" min="0" step="1" required>
+                                        </div>
+                                        <div class="col-4">
+                                            <label class="form-label small">Qté en pièces (stock)</label>
+                                            <input type="text" class="form-control form-control-sm" :value="quantitePieces(ligne)" disabled>
+                                        </div>
                                     </div>
-                                    <div class="col-4">
-                                        <label class="form-label small">Qté en pièces (stock)</label>
-                                        <input type="text" class="form-control form-control-sm" :value="quantitePieces(ligne)" disabled>
-                                    </div>
-                                </div>
-                                <div class="row g-2 align-items-end">
-                                    <div class="col-6 col-md-4">
-                                        <label class="form-label small">Destination<span class="required-marker">*</span></label>
-                                        <select :name="'lignes['+index+'][magasin_destination_id]'" x-model="ligne.magasin_destination_id" class="form-select form-select-sm" required>
-                                            <option value="">— Choisir —</option>
-                                            @foreach ($magasins as $magasin)
-                                                <option value="{{ $magasin->id }}">{{ $magasin->nom }} @if ($magasin->estDepot()) (dépôt) @endif</option>
-                                            @endforeach
-                                        </select>
-                                        <div class="text-danger small mt-1" x-show="erreurs['lignes.'+index+'.magasin_destination_id']" x-text="(erreurs['lignes.'+index+'.magasin_destination_id'] || [])[0]"></div>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <label class="form-label small">Taxe</label>
-                                        <select :name="'lignes['+index+'][taxe_id]'" x-model="ligne.taxe_id" class="form-select form-select-sm">
-                                            <option value="" :selected="!ligne.taxe_id">Aucune</option>
-                                            <template x-for="taxe in taxes" :key="taxe.id">
-                                                <option :value="taxe.id" :selected="String(taxe.id) === String(ligne.taxe_id)" x-text="taxe.libelle + ' (' + taxe.taux + '%)'"></option>
-                                            </template>
-                                        </select>
-                                    </div>
-                                    <div class="col-6 col-md-2">
-                                        <label class="form-label small">Total HT</label>
-                                        <input type="text" class="form-control form-control-sm" :value="montantHtLigne(ligne).toLocaleString('fr-FR')" disabled>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <label class="form-label small">Total TTC</label>
-                                        <input type="text" class="form-control form-control-sm fw-semibold" :value="montantTtcLigne(ligne).toLocaleString('fr-FR') + ' F'" disabled>
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-6 col-md-4">
+                                            <label class="form-label small">Destination<span class="required-marker">*</span></label>
+                                            <select :name="'lignes['+index+'][magasin_destination_id]'" x-model="ligne.magasin_destination_id" class="form-select form-select-sm" required>
+                                                <option value="">— Choisir —</option>
+                                                @foreach ($magasins as $magasin)
+                                                    <option value="{{ $magasin->id }}">{{ $magasin->nom }} @if ($magasin->estDepot()) (dépôt) @endif</option>
+                                                @endforeach
+                                            </select>
+                                            <div class="text-danger small mt-1" x-show="erreurs['lignes.'+index+'.magasin_destination_id']" x-text="(erreurs['lignes.'+index+'.magasin_destination_id'] || [])[0]"></div>
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <label class="form-label small">Taxe</label>
+                                            <select :name="'lignes['+index+'][taxe_id]'" x-model="ligne.taxe_id" class="form-select form-select-sm">
+                                                <option value="" :selected="!ligne.taxe_id">Aucune</option>
+                                                <template x-for="taxe in taxes" :key="taxe.id">
+                                                    <option :value="taxe.id" :selected="String(taxe.id) === String(ligne.taxe_id)" x-text="taxe.libelle + ' (' + taxe.taux + '%)'"></option>
+                                                </template>
+                                            </select>
+                                        </div>
+                                        <div class="col-6 col-md-2">
+                                            <label class="form-label small">Total HT</label>
+                                            <input type="text" class="form-control form-control-sm" :value="montantHtLigne(ligne).toLocaleString('fr-FR')" disabled>
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <label class="form-label small">Total TTC</label>
+                                            <input type="text" class="form-control form-control-sm fw-semibold" :value="montantTtcLigne(ligne).toLocaleString('fr-FR') + ' F'" disabled>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </template>
 
-                        <button type="button" class="btn btn-sm btn-outline-primary mb-2" @click="ajouterLigne()">
+                        <button type="button" class="btn btn-sm btn-outline-primary" @click="ajouterLigne()">
                             <i class="bi bi-plus-lg"></i> Ajouter une ligne
                         </button>
+                        </div>
 
                         @error('lignes') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         @error('lignes.*.quantite') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         @error('lignes.*.prix_achat') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
 
                         <div class="text-danger small mt-2" x-show="aUnDoublon" x-cloak>
-                            <i class="bi bi-exclamation-triangle-fill me-1"></i>Un même produit avec la même unité ne peut pas apparaître sur plusieurs lignes : corrigez avant d'enregistrer.
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>Un même produit avec la même unité et la même destination ne peut pas apparaître sur plusieurs lignes : corrigez avant d'enregistrer.
                         </div>
 
                         <hr>

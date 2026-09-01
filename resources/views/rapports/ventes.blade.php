@@ -130,6 +130,7 @@
                         <th>Caissier</th>
                         <th>Total net</th>
                         <th>Avoir appliqué</th>
+                        <th>Livraison</th>
                         <th class="text-end d-print-none">Actions</th>
                     </tr>
                 </thead>
@@ -143,6 +144,19 @@
                             <td>{{ $vente->caissier->name }}</td>
                             <td>{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
                             <td class="text-secondary">{{ $vente->avoir_applique > 0 ? number_format($vente->avoir_applique, 0, ',', ' ').' F' : '—' }}</td>
+                            <td>
+                                @if ($vente->livraisonEngagee())
+                                    @if ($vente->entierementLivree())
+                                        <span class="badge text-bg-success-subtle text-success-emphasis">Entièrement livrée</span>
+                                    @else
+                                        <span class="badge text-bg-warning-subtle text-warning-emphasis">
+                                            {{ $vente->quantiteLivreePieces() }}/{{ $vente->lignes->sum('quantite_pieces') }} pièce(s)
+                                        </span>
+                                    @endif
+                                @else
+                                    <span class="text-secondary">—</span>
+                                @endif
+                            </td>
                             <td class="text-end d-print-none">
                                 <a href="{{ route('ventes.ticket', $vente) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Détail de la vente">
                                     <i class="bi bi-eye"></i>
@@ -152,7 +166,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-secondary py-4">Aucune vente sur cette période.</td>
+                            <td colspan="9" class="text-center text-secondary py-4">Aucune vente sur cette période.</td>
                         </tr>
                     @endforelse
                 </tbody>

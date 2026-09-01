@@ -121,7 +121,7 @@ class RapportController extends Controller
 
         return $this->pdfDepuisListe(
             'Rapport des ventes',
-            ['Numéro', 'Date', 'Magasin', 'Caisse', 'Caissier', 'Total net', 'Avoir appliqué'],
+            ['Numéro', 'Date', 'Magasin', 'Caisse', 'Caissier', 'Total net', 'Avoir appliqué', 'Livraison'],
             $this->requeteVentesFiltree($request, $debut, $fin, $magasinId)->get()->map(fn (Vente $v) => [
                 $v->numero,
                 $v->created_at->format('d/m/Y H:i'),
@@ -130,6 +130,7 @@ class RapportController extends Controller
                 $v->caissier->name,
                 number_format($v->total_net, 0, ',', ' ').' F',
                 $v->avoir_applique > 0 ? number_format($v->avoir_applique, 0, ',', ' ').' F' : '—',
+                $this->statutLivraisonLibelle($v),
             ]),
             'rapport-ventes.pdf',
             'Du '.$debut->format('d/m/Y').' au '.$fin->format('d/m/Y'),
@@ -144,7 +145,7 @@ class RapportController extends Controller
 
         return $this->excelDepuisListe(
             'Rapport des ventes',
-            ['Numéro', 'Date', 'Magasin', 'Caisse', 'Caissier', 'Total net', 'Avoir appliqué'],
+            ['Numéro', 'Date', 'Magasin', 'Caisse', 'Caissier', 'Total net', 'Avoir appliqué', 'Livraison'],
             $this->requeteVentesFiltree($request, $debut, $fin, $magasinId)->get()->map(fn (Vente $v) => [
                 $v->numero,
                 $v->created_at->format('d/m/Y H:i'),
@@ -153,16 +154,34 @@ class RapportController extends Controller
                 $v->caissier->name,
                 $v->total_net,
                 $v->avoir_applique,
+                $this->statutLivraisonLibelle($v),
             ]),
             'rapport-ventes.xlsx',
             $this->bilanVentes($request, $debut, $fin, $magasinId),
         );
     }
 
+    /**
+     * "—" si la vente n'a jamais eu de bon de livraison (feature non
+     * engagée, voir Vente::livraisonEngagee()) : pas de "non livrée"
+     * trompeur sur une vente comptoir classique. Même libellé utilisé par
+     * l'écran, le PDF et l'Excel — jamais un calcul recopié à trois endroits.
+     */
+    private function statutLivraisonLibelle(Vente $vente): string
+    {
+        if (! $vente->livraisonEngagee()) {
+            return '—';
+        }
+
+        return $vente->entierementLivree()
+            ? 'Entièrement livrée'
+            : $vente->quantiteLivreePieces().'/'.$vente->lignes->sum('quantite_pieces').' pièce(s)';
+    }
+
     private function requeteVentesFiltree(Request $request, Carbon $debut, Carbon $fin, ?int $magasinId): \Illuminate\Database\Eloquent\Builder
     {
         return Vente::query()
-            ->with(['magasin', 'caissier', 'sessionCaisse.caisse'])
+            ->with(['magasin', 'caissier', 'sessionCaisse.caisse', 'lignes', 'bonsLivraison.lignes'])
             ->when($magasinId, fn ($q) => $q->where('magasin_id', $magasinId))
             ->when($request->filled('caissier_id'), fn ($q) => $q->where('caissier_id', $request->integer('caissier_id')))
             ->when($request->filled('caisse_id'), fn ($q) => $q->whereHas('sessionCaisse', fn ($sc) => $sc->where('caisse_id', $request->integer('caisse_id'))))

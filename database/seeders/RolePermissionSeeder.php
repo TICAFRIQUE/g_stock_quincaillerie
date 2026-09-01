@@ -38,6 +38,7 @@ class RolePermissionSeeder extends Seeder
                 'vente.credit',
                 'vente.signaler',
                 'vente.retour',
+                'vente.livrer',
                 'ventenattente.gerer',
                 'client.voir',
                 'client.gerer',

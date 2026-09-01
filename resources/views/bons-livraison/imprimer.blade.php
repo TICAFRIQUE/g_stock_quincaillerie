@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="utf-8">
-    <title>Bon d'achat {{ $commande->numero }}</title>
+    <title>Bon de livraison {{ $bonLivraison->numero }}</title>
     <style>
         /* Feuille de style volontairement autonome (pas de Bootstrap) : ce
            document sert aussi de source au PDF (dompdf), dont le support CSS
@@ -40,11 +40,9 @@
         table.lignes { width: 100%; margin-top: 8px; }
         table.lignes th, table.lignes td { border: 1px solid #ccc; padding: 6px 8px; font-size: 12px; }
         table.lignes th { background: #f0ece6; text-align: left; }
-        table.totaux { width: 45%; margin-left: 55%; margin-top: 12px; }
-        table.totaux td { padding: 5px 8px; }
-        table.totaux .net td { font-weight: bold; font-size: 15px; border-top: 2px solid #241e19; }
-        table.totaux .credit td { color: #b02a37; font-weight: bold; }
         .badge-annulee { display: inline-block; padding: 4px 10px; border: 1px solid #b02a37; color: #b02a37; font-weight: bold; margin-bottom: 12px; }
+        .signatures { width: 100%; margin-top: 50px; }
+        .signatures td { width: 50%; vertical-align: top; padding-top: 30px; border-top: 1px solid #241e19; font-size: 12px; }
         .mention { margin-top: 30px; font-size: 11px; color: #888; text-align: center; }
         /* @page (pas body padding) : seul mécanisme qui réserve une marge de
            sécurité fiable sur CHAQUE page côté dompdf comme à l'impression
@@ -65,7 +63,6 @@
             .bloc-client { background: #fff; border-color: #000; }
             .bloc-client .label { color: #000; }
             table.lignes th { background: #fff; }
-            table.totaux .credit td { color: #000; }
             .badge-annulee { color: #000; border-color: #000; }
             .mention { color: #000; }
         }
@@ -81,7 +78,6 @@
             .bloc-client { background: #fff; border-color: #000; }
             .bloc-client .label { color: #000; }
             table.lignes th { background: #fff; }
-            table.totaux .credit td { color: #000; }
             .badge-annulee { color: #000; border-color: #000; }
             .mention { color: #000; }
         </style>
@@ -90,17 +86,14 @@
 <body>
     @unless ($pourPdf ?? false)
         <div class="actions">
-            {{-- Imprime le PDF réel (dompdf) plutôt que cette page HTML :
-                 rendu garanti identique à "Télécharger en PDF". --}}
-            <x-bouton-imprimer :pdf-route="route('commande-achats.pdf', $commande)" />
-            <a href="{{ route('commande-achats.pdf', $commande) }}">Télécharger en PDF</a>
-            <a href="{{ route('commande-achats.excel', $commande) }}">Télécharger en Excel</a>
-            <a href="{{ route('commande-achats.show', $commande) }}">Voir le détail</a>
+            <x-bouton-imprimer :pdf-route="route('bons-livraison.pdf', $bonLivraison)" />
+            <a href="{{ route('bons-livraison.pdf', $bonLivraison) }}">Télécharger en PDF</a>
+            <a href="{{ route('ventes.ticket', $bonLivraison->vente) }}">Voir la vente {{ $bonLivraison->vente->numero }}</a>
         </div>
     @endunless
 
-    @if ($commande->trashed())
-        <div class="badge-annulee">COMMANDE ANNULÉE</div>
+    @if ($bonLivraison->trashed())
+        <div class="badge-annulee">BON DE LIVRAISON ANNULÉ — {{ $bonLivraison->motif_annulation }}</div>
     @endif
 
     <table class="entete">
@@ -115,83 +108,49 @@
                 @if ($parametre->numero) Tél : {{ $parametre->numero }} @endif
             </td>
             <td style="width: 45%;">
-                <div class="facture-titre">BON D'ACHAT</div>
+                <div class="facture-titre">BON DE LIVRAISON</div>
                 <div class="facture-meta">
-                    N° {{ $commande->numero }}<br>
-                    Date : {{ $commande->date_commande->format('d/m/Y') }}<br>
-                    Statut : {{ $commande->statut === 'validee' ? 'Validée' : 'Brouillon' }}
+                    N° {{ $bonLivraison->numero }}<br>
+                    Date : {{ $bonLivraison->created_at->format('d/m/Y à H:i') }}<br>
+                    Vente d'origine : {{ $bonLivraison->vente->numero }}<br>
+                    Magasin : {{ $bonLivraison->vente->magasin->nom }}<br>
+                    Remis par : {{ $bonLivraison->auteur->name ?? 'utilisateur supprimé' }}
                 </div>
             </td>
         </tr>
     </table>
 
     <div class="bloc-client">
-        <div class="label">Fournisseur</div>
-        <strong>{{ $commande->fournisseur->nom }}</strong><br>
-        @if ($commande->fournisseur->telephone) Tél : {{ $commande->fournisseur->telephone }}<br> @endif
-        @if ($commande->fournisseur->adresse) {{ $commande->fournisseur->adresse }} @endif
+        <div class="label">Client</div>
+        <strong>{{ $bonLivraison->vente->client->nom ?? 'Client comptant' }}</strong><br>
+        @if ($bonLivraison->vente->client?->telephone) Tél : {{ $bonLivraison->vente->client->telephone }}<br> @endif
+        @if ($bonLivraison->vente->client?->adresse) {{ $bonLivraison->vente->client->adresse }} @endif
     </div>
 
     <table class="lignes">
         <thead>
             <tr>
                 <th>Désignation</th>
-                <th>Unité</th>
-                <th>Destination</th>
-                <th class="text-end">Qté</th>
-                <th class="text-end">Prix HT</th>
-                <th>Taxe</th>
-                <th class="text-end">Total HT</th>
-                <th class="text-end">Total TTC</th>
+                <th class="text-end">Quantité livrée</th>
+                <th>Magasin / dépôt source</th>
             </tr>
         </thead>
         <tbody>
-            @foreach ($commande->lignes as $ligne)
+            @foreach ($bonLivraison->lignes as $ligne)
                 <tr>
                     <td>{{ $ligne->produit->libelle_affichage }}</td>
-                    <td>{{ $ligne->uniteVente->unite->nom_avec_abbreviation ?? $ligne->produit->unite_base_libelle }}</td>
-                    <td>{{ $ligne->magasinDestination->nom }}</td>
-                    <td class="text-end">{{ $ligne->quantite }}</td>
-                    <td class="text-end">{{ number_format($ligne->prix_achat, 0, ',', ' ') }} F</td>
-                    <td>{{ $ligne->taxe->nom ?? '—' }}</td>
-                    <td class="text-end">{{ number_format($ligne->montantHt(), 0, ',', ' ') }} F</td>
-                    <td class="text-end">{{ number_format($ligne->montantTtc(), 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ $ligne->quantite_pieces }}</td>
+                    <td>{{ $ligne->magasin->nom }}</td>
                 </tr>
             @endforeach
         </tbody>
     </table>
 
-    <table class="totaux">
+    <table class="signatures">
         <tr>
-            <td>Total HT</td>
-            <td class="text-end">{{ number_format($commande->totalHt(), 0, ',', ' ') }} F</td>
+            <td>Remis par</td>
+            <td>Reçu par (nom, date, signature)</td>
         </tr>
-        <tr>
-            <td>Total taxes</td>
-            <td class="text-end">{{ number_format($commande->totalTaxes(), 0, ',', ' ') }} F</td>
-        </tr>
-        <tr class="net">
-            <td>Total TTC</td>
-            <td class="text-end">{{ number_format($commande->totalTtc(), 0, ',', ' ') }} F</td>
-        </tr>
-        @foreach ($commande->paiements as $paiement)
-            <tr>
-                <td>{{ $paiement->moyenPaiement->nom }}</td>
-                <td class="text-end">{{ number_format($paiement->montant, 0, ',', ' ') }} F</td>
-            </tr>
-        @endforeach
-        @if ($commande->statut === 'validee' && $commande->montantRegle() > 0)
-            <tr>
-                <td>Montant réglé</td>
-                <td class="text-end">{{ number_format($commande->montantRegle(), 0, ',', ' ') }} F</td>
-            </tr>
-            @if ($commande->resteDu() > 0)
-                <tr class="credit">
-                    <td>Reste dû au fournisseur</td>
-                    <td class="text-end">{{ number_format($commande->resteDu(), 0, ',', ' ') }} F</td>
-                </tr>
-            @endif
-        @endif
     </table>
 
     <div class="mention">

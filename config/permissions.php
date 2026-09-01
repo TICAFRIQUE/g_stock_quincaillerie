@@ -39,6 +39,7 @@ return [
         'vente.signaler',
         'vente.annuler',
         'vente.retour',
+        'vente.livrer',
         'ventenattente.gerer',
         'client.voir',
         'client.gerer',

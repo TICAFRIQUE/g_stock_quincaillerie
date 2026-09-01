@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\BonLivraisonController;
 use App\Http\Controllers\CaisseController;
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\ClientController;
@@ -291,6 +292,17 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('can:vente.retour')->group(function () {
         Route::post('ventes/{vente}/retours', [RetourVenteController::class, 'store'])->name('ventes.retours.store');
+    });
+
+    Route::middleware('can:vente.livrer')->group(function () {
+        Route::post('ventes/{vente}/bons-livraison', [BonLivraisonController::class, 'store'])->name('ventes.bons-livraison.store');
+        // withTrashed() : un bon de livraison annulé reste consultable
+        // (badge "Annulé"), jamais un 404 — même logique que ventes.facture.
+        Route::get('bons-livraison/{bonLivraison}', [BonLivraisonController::class, 'imprimer'])->name('bons-livraison.imprimer')->withTrashed();
+        Route::get('bons-livraison/{bonLivraison}/pdf', [BonLivraisonController::class, 'pdf'])->name('bons-livraison.pdf')->withTrashed();
+        // Pas de withTrashed() ici : annuler un BL déjà annulé doit échouer
+        // (404), pas le re-traiter — même logique que ventes.annuler.
+        Route::post('bons-livraison/{bonLivraison}/annuler', [BonLivraisonController::class, 'annuler'])->name('bons-livraison.annuler');
     });
 
     Route::middleware('can:client.reglement')->group(function () {

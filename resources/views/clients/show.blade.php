@@ -64,6 +64,143 @@
     </div>
 
     <div class="card mb-3">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <h3 class="h6 mb-0">Ventes</h3>
+            <a href="{{ route('clients.ventes.excel', $client) }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-file-earmark-excel me-1"></i>Exporter en Excel
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Numéro</th>
+                        <th>Date</th>
+                        <th>Magasin</th>
+                        <th>Statut</th>
+                        <th class="text-end">Total</th>
+                        <th class="text-end">Réglé</th>
+                        <th class="text-end">Reste dû</th>
+                        <th>Livraison</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($ventes as $vente)
+                        <tr>
+                            <td><code>{{ $vente->numero }}</code></td>
+                            <td>{{ $vente->created_at->format('d/m/Y H:i') }}</td>
+                            <td>{{ $vente->magasin->nom }}</td>
+                            <td>
+                                @if ($vente->trashed())
+                                    <span class="badge text-bg-danger">Annulée</span>
+                                @else
+                                    <span class="badge text-bg-success">Validée</span>
+                                @endif
+                            </td>
+                            <td class="text-end">{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
+                            @if (! $vente->trashed())
+                                <td class="text-end text-success">{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</td>
+                                <td class="text-end {{ $vente->soldeDuReel() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</td>
+                            @else
+                                <td class="text-end text-secondary">—</td>
+                                <td class="text-end text-secondary">—</td>
+                            @endif
+                            <td>
+                                @if ($vente->livraisonEngagee())
+                                    @if ($vente->entierementLivree())
+                                        <span class="badge text-bg-success-subtle text-success-emphasis">Entièrement livrée</span>
+                                    @else
+                                        <span class="badge text-bg-warning-subtle text-warning-emphasis">
+                                            {{ $vente->quantiteLivreePieces() }}/{{ $vente->lignes->sum('quantite_pieces') }} pièce(s)
+                                        </span>
+                                    @endif
+                                @else
+                                    <span class="text-secondary">—</span>
+                                @endif
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ route('ventes.ticket', $vente) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Détail de la vente">
+                                    <i class="bi bi-eye"></i>
+                                    <span class="visually-hidden">Détail</span>
+                                </a>
+                                @can('client.reglement')
+                                    @if (! $vente->trashed() && $vente->soldeDuReel() > 0 && $sessionOuverte)
+                                        <button type="button" class="btn btn-sm btn-icon btn-outline-reglement" title="Régler cette dette"
+                                                data-bs-toggle="modal" data-bs-target="#reglerClientModal"
+                                                data-montant="{{ min($vente->soldeDuReel(), $solde) }}"
+                                                data-vente="{{ $vente->id }}"
+                                                data-numero="{{ $vente->numero }}">
+                                            <i class="bi bi-cash-coin"></i>
+                                            <span class="visually-hidden">Régler</span>
+                                        </button>
+                                    @endif
+                                @endcan
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="9" class="text-center text-secondary py-4">Aucune vente pour ce client.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @if ($ventes->hasPages())
+            <div class="card-body">
+                {{ $ventes->onEachSide(1)->links() }}
+            </div>
+        @endif
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <h3 class="h6 mb-0">Devis</h3>
+            <a href="{{ route('clients.devis.excel', $client) }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-file-earmark-excel me-1"></i>Exporter en Excel
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Numéro</th>
+                        <th>Date</th>
+                        <th>Statut</th>
+                        <th>Valide jusqu'au</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($devis as $unDevis)
+                        <tr>
+                            <td><code>{{ $unDevis->numero }}</code></td>
+                            <td>{{ $unDevis->created_at->format('d/m/Y H:i') }}</td>
+                            <td><span class="badge {{ $unDevis->statutEffectif()->classeBadge() }}">{{ $unDevis->statutEffectif()->libelle() }}</span></td>
+                            <td>{{ $unDevis->date_validite->format('d/m/Y') }}</td>
+                            <td class="text-end">
+                                <a href="{{ route('devis.show', $unDevis) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Détail du devis">
+                                    <i class="bi bi-eye"></i>
+                                    <span class="visually-hidden">Détail</span>
+                                </a>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="text-center text-secondary py-4">Aucun devis pour ce client.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @if ($devis->hasPages())
+            <div class="card-body">
+                {{ $devis->onEachSide(1)->links() }}
+            </div>
+        @endif
+    </div>
+
+    <div class="card mb-3">
         <div class="card-body">
             <h3 class="h6">Historique du compte</h3>
         </div>
@@ -128,129 +265,6 @@
         @if ($ecritures->hasPages())
             <div class="card-body">
                 {{ $ecritures->onEachSide(1)->links() }}
-            </div>
-        @endif
-    </div>
-
-    <div class="card mb-3">
-        <div class="card-body d-flex justify-content-between align-items-center">
-            <h3 class="h6 mb-0">Ventes</h3>
-            <a href="{{ route('clients.ventes.excel', $client) }}" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-file-earmark-excel me-1"></i>Exporter en Excel
-            </a>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th>Numéro</th>
-                        <th>Date</th>
-                        <th>Magasin</th>
-                        <th>Statut</th>
-                        <th class="text-end">Total</th>
-                        <th class="text-end">Réglé</th>
-                        <th class="text-end">Reste dû</th>
-                        <th class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($ventes as $vente)
-                        <tr>
-                            <td><code>{{ $vente->numero }}</code></td>
-                            <td>{{ $vente->created_at->format('d/m/Y H:i') }}</td>
-                            <td>{{ $vente->magasin->nom }}</td>
-                            <td>
-                                @if ($vente->trashed())
-                                    <span class="badge text-bg-danger">Annulée</span>
-                                @else
-                                    <span class="badge text-bg-success">Validée</span>
-                                @endif
-                            </td>
-                            <td class="text-end">{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
-                            @if (! $vente->trashed())
-                                <td class="text-end text-success">{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</td>
-                                <td class="text-end {{ $vente->soldeDuReel() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</td>
-                            @else
-                                <td class="text-end text-secondary">—</td>
-                                <td class="text-end text-secondary">—</td>
-                            @endif
-                            <td class="text-end">
-                                <a href="{{ route('ventes.ticket', $vente) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Détail de la vente">
-                                    <i class="bi bi-eye"></i>
-                                    <span class="visually-hidden">Détail</span>
-                                </a>
-                                @can('client.reglement')
-                                    @if (! $vente->trashed() && $vente->soldeDuReel() > 0 && $sessionOuverte)
-                                        <button type="button" class="btn btn-sm btn-icon btn-outline-reglement" title="Régler cette dette"
-                                                data-bs-toggle="modal" data-bs-target="#reglerClientModal"
-                                                data-montant="{{ min($vente->soldeDuReel(), $solde) }}"
-                                                data-vente="{{ $vente->id }}"
-                                                data-numero="{{ $vente->numero }}">
-                                            <i class="bi bi-cash-coin"></i>
-                                            <span class="visually-hidden">Régler</span>
-                                        </button>
-                                    @endif
-                                @endcan
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="8" class="text-center text-secondary py-4">Aucune vente pour ce client.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        @if ($ventes->hasPages())
-            <div class="card-body">
-                {{ $ventes->onEachSide(1)->links() }}
-            </div>
-        @endif
-    </div>
-
-    <div class="card mb-3">
-        <div class="card-body d-flex justify-content-between align-items-center">
-            <h3 class="h6 mb-0">Devis</h3>
-            <a href="{{ route('clients.devis.excel', $client) }}" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-file-earmark-excel me-1"></i>Exporter en Excel
-            </a>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th>Numéro</th>
-                        <th>Date</th>
-                        <th>Statut</th>
-                        <th>Valide jusqu'au</th>
-                        <th class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($devis as $unDevis)
-                        <tr>
-                            <td><code>{{ $unDevis->numero }}</code></td>
-                            <td>{{ $unDevis->created_at->format('d/m/Y H:i') }}</td>
-                            <td><span class="badge {{ $unDevis->statutEffectif()->classeBadge() }}">{{ $unDevis->statutEffectif()->libelle() }}</span></td>
-                            <td>{{ $unDevis->date_validite->format('d/m/Y') }}</td>
-                            <td class="text-end">
-                                <a href="{{ route('devis.show', $unDevis) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Détail du devis">
-                                    <i class="bi bi-eye"></i>
-                                    <span class="visually-hidden">Détail</span>
-                                </a>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" class="text-center text-secondary py-4">Aucun devis pour ce client.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        @if ($devis->hasPages())
-            <div class="card-body">
-                {{ $devis->onEachSide(1)->links() }}
             </div>
         @endif
     </div>

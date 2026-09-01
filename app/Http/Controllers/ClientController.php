@@ -182,7 +182,7 @@ class ClientController extends Controller
         // logique que le ticket de vente.
         $ventes = $client->ventes()
             ->withTrashed()
-            ->with(['magasin', 'paiements', 'reglementsClient'])
+            ->with(['magasin', 'paiements', 'reglementsClient', 'lignes', 'bonsLivraison.lignes'])
             ->latest('created_at')
             ->paginate(10, ['*'], 'ventes_page');
 
@@ -214,12 +214,12 @@ class ClientController extends Controller
 
     public function exporterVentes(Client $client): StreamedResponse
     {
-        $ventes = $client->ventes()->withTrashed()->with('magasin')->orderBy('created_at')->get();
+        $ventes = $client->ventes()->withTrashed()->with(['magasin', 'lignes', 'bonsLivraison.lignes'])->orderBy('created_at')->get();
 
         $spreadsheet = new Spreadsheet();
         $feuille = $spreadsheet->getActiveSheet();
         $feuille->setTitle('Ventes');
-        $feuille->fromArray(['Numéro', 'Date', 'Magasin', 'Total net', 'Statut'], null, 'A1');
+        $feuille->fromArray(['Numéro', 'Date', 'Magasin', 'Total net', 'Statut', 'Livraison'], null, 'A1');
 
         $ligne = 2;
         foreach ($ventes as $vente) {
@@ -228,10 +228,13 @@ class ClientController extends Controller
             $feuille->setCellValue("C{$ligne}", $vente->magasin->nom);
             $feuille->setCellValue("D{$ligne}", $vente->total_net);
             $feuille->setCellValue("E{$ligne}", $vente->trashed() ? 'Annulée' : 'Validée');
+            $feuille->setCellValue("F{$ligne}", ! $vente->livraisonEngagee() ? '—' : ($vente->entierementLivree()
+                ? 'Entièrement livrée'
+                : $vente->quantiteLivreePieces().'/'.$vente->lignes->sum('quantite_pieces').' pièce(s)'));
             $ligne++;
         }
 
-        foreach (['A', 'B', 'C', 'D', 'E'] as $colonne) {
+        foreach (['A', 'B', 'C', 'D', 'E', 'F'] as $colonne) {
             $feuille->getColumnDimension($colonne)->setAutoSize(true);
         }
 

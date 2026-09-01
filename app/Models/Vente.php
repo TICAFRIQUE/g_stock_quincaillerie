@@ -87,6 +87,11 @@ class Vente extends Model
         return $this->hasMany(RetourVente::class);
     }
 
+    public function bonsLivraison(): HasMany
+    {
+        return $this->hasMany(BonLivraison::class);
+    }
+
     public function paiements(): HasMany
     {
         return $this->hasMany(Paiement::class);
@@ -134,5 +139,36 @@ class Vente extends Model
     public function soldeDuReel(): int
     {
         return max(0, $this->soldeDu() - $this->avoir_applique);
+    }
+
+    /**
+     * true si au moins un bon de livraison actif a été enregistré sur cette
+     * vente — sert à savoir si un statut de livraison doit être affiché du
+     * tout : une vente comptoir classique, jamais suivie via un bon de
+     * livraison (remise immédiate au comptoir), n'affiche rien plutôt qu'un
+     * trompeur "non livrée". Suppose `bonsLivraison` chargée.
+     */
+    public function livraisonEngagee(): bool
+    {
+        return $this->bonsLivraison->isNotEmpty();
+    }
+
+    /**
+     * Quantité totale (en pièces, toutes lignes confondues) déjà couverte
+     * par des bons de livraison actifs. Suppose `bonsLivraison.lignes`
+     * chargée.
+     */
+    public function quantiteLivreePieces(): int
+    {
+        return $this->bonsLivraison->flatMap->lignes->sum('quantite_pieces');
+    }
+
+    /**
+     * true si la totalité des pièces vendues a été couverte par des bons de
+     * livraison actifs. Suppose `lignes` et `bonsLivraison.lignes` chargées.
+     */
+    public function entierementLivree(): bool
+    {
+        return $this->quantiteLivreePieces() >= $this->lignes->sum('quantite_pieces');
     }
 }

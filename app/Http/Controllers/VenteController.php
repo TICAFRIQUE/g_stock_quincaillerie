@@ -322,6 +322,9 @@ class VenteController extends Controller
             'lignes.produit', 'lignes.uniteVente', 'lignes.magasinSource', 'paiements.moyenPaiement',
             'reglementsClient.paiements.moyenPaiement', 'reglementsClient.caissier',
             'retours.lignes.produit', 'retours.auteur',
+            'bonsLivraison' => fn ($q) => $q->withTrashed(),
+            'bonsLivraison.lignes.produit', 'bonsLivraison.lignes.magasin',
+            'bonsLivraison.auteur', 'bonsLivraison.annulateur',
             'magasin', 'caissier', 'sessionCaisse.caisse', 'annulateur', 'client',
         ]);
 
@@ -330,6 +333,15 @@ class VenteController extends Controller
         // ligne (voir RetourVenteService, même logique de calcul).
         $dejaRetourneParLigne = $vente->retours
             ->flatMap(fn ($retour) => $retour->lignes)
+            ->groupBy('ligne_vente_id')
+            ->map(fn ($lignes) => $lignes->sum('quantite_pieces'));
+
+        // Reste à livrer par ligne : même principe, mais en excluant d'abord
+        // les bons de livraison annulés (chargés withTrashed() ci-dessus pour
+        // l'historique, mais qui ne comptent jamais dans le reste à livrer).
+        $dejaLivreParLigne = $vente->bonsLivraison
+            ->whereNull('deleted_at')
+            ->flatMap(fn ($bonLivraison) => $bonLivraison->lignes)
             ->groupBy('ligne_vente_id')
             ->map(fn ($lignes) => $lignes->sum('quantite_pieces'));
 
@@ -362,7 +374,9 @@ class VenteController extends Controller
             'sessionOuverte' => $sessionOuverte,
             'peutRegler' => request()->user()->can('client.reglement'),
             'peutRetourner' => request()->user()->can('vente.retour'),
+            'peutLivrer' => request()->user()->can('vente.livrer'),
             'dejaRetourneParLigne' => $dejaRetourneParLigne,
+            'dejaLivreParLigne' => $dejaLivreParLigne,
             'moyensPaiement' => MoyenPaiement::actifs(),
             'parametre' => $parametre,
             'logoDataUri' => $logoDataUri,
@@ -395,7 +409,13 @@ class VenteController extends Controller
     {
         $this->assurerMagasin($vente->magasin_id);
 
-        $vente->load(['client', 'magasin', 'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement', 'reglementsClient']);
+        $vente->load(['client', 'magasin', 'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement', 'reglementsClient', 'bonsLivraison.lignes']);
+
+        $dejaLivreParLigne = $vente->bonsLivraison
+            ->flatMap(fn ($bonLivraison) => $bonLivraison->lignes)
+            ->groupBy('ligne_vente_id')
+            ->map(fn ($lignes) => $lignes->sum('quantite_pieces'));
+        $livraisonEngagee = $vente->bonsLivraison->isNotEmpty();
 
         $spreadsheet = new Spreadsheet();
         $feuille = $spreadsheet->getActiveSheet();
@@ -417,7 +437,11 @@ class VenteController extends Controller
         $feuille->setCellValue('A9', $vente->client->adresse ?? '');
 
         $ligneEnTete = 11;
-        foreach (['A' => 'Désignation', 'B' => 'Unité', 'C' => 'Quantité', 'D' => 'Prix unitaire', 'E' => 'Remise', 'F' => 'Total'] as $colonne => $libelle) {
+        $entetes = ['A' => 'Désignation', 'B' => 'Unité', 'C' => 'Quantité', 'D' => 'Prix unitaire', 'E' => 'Remise', 'F' => 'Total'];
+        if ($livraisonEngagee) {
+            $entetes['G'] = 'Livré';
+        }
+        foreach ($entetes as $colonne => $libelle) {
             $feuille->setCellValue("{$colonne}{$ligneEnTete}", $libelle);
         }
 
@@ -429,6 +453,9 @@ class VenteController extends Controller
             $feuille->setCellValue("D{$ligne}", $ligneVente->prix_unitaire_applique);
             $feuille->setCellValue("E{$ligne}", $ligneVente->remise_ligne_montant);
             $feuille->setCellValue("F{$ligne}", $ligneVente->total_ligne);
+            if ($livraisonEngagee) {
+                $feuille->setCellValue("G{$ligne}", ($dejaLivreParLigne[$ligneVente->id] ?? 0).'/'.$ligneVente->quantite_pieces);
+            }
             $ligne++;
         }
 
@@ -451,7 +478,7 @@ class VenteController extends Controller
             $feuille->setCellValue("F{$ligne}", $vente->soldeDuReel());
         }
 
-        foreach (['A', 'B', 'C', 'D', 'E', 'F'] as $colonne) {
+        foreach (array_keys($entetes) as $colonne) {
             $feuille->getColumnDimension($colonne)->setAutoSize(true);
         }
 
@@ -469,7 +496,15 @@ class VenteController extends Controller
      */
     private function chargerDonneesFacture(Vente $vente): array
     {
-        $vente->load(['client', 'magasin', 'caissier', 'sessionCaisse.caisse', 'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement', 'reglementsClient']);
+        $vente->load(['client', 'magasin', 'caissier', 'sessionCaisse.caisse', 'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement', 'reglementsClient', 'bonsLivraison.lignes']);
+
+        // bonsLivraison exclut déjà les BL annulés (scope global SoftDeletes) :
+        // pas de filtre deleted_at à refaire ici, contrairement à ticket() qui
+        // les charge withTrashed() pour les afficher grisés dans l'historique.
+        $dejaLivreParLigne = $vente->bonsLivraison
+            ->flatMap(fn ($bonLivraison) => $bonLivraison->lignes)
+            ->groupBy('ligne_vente_id')
+            ->map(fn ($lignes) => $lignes->sum('quantite_pieces'));
 
         $parametre = Parametre::actuel();
         $logo = $parametre->getFirstMedia('logo');
@@ -479,6 +514,7 @@ class VenteController extends Controller
 
         return [
             'vente' => $vente,
+            'dejaLivreParLigne' => $dejaLivreParLigne,
             'parametre' => $parametre,
             'logoDataUri' => $logoDataUri,
         ];

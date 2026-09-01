@@ -271,6 +271,7 @@
                         <th class="text-end">Avoir appliqué</th>
                         <th class="text-end">Reste à payer</th>
                         <th>Statut</th>
+                        <th>Livraison</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -284,6 +285,19 @@
                             <td class="text-end text-secondary">{{ $vente->avoir_applique > 0 ? number_format($vente->avoir_applique, 0, ',', ' ').' F' : '—' }}</td>
                             <td class="text-end {{ $vente->soldeDuReel() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</td>
                             <td><span class="badge text-bg-success">Validée</span></td>
+                            <td>
+                                @if ($vente->livraisonEngagee())
+                                    @if ($vente->entierementLivree())
+                                        <span class="badge text-bg-success-subtle text-success-emphasis">Entièrement livrée</span>
+                                    @else
+                                        <span class="badge text-bg-warning-subtle text-warning-emphasis">
+                                            {{ $vente->quantiteLivreePieces() }}/{{ $vente->lignes->sum('quantite_pieces') }} pièce(s)
+                                        </span>
+                                    @endif
+                                @else
+                                    <span class="text-secondary">—</span>
+                                @endif
+                            </td>
                             <td class="text-end">
                                 <a href="{{ route('ventes.ticket', $vente) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Détail de la vente">
                                     <i class="bi bi-eye"></i>
@@ -293,7 +307,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-secondary py-4">Aucune vente pour l'instant.</td>
+                            <td colspan="9" class="text-center text-secondary py-4">Aucune vente pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>

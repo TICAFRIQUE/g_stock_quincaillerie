@@ -10,6 +10,29 @@ pas supprimer les entrées cochées (historique).
 
 ---
 
+## 2026-09-01
+
+- [ ] **Nouveau : Bon de livraison** (une vente peut être livrée en plusieurs
+  fois, suivi ligne par ligne — voir `resources/views/ventes/ticket.blade.php`,
+  carte "Livrer des articles"). Déploiement standard, plus :
+  ```
+  php artisan migrate --force
+  php artisan db:seed --class=RolePermissionSeeder --force
+  ```
+  Les deux migrations créent `bon_livraisons`/`ligne_bon_livraisons` (aucune
+  donnée existante touchée). Le seeder enregistre la nouvelle permission
+  `vente.livrer` — comme pour toute nouvelle permission (voir
+  `GUIDE-MISES-A-JOUR.md`), elle n'est **cochée pour aucun rôle existant**
+  automatiquement : l'accorder manuellement sur `/roles` au(x) rôle(s) qui
+  doivent pouvoir enregistrer une livraison (ex. Caissier).
+
+- [ ] **Tester après déploiement** : sur une vente existante, enregistrer un
+  bon de livraison partiel (carte "Livrer des articles" du ticket) → vérifier
+  que le reste à livrer se met à jour, que le PDF individuel du bon
+  s'imprime sans prix, et que le badge de statut de livraison apparaît bien
+  dans la Facture, le rapport des ventes, la fiche client et le détail de
+  session de caisse.
+
 ## 2026-08-28
 
 - [ ] **Déployer le code sur le poste serveur** (copie/zip du projet, ou

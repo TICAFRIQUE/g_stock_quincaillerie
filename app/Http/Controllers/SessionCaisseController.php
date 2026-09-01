@@ -128,7 +128,7 @@ class SessionCaisseController extends Controller
         // soldeDu() (colonnes Réglé/Reste dû du tableau) — chargées ici pour
         // éviter un N+1 sur chaque ligne de la page.
         $query = $session->ventes()->getQuery()
-            ->with(['paiements', 'reglementsClient'])
+            ->with(['paiements', 'reglementsClient', 'lignes', 'bonsLivraison.lignes'])
             ->when($request->filled('recherche'), function ($q) use ($request) {
                 $recherche = $request->string('recherche');
                 $q->where('numero', 'like', "%{$recherche}%");

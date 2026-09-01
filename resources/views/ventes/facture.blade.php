@@ -45,6 +45,8 @@
         table.totaux .net td { font-weight: bold; font-size: 15px; border-top: 2px solid #241e19; }
         table.totaux .credit td { color: #b02a37; font-weight: bold; }
         .badge-annulee { display: inline-block; padding: 4px 10px; border: 1px solid #b02a37; color: #b02a37; font-weight: bold; margin-bottom: 12px; }
+        .badge-livraison { display: inline-block; padding: 4px 10px; border: 1px solid #2f7d32; color: #2f7d32; font-weight: bold; margin-bottom: 12px; }
+        .badge-livraison.partielle { border-color: #92650a; color: #92650a; }
         .mention { margin-top: 30px; font-size: 11px; color: #888; text-align: center; }
         /* @page (pas body padding) : seul mécanisme qui réserve une marge de
            sécurité fiable sur CHAQUE page côté dompdf comme à l'impression
@@ -67,6 +69,7 @@
             table.lignes th { background: #fff; }
             table.totaux .credit td { color: #000; }
             .badge-annulee { color: #000; border-color: #000; }
+            .badge-livraison, .badge-livraison.partielle { color: #000; border-color: #000; }
             .mention { color: #000; }
         }
     </style>
@@ -83,6 +86,7 @@
             table.lignes th { background: #fff; }
             table.totaux .credit td { color: #000; }
             .badge-annulee { color: #000; border-color: #000; }
+            .badge-livraison, .badge-livraison.partielle { color: #000; border-color: #000; }
             .mention { color: #000; }
         </style>
     @endif
@@ -109,6 +113,26 @@
 
     @if ($vente->trashed())
         <div class="badge-annulee">VENTE ANNULÉE</div>
+    @endif
+
+    @php
+        // N'affiche le statut de livraison que si la fonctionnalité a été
+        // utilisée sur cette vente (voir Vente::livraisonEngagee()) — pas de
+        // mention "non livré" sur une vente comptoir classique jamais suivie
+        // via un bon de livraison (remise immédiate au comptoir).
+        $livraisonEngagee = $vente->livraisonEngagee();
+        $totalVenduPieces = $vente->lignes->sum('quantite_pieces');
+        $totalLivrePieces = $vente->quantiteLivreePieces();
+        $entierementLivree = $vente->entierementLivree();
+    @endphp
+    @if ($livraisonEngagee)
+        <div class="badge-livraison {{ $entierementLivree ? '' : 'partielle' }}">
+            @if ($entierementLivree)
+                ENTIÈREMENT LIVRÉE
+            @else
+                LIVRAISON PARTIELLE — {{ $totalLivrePieces }}/{{ $totalVenduPieces }} pièce(s) livrée(s)
+            @endif
+        </div>
     @endif
 
     <table class="entete">
@@ -151,6 +175,9 @@
                 <th class="text-end">Prix unitaire</th>
                 <th class="text-end">Remise</th>
                 <th class="text-end">Total</th>
+                @if ($livraisonEngagee)
+                    <th class="text-end">Livré</th>
+                @endif
             </tr>
         </thead>
         <tbody>
@@ -162,6 +189,9 @@
                     <td class="text-end">{{ number_format($ligne->prix_unitaire_applique, 0, ',', ' ') }} F</td>
                     <td class="text-end">{{ $ligne->remise_ligne_montant > 0 ? '− '.number_format($ligne->remise_ligne_montant, 0, ',', ' ').' F' : '—' }}</td>
                     <td class="text-end">{{ number_format($ligne->total_ligne, 0, ',', ' ') }} F</td>
+                    @if ($livraisonEngagee)
+                        <td class="text-end">{{ $dejaLivreParLigne[$ligne->id] ?? 0 }}/{{ $ligne->quantite_pieces }}</td>
+                    @endif
                 </tr>
             @endforeach
         </tbody>

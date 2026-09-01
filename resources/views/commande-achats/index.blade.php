@@ -39,6 +39,9 @@
                         <th>Fournisseur</th>
                         <x-th-tri champ="date_commande" label="Date" />
                         <x-th-tri champ="statut" label="Statut" />
+                        <th class="text-end">Montant dû</th>
+                        <th class="text-end">Déjà réglé</th>
+                        <th class="text-end">Reste à régler</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -55,6 +58,15 @@
                                     <span class="badge text-bg-secondary">Brouillon</span>
                                 @endif
                             </td>
+                            @if ($commande->statut === 'validee')
+                                <td class="text-end">{{ number_format($commande->totalTtc(), 0, ',', ' ') }} F</td>
+                                <td class="text-end text-success">{{ number_format($commande->montantRegle(), 0, ',', ' ') }} F</td>
+                                <td class="text-end {{ $commande->resteDu() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ number_format($commande->resteDu(), 0, ',', ' ') }} F</td>
+                            @else
+                                <td class="text-end text-secondary">—</td>
+                                <td class="text-end text-secondary">—</td>
+                                <td class="text-end text-secondary">—</td>
+                            @endif
                             <td class="text-end">
                                 <a href="{{ route('commande-achats.show', $commande) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Voir">
                                     <i class="bi bi-eye"></i>
@@ -64,7 +76,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="text-center text-secondary py-4">Aucun bon d'achat pour l'instant.</td>
+                            <td colspan="8" class="text-center text-secondary py-4">Aucun bon d'achat pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>
