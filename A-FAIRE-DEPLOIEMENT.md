@@ -30,6 +30,12 @@ pas supprimer les entrées cochées (historique).
   - [ ] Créer un utilisateur avec un numéro de téléphone pour confirmer le
     nouveau champ.
 
+- [ ] **Nouveau : option "Remplacer" à l'activation** — case à cocher
+  (visible seulement s'il reste des jours) sur le formulaire d'activation,
+  pour un vrai changement d'offre (ex. repasser un client en Essai malgré
+  des jours restants) au lieu du renouvellement additif par défaut.
+  Déploiement standard, aucune migration.
+
 - [ ] **Nouveau : Système d'abonnement** — passé une date d'expiration, tout
   compte autre que Superadmin/développeur est redirigé vers "Mon abonnement"
   (lien dans le menu utilisateur, après "Guide d'utilisation") sur **toutes**
