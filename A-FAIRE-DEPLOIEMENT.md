@@ -12,6 +12,24 @@ pas supprimer les entrées cochées (historique).
 
 ## 2026-09-02
 
+- [ ] **Nouveau : alerte d'abonnement + téléphone utilisateur + confidentialité
+  des comptes privilégiés**. Déploiement standard, plus :
+  ```
+  php artisan migrate --force
+  ```
+  Une migration (`users.telephone`, nullable), aucune donnée existante
+  touchée. Aucune permission à seeder.
+  - [ ] **Tester après déploiement** : activer une formule de 5 jours ou
+    moins pour voir le bandeau d'alerte apparaître sur le dashboard (lien
+    "Renouveler maintenant" pour Superadmin/développeur uniquement).
+  - [ ] Vérifier que "Abonnement" apparaît bien en dernier dans le sous-menu
+    Administration (Superadmin/développeur), et n'apparaît plus dans la
+    barre horizontale directement.
+  - [ ] Vérifier qu'un Gérant (ou tout compte non Superadmin/développeur) ne
+    voit plus les comptes Superadmin/développeur sur `/utilisateurs`.
+  - [ ] Créer un utilisateur avec un numéro de téléphone pour confirmer le
+    nouveau champ.
+
 - [ ] **Nouveau : Système d'abonnement** — passé une date d'expiration, tout
   compte autre que Superadmin/développeur est redirigé vers "Mon abonnement"
   (lien dans le menu utilisateur, après "Guide d'utilisation") sur **toutes**
