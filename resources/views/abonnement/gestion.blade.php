@@ -129,19 +129,25 @@
                         </thead>
                         <tbody>
                             @foreach ($formules as $formule)
-                                <tr x-data="{ edition: false }">
-                                    <td x-show="!edition">{{ $formule->nom }}</td>
-                                    <td x-show="!edition">{{ $formule->illimite ? 'Illimité' : $formule->jours.' jours' }}</td>
-                                    <td x-show="!edition">{{ number_format($formule->prix, 0, ',', ' ') }} F</td>
-                                    <td x-show="!edition">
+                                <tr>
+                                    <td>{{ $formule->nom }}</td>
+                                    <td>{{ $formule->illimite ? 'Illimité' : $formule->jours.' jours' }}</td>
+                                    <td>{{ number_format($formule->prix, 0, ',', ' ') }} F</td>
+                                    <td>
                                         @if ($formule->actif)
                                             <span class="badge text-bg-success">Active</span>
                                         @else
                                             <span class="badge text-bg-secondary">Inactive</span>
                                         @endif
                                     </td>
-                                    <td x-show="!edition" class="text-end">
-                                        <button type="button" class="btn btn-sm btn-outline-primary" @click="edition = true">
+                                    <td class="text-end">
+                                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                            data-bs-toggle="modal" data-bs-target="#modifierFormuleModal"
+                                            data-formule-id="{{ $formule->id }}"
+                                            data-nom="{{ $formule->nom }}"
+                                            data-jours="{{ $formule->jours }}"
+                                            data-illimite="{{ $formule->illimite ? '1' : '0' }}"
+                                            data-prix="{{ $formule->prix }}">
                                             Modifier
                                         </button>
                                         <form method="POST" action="{{ route('abonnement.formules.basculer', $formule) }}" class="d-inline">
@@ -150,40 +156,6 @@
                                             <button type="submit" class="btn btn-sm btn-outline-secondary">
                                                 {{ $formule->actif ? 'Désactiver' : 'Activer' }}
                                             </button>
-                                        </form>
-                                    </td>
-
-                                    <td colspan="5" x-show="edition" x-cloak>
-                                        <form method="POST" action="{{ route('abonnement.formules.update', $formule) }}"
-                                            class="row g-2 align-items-end"
-                                            x-data="{ illimite: {{ $formule->illimite ? 'true' : 'false' }} }">
-                                            @csrf
-                                            @method('PUT')
-                                            <div class="col-sm-4">
-                                                <input type="text" name="nom" class="form-control form-control-sm"
-                                                    required maxlength="255" value="{{ $formule->nom }}">
-                                            </div>
-                                            <div class="col-sm-2">
-                                                <input type="number" name="jours" class="form-control form-control-sm"
-                                                    min="1" :disabled="illimite" value="{{ $formule->jours }}">
-                                            </div>
-                                            <div class="col-sm-2">
-                                                <div class="form-check mt-2">
-                                                    <input type="checkbox" name="illimite" value="1" class="form-check-input"
-                                                        x-model="illimite" {{ $formule->illimite ? 'checked' : '' }}>
-                                                    <label class="form-check-label small">Illimité</label>
-                                                </div>
-                                            </div>
-                                            <div class="col-sm-2">
-                                                <input type="number" name="prix" class="form-control form-control-sm"
-                                                    min="0" required value="{{ $formule->prix }}">
-                                            </div>
-                                            <div class="col-sm-2 d-flex gap-1">
-                                                <button type="submit" class="btn btn-sm btn-primary flex-fill">Enregistrer</button>
-                                                <button type="button" class="btn btn-sm btn-outline-secondary" @click="edition = false">
-                                                    Annuler
-                                                </button>
-                                            </div>
                                         </form>
                                     </td>
                                 </tr>
@@ -217,6 +189,55 @@
                             <button type="submit" class="btn btn-sm btn-primary w-100">Ajouter</button>
                         </div>
                     </form>
+                </div>
+            </div>
+
+            {{-- Modale partagée, une seule pour toutes les lignes du tableau —
+                 même patron que reglerClientModal (clients/show.blade.php) :
+                 les data-* du bouton "Modifier" cliqué alimentent l'état Alpine
+                 via l'évènement natif show.bs.modal, pas un modal par ligne. --}}
+            <div class="modal fade" id="modifierFormuleModal" tabindex="-1" aria-hidden="true"
+                 x-data="{ formuleId: null, nom: '', jours: null, illimite: false, prix: null }"
+                 x-init="$el.addEventListener('show.bs.modal', (event) => {
+                     formuleId = event.relatedTarget?.dataset.formuleId || null;
+                     nom = event.relatedTarget?.dataset.nom || '';
+                     jours = event.relatedTarget?.dataset.jours || null;
+                     illimite = event.relatedTarget?.dataset.illimite === '1';
+                     prix = event.relatedTarget?.dataset.prix || null;
+                 })">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="POST" :action="`{{ url('abonnement/formules') }}/${formuleId}`">
+                            @csrf
+                            @method('PUT')
+                            <div class="modal-header">
+                                <h5 class="modal-title">Modifier la formule</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Nom</label>
+                                    <input type="text" name="nom" class="form-control" required maxlength="255" x-model="nom">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Jours</label>
+                                    <input type="number" name="jours" class="form-control" min="1" :disabled="illimite" x-model="jours">
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" name="illimite" value="1" class="form-check-input" id="modifierFormuleIllimite" x-model="illimite">
+                                    <label class="form-check-label" for="modifierFormuleIllimite">Illimité</label>
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label">Prix (F)</label>
+                                    <input type="number" name="prix" class="form-control" min="0" required x-model="prix">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                                <button type="submit" class="btn btn-primary">Enregistrer</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
