@@ -29,6 +29,9 @@ class AbonnementController extends Controller
                 ->latest('date_debut')->latest('id')->paginate(15),
             'configuration' => ConfigurationAbonnement::actuel(),
             'estGestionnaire' => (bool) $request->user()?->estGestionnaireAbonnement(),
+            // Pour la section "Formules disponibles" (choix indicatif, en
+            // attendant un moyen de paiement en ligne — voir la vue).
+            'formules' => FormuleAbonnement::where('actif', true)->orderBy('jours')->get(),
         ]);
     }
 

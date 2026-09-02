@@ -19,11 +19,13 @@
             @else
                 <strong>Votre abonnement expire dans {{ $joursRestants }} jour{{ $joursRestants > 1 ? 's' : '' }}.</strong>
             @endif
-            @if (auth()->user()->estGestionnaireAbonnement())
-                <a href="{{ route('abonnement.gestion') }}" class="alert-link">Renouveler maintenant</a>
-            @else
-                Merci de prévenir votre responsable pour éviter une interruption de service.
-            @endif
+            {{-- Vers "Mon abonnement" pour tout le monde (formules disponibles +
+                 coordonnées de contact, ou raccourci Gestion abonnement pour un
+                 Superadmin/développeur — voir abonnement/mon.blade.php) — sauf
+                 si on y est déjà, où le lien n'aurait aucun sens. --}}
+            @unless (request()->routeIs('abonnement.mon'))
+                <a href="{{ route('abonnement.mon') }}" class="alert-link">Renouveler maintenant</a>
+            @endunless
         </div>
         <button type="button" class="btn-close" @click="fermer()" aria-label="Fermer"></button>
     </div>
