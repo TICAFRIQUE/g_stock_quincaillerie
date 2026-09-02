@@ -21,6 +21,19 @@ pas supprimer les entrées cochées (historique).
     Réessayez dans N secondes." ; vérifier qu'un autre identifiant peut se
     connecter normalement pendant ce temps.
 
+- [ ] **Sécurité (haute) : IDOR sur les ventes en attente** — déploiement
+  standard, aucune migration. Un Gérant d'un magasin ne peut plus modifier/
+  reprendre une vente en attente d'un autre magasin en devinant son ID.
+
+- [ ] **Sécurité (haute + moyenne, coquille desktop) : restriction de
+  navigation** — se met à jour automatiquement (v1.0.9) comme d'habitude,
+  aucune action côté serveur. La fenêtre principale refuse désormais toute
+  navigation hors de l'adresse du serveur configuré, et l'aperçu PDF refuse
+  une URL qui ne vient pas de ce même serveur.
+  - [ ] **Tester après mise à jour** : vérifier qu'imprimer une facture/un
+    devis/un bon d'achat fonctionne toujours normalement (aucune régression
+    attendue, ces PDF viennent déjà du même serveur).
+
 - [ ] **Nouveau : alerte d'abonnement + téléphone utilisateur + confidentialité
   des comptes privilégiés**. Déploiement standard, plus :
   ```
