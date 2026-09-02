@@ -64,12 +64,17 @@
                                     </option>
                                 @endforeach
                             </select>
+                            {{-- La formule choisie fixe déjà la durée (jours ou illimité) — la case
+                                 et le champ ci-dessous ne servent qu'au cas "montant/durée libre". --}}
+                            <p class="form-text mb-0" x-show="formule" x-cloak>
+                                <span x-text="formule?.illimite ? 'Illimité' : (formule?.jours + ' jours')"></span>
+                            </p>
                         </div>
-                        <div class="form-check mb-3">
+                        <div class="form-check mb-3" x-show="!formuleId" x-cloak>
                             <input type="checkbox" name="illimite" value="1" class="form-check-input" id="illimite" x-ref="illimite">
                             <label class="form-check-label" for="illimite">Illimité</label>
                         </div>
-                        <div class="mb-3">
+                        <div class="mb-3" x-show="!formuleId" x-cloak>
                             <label class="form-label">Jours</label>
                             <input type="number" name="jours" class="form-control" min="1" x-ref="jours">
                         </div>
