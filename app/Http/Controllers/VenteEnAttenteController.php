@@ -80,6 +80,7 @@ class VenteEnAttenteController extends Controller
     public function update(Request $request, VenteEnAttente $venteEnAttente, VenteEnAttenteService $venteEnAttenteService): RedirectResponse
     {
         $this->assurerProprietaireOuGerant($venteEnAttente);
+        $this->assurerMagasin($venteEnAttente->sessionCaisse->caisse->magasin_id);
         $this->nettoyerLignes($request);
         $this->bloquerCreditSansPermission($request);
 
@@ -114,6 +115,7 @@ class VenteEnAttenteController extends Controller
     public function reprendre(Request $request, VenteEnAttente $venteEnAttente, VenteEnAttenteService $venteEnAttenteService): RedirectResponse
     {
         $this->assurerProprietaireOuGerant($venteEnAttente);
+        $this->assurerMagasin($venteEnAttente->sessionCaisse->caisse->magasin_id);
         $this->nettoyerLignes($request);
         $request->merge([
             'remise_totale_type' => $request->input('remise_totale_type') ?: null,
