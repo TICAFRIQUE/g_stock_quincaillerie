@@ -129,24 +129,61 @@
                         </thead>
                         <tbody>
                             @foreach ($formules as $formule)
-                                <tr>
-                                    <td>{{ $formule->nom }}</td>
-                                    <td>{{ $formule->illimite ? 'Illimité' : $formule->jours.' jours' }}</td>
-                                    <td>{{ number_format($formule->prix, 0, ',', ' ') }} F</td>
-                                    <td>
+                                <tr x-data="{ edition: false }">
+                                    <td x-show="!edition">{{ $formule->nom }}</td>
+                                    <td x-show="!edition">{{ $formule->illimite ? 'Illimité' : $formule->jours.' jours' }}</td>
+                                    <td x-show="!edition">{{ number_format($formule->prix, 0, ',', ' ') }} F</td>
+                                    <td x-show="!edition">
                                         @if ($formule->actif)
                                             <span class="badge text-bg-success">Active</span>
                                         @else
                                             <span class="badge text-bg-secondary">Inactive</span>
                                         @endif
                                     </td>
-                                    <td class="text-end">
-                                        <form method="POST" action="{{ route('abonnement.formules.basculer', $formule) }}">
+                                    <td x-show="!edition" class="text-end">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" @click="edition = true">
+                                            Modifier
+                                        </button>
+                                        <form method="POST" action="{{ route('abonnement.formules.basculer', $formule) }}" class="d-inline">
                                             @csrf
                                             @method('PATCH')
                                             <button type="submit" class="btn btn-sm btn-outline-secondary">
                                                 {{ $formule->actif ? 'Désactiver' : 'Activer' }}
                                             </button>
+                                        </form>
+                                    </td>
+
+                                    <td colspan="5" x-show="edition" x-cloak>
+                                        <form method="POST" action="{{ route('abonnement.formules.update', $formule) }}"
+                                            class="row g-2 align-items-end"
+                                            x-data="{ illimite: {{ $formule->illimite ? 'true' : 'false' }} }">
+                                            @csrf
+                                            @method('PUT')
+                                            <div class="col-sm-4">
+                                                <input type="text" name="nom" class="form-control form-control-sm"
+                                                    required maxlength="255" value="{{ $formule->nom }}">
+                                            </div>
+                                            <div class="col-sm-2">
+                                                <input type="number" name="jours" class="form-control form-control-sm"
+                                                    min="1" :disabled="illimite" value="{{ $formule->jours }}">
+                                            </div>
+                                            <div class="col-sm-2">
+                                                <div class="form-check mt-2">
+                                                    <input type="checkbox" name="illimite" value="1" class="form-check-input"
+                                                        x-model="illimite" {{ $formule->illimite ? 'checked' : '' }}>
+                                                    <label class="form-check-label small">Illimité</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-sm-2">
+                                                <input type="number" name="prix" class="form-control form-control-sm"
+                                                    min="0" required value="{{ $formule->prix }}">
+                                            </div>
+                                            <div class="col-sm-2 d-flex gap-1">
+                                                <button type="submit" class="btn btn-sm btn-primary flex-fill">Enregistrer</button>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" @click="edition = false">
+                                                    Annuler
+                                                </button>
+                                            </div>
                                         </form>
                                     </td>
                                 </tr>

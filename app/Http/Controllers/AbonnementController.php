@@ -94,6 +94,26 @@ class AbonnementController extends Controller
         return redirect()->route('abonnement.gestion')->with('succes', 'Formule créée.');
     }
 
+    public function updateFormule(Request $request, FormuleAbonnement $formuleAbonnement): RedirectResponse
+    {
+        $illimite = $request->boolean('illimite');
+
+        $donnees = $request->validate([
+            'nom' => ['required', 'string', 'max:255'],
+            'jours' => [$illimite ? 'nullable' : 'required', 'nullable', 'integer', 'min:1'],
+            'prix' => ['required', 'integer', 'min:0'],
+        ]);
+
+        $formuleAbonnement->update([
+            'nom' => $donnees['nom'],
+            'illimite' => $illimite,
+            'jours' => $illimite ? null : $donnees['jours'],
+            'prix' => $donnees['prix'],
+        ]);
+
+        return redirect()->route('abonnement.gestion')->with('succes', 'Formule modifiée.');
+    }
+
     public function toggleFormule(FormuleAbonnement $formuleAbonnement): RedirectResponse
     {
         $formuleAbonnement->update(['actif' => ! $formuleAbonnement->actif]);

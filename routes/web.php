@@ -58,6 +58,7 @@ Route::middleware(['auth', 'abonnement.actif'])->group(function () {
         Route::get('abonnement/gestion', [AbonnementController::class, 'gestion'])->name('abonnement.gestion');
         Route::post('abonnement/activer', [AbonnementController::class, 'activer'])->name('abonnement.activer');
         Route::post('abonnement/formules', [AbonnementController::class, 'storeFormule'])->name('abonnement.formules.store');
+        Route::put('abonnement/formules/{formuleAbonnement}', [AbonnementController::class, 'updateFormule'])->name('abonnement.formules.update');
         Route::patch('abonnement/formules/{formuleAbonnement}/basculer', [AbonnementController::class, 'toggleFormule'])->name('abonnement.formules.basculer');
         Route::post('abonnement/configuration', [AbonnementController::class, 'updateConfiguration'])->name('abonnement.configuration.update');
     });
