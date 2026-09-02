@@ -12,6 +12,15 @@ pas supprimer les entrées cochées (historique).
 
 ## 2026-09-02
 
+- [ ] **Sécurité (critique) : limitation des tentatives de connexion** —
+  déploiement standard, aucune migration. Rien à configurer : le verrou (5
+  tentatives, 60s d'attente, par identifiant + IP) est actif dès le
+  déploiement.
+  - [ ] **Tester après déploiement** : saisir un mauvais code PIN 5-6 fois
+    de suite sur `/login` → le message doit passer à "Trop de tentatives.
+    Réessayez dans N secondes." ; vérifier qu'un autre identifiant peut se
+    connecter normalement pendant ce temps.
+
 - [ ] **Nouveau : alerte d'abonnement + téléphone utilisateur + confidentialité
   des comptes privilégiés**. Déploiement standard, plus :
   ```
