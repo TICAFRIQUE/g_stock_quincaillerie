@@ -47,7 +47,7 @@
                 <div class="card h-100">
                     <div class="card-body">
                         <div class="text-secondary small">Chiffre d'affaires</div>
-                        <div class="fs-4 fw-medium">{{ number_format($totalVentes, 0, ',', ' ') }} F</div>
+                        <div class="fs-4 fw-medium">{{ montant($totalVentes) }}</div>
                     </div>
                 </div>
             </div>
@@ -55,7 +55,7 @@
                 <div class="card h-100">
                     <div class="card-body">
                         <div class="text-secondary small">Panier moyen</div>
-                        <div class="fs-4 fw-medium">{{ number_format($panierMoyen, 0, ',', ' ') }} F</div>
+                        <div class="fs-4 fw-medium">{{ montant($panierMoyen) }}</div>
                     </div>
                 </div>
             </div>
@@ -79,7 +79,7 @@
                 <div class="card h-100">
                     <div class="card-body">
                         <div class="text-secondary small">Total dû (crédit)</div>
-                        <div class="fs-4 fw-medium {{ $totalDu > 0 ? 'text-warning-emphasis' : '' }}">{{ number_format($totalDu, 0, ',', ' ') }} F</div>
+                        <div class="fs-4 fw-medium {{ $totalDu > 0 ? 'text-warning-emphasis' : '' }}">{{ montant($totalDu) }}</div>
                     </div>
                 </div>
             </div>
@@ -87,7 +87,7 @@
                 <div class="card h-100">
                     <div class="card-body">
                         <div class="text-secondary small">Avoirs appliqués</div>
-                        <div class="fs-4 fw-medium">{{ number_format($avoirApplique, 0, ',', ' ') }} F</div>
+                        <div class="fs-4 fw-medium">{{ montant($avoirApplique) }}</div>
                     </div>
                 </div>
             </div>
@@ -95,7 +95,7 @@
                 <div class="card h-100">
                     <div class="card-body">
                         <div class="text-secondary small">Total en caisse</div>
-                        <div class="fs-4 fw-medium">{{ number_format($totalEspeces, 0, ',', ' ') }} F</div>
+                        <div class="fs-4 fw-medium">{{ montant($totalEspeces) }}</div>
                         <div class="small text-secondary fst-italic">Espèces réellement encaissées</div>
                     </div>
                 </div>
@@ -119,7 +119,7 @@
                         @foreach ($parMoyen as $moyen)
                             <tr>
                                 <td>{{ $moyen->nom }}</td>
-                                <td class="text-end">{{ number_format($moyen->total, 0, ',', ' ') }} F</td>
+                                <td class="text-end">{{ montant($moyen->total) }}</td>
                             </tr>
                         @endforeach
                     </table>

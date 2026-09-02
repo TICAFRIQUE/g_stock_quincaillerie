@@ -31,7 +31,7 @@
                 @if ($type === \App\Notifications\EcartCaisseDetecte::class)
                     <div class="small fw-medium text-danger">
                         <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                        Écart de {{ $notification->data['ecart'] > 0 ? '+' : '' }}{{ number_format($notification->data['ecart'], 0, ',', ' ') }} F
+                        Écart de {{ $notification->data['ecart'] > 0 ? '+' : '' }}{{ montant($notification->data['ecart']) }}
                     </div>
                     <div class="small text-secondary">
                         {{ $notification->data['caissier'] }} — {{ $notification->data['caisse'] }} ({{ $notification->data['magasin'] }})

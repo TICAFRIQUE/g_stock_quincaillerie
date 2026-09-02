@@ -9,6 +9,7 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CommandeAchatController;
 use App\Http\Controllers\ComptabiliteController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DeviseController;
 use App\Http\Controllers\DevisController;
 use App\Http\Controllers\FournisseurController;
 use App\Http\Controllers\InventaireController;
@@ -141,6 +142,10 @@ Route::middleware(['auth', 'abonnement.actif'])->group(function () {
         Route::resource('type-clients', TypeClientController::class)
             ->except(['show'])
             ->parameters(['type-clients' => 'typeClient']);
+    });
+
+    Route::middleware('can:devise.gerer')->group(function () {
+        Route::resource('devises', DeviseController::class)->except(['show']);
     });
 
     // motifs-mouvement/rapide avant le resource() ci-dessous : sinon "rapide"

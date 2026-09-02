@@ -91,6 +91,34 @@ pas supprimer les entrées cochées (historique).
     de fin dépassée (peut se tester en activant une formule très courte),
     et que Superadmin garde un accès complet malgré l'expiration.
 
+- [ ] **Nouveau : Devise configurable (affichage uniquement, pas de
+  conversion)** — permet d'utiliser l'application hors zone FCFA (Euro,
+  Dollar…). Un référentiel `Devise` (nom + abréviation) remplace le "F"
+  codé en dur partout (tickets, factures, dashboard, écran de vente/achat/
+  devis en direct via `window.DEVISE_ABREVIATION`). **Aucune conversion de
+  montant** : changer la devise ne fait que changer le libellé affiché, les
+  montants restent des entiers identiques. Déploiement standard, plus :
+  ```
+  php artisan migrate --force
+  php artisan db:seed --class=DeviseSeeder --force
+  ```
+  Deux nouvelles migrations (table `devises`, colonne `parametres.devise_id`
+  nullable), aucune donnée existante touchée. `DeviseSeeder` crée FCFA/Euro/
+  Dollar et active FCFA par défaut si aucune devise n'est déjà configurée.
+  - [ ] **Permission à seeder manuellement sur les installs existantes** :
+    `devise.gerer` est nouvelle dans `config/permissions.php` — comme pour
+    toute nouvelle permission, le rôle Gérant d'une install déjà en
+    production ne la reçoit pas automatiquement (`RolePermissionSeeder` ne
+    resynchronise que les rôles nouvellement créés). Accorder `devise.gerer`
+    au rôle voulu depuis `/roles` si le Gérant doit pouvoir changer la
+    devise (sinon seul Superadmin, qui a le bypass total, le peut).
+  - [ ] **Tester après déploiement** : dans Administration → Devises,
+    vérifier que FCFA/Euro/Dollar sont bien présents ; changer la devise
+    active depuis Paramètres → vérifier que le nouveau symbole apparaît
+    immédiatement (sans redéploiement) sur le dashboard, un ticket de vente
+    existant, ET l'écran de vente en direct (totaux calculés en JS) ; remettre
+    FCFA par défaut ensuite.
+
 ## 2026-09-01
 
 - [ ] **Nouveau : Prix personnalisé à la vente** — le caissier peut taper un

@@ -7,7 +7,7 @@
         <div class="card h-100">
             <div class="card-body">
                 <div class="text-secondary small">CA du jour</div>
-                <div class="fs-5 fw-medium">{{ number_format($caJour, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium">{{ montant($caJour) }}</div>
             </div>
         </div>
     </div>
@@ -15,7 +15,7 @@
         <div class="card h-100">
             <div class="card-body">
                 <div class="text-secondary small">CA de la semaine</div>
-                <div class="fs-5 fw-medium">{{ number_format($caSemaine, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium">{{ montant($caSemaine) }}</div>
             </div>
         </div>
     </div>
@@ -23,7 +23,7 @@
         <div class="card h-100">
             <div class="card-body">
                 <div class="text-secondary small">CA du mois</div>
-                <div class="fs-5 fw-medium">{{ number_format($caMois, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium">{{ montant($caMois) }}</div>
             </div>
         </div>
     </div>
@@ -31,7 +31,7 @@
         <div class="card h-100">
             <div class="card-body">
                 <div class="text-secondary small">Panier moyen (mois)</div>
-                <div class="fs-5 fw-medium">{{ number_format($panierMoyenMois, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium">{{ montant($panierMoyenMois) }}</div>
             </div>
         </div>
     </div>
@@ -47,7 +47,7 @@
         <div class="card h-100">
             <div class="card-body">
                 <div class="text-secondary small">Total ventes (mois)</div>
-                <div class="fs-5 fw-medium">{{ number_format($caMois, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium">{{ montant($caMois) }}</div>
             </div>
         </div>
     </div>
@@ -55,7 +55,7 @@
         <div class="card h-100 {{ $creancesClients > 0 ? 'border-warning' : '' }}">
             <div class="card-body">
                 <div class="text-secondary small">Total dû (créances clients)</div>
-                <div class="fs-5 fw-medium {{ $creancesClients > 0 ? 'text-warning-emphasis' : '' }}">{{ number_format($creancesClients, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium {{ $creancesClients > 0 ? 'text-warning-emphasis' : '' }}">{{ montant($creancesClients) }}</div>
             </div>
         </div>
     </div>
@@ -63,7 +63,7 @@
         <div class="card h-100">
             <div class="card-body">
                 <div class="text-secondary small">Avoirs appliqués (mois)</div>
-                <div class="fs-5 fw-medium">{{ number_format($avoirAppliqueMois, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium">{{ montant($avoirAppliqueMois) }}</div>
             </div>
         </div>
     </div>
@@ -71,7 +71,7 @@
         <div class="card h-100">
             <div class="card-body">
                 <div class="text-secondary small">Total en caisse (mois)</div>
-                <div class="fs-5 fw-medium">{{ number_format($totalEspecesMois, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium">{{ montant($totalEspecesMois) }}</div>
                 <div class="small text-secondary fst-italic">Espèces réellement encaissées</div>
             </div>
         </div>
@@ -83,7 +83,7 @@
         <div class="card h-100">
             <div class="card-body">
                 <div class="text-secondary small">Valeur du stock (CMP)</div>
-                <div class="fs-5 fw-medium">{{ number_format($valeurStock, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium">{{ montant($valeurStock) }}</div>
             </div>
         </div>
     </div>
@@ -107,7 +107,7 @@
         <div class="card h-100 {{ $detteFournisseurs > 0 ? 'border-warning' : '' }}">
             <div class="card-body">
                 <div class="text-secondary small">Dette fournisseurs</div>
-                <div class="fs-5 fw-medium {{ $detteFournisseurs > 0 ? 'text-warning-emphasis' : '' }}">{{ number_format($detteFournisseurs, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium {{ $detteFournisseurs > 0 ? 'text-warning-emphasis' : '' }}">{{ montant($detteFournisseurs) }}</div>
             </div>
         </div>
     </div>
@@ -161,7 +161,7 @@
                                 <tr>
                                     <td>{{ $produit->libelle_distinctif ? "{$produit->nom} — {$produit->libelle_distinctif}" : $produit->nom }}</td>
                                     <td>{{ $produit->pieces_vendues }}</td>
-                                    <td>{{ number_format($produit->total, 0, ',', ' ') }} F</td>
+                                    <td>{{ montant($produit->total) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -221,7 +221,7 @@
                         <tr>
                             <td><span class="badge {{ $ligne->type->classeBadge() }}">{{ $ligne->type->libelle() }}</span></td>
                             <td>{{ $ligne->motif }}</td>
-                            <td class="text-end fw-medium">{{ number_format($ligne->total, 0, ',', ' ') }} F</td>
+                            <td class="text-end fw-medium">{{ montant($ligne->total) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -252,7 +252,7 @@
                             <td>{{ $s->caissier->name }}</td>
                             <td>{{ $s->date_cloture->format('d/m/Y H:i') }}</td>
                             <td class="{{ $s->ecart > 0 ? 'text-success' : 'text-danger' }} fw-medium">
-                                {{ $s->ecart > 0 ? '+' : '' }}{{ number_format($s->ecart, 0, ',', ' ') }} F
+                                {{ $s->ecart > 0 ? '+' : '' }}{{ montant($s->ecart) }}
                             </td>
                         </tr>
                     @endforeach
@@ -272,7 +272,7 @@
                     data: {
                         labels: JSON.parse(evolutionEl.dataset.labels),
                         datasets: [{
-                            label: 'Ventes (F)',
+                            label: 'Ventes ({{ App\Models\Devise::abreviationActuelle() }})',
                             data: JSON.parse(evolutionEl.dataset.valeurs),
                             borderColor: '#e8590c',
                             backgroundColor: 'rgba(232, 89, 12, 0.15)',

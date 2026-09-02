@@ -111,23 +111,23 @@
                                 @endif
                             </td>
                             <td>
-                                {{ number_format($ligne->prix_achat, 0, ',', ' ') }} F
+                                {{ montant($ligne->prix_achat) }}
                                 @if ($ligne->uniteVente)
-                                    <div class="text-secondary small">soit {{ number_format($ligne->prixAchatParPiece(), 0, ',', ' ') }} F / {{ $ligne->produit->unite_base_libelle }}</div>
+                                    <div class="text-secondary small">soit {{ montant($ligne->prixAchatParPiece()) }} / {{ $ligne->produit->unite_base_libelle }}</div>
                                 @endif
                             </td>
                             <td>{{ $ligne->taxe->nom ?? '—' }}</td>
-                            <td>{{ number_format($ligne->montantHt(), 0, ',', ' ') }} F</td>
-                            <td>{{ number_format($ligne->montantTtc(), 0, ',', ' ') }} F</td>
+                            <td>{{ montant($ligne->montantHt()) }}</td>
+                            <td>{{ montant($ligne->montantTtc()) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
                 <tfoot>
                     <tr>
                         <th colspan="6" class="text-end">Total</th>
-                        <th>{{ number_format($commande->totalTaxes(), 0, ',', ' ') }} F</th>
-                        <th>{{ number_format($commande->totalHt(), 0, ',', ' ') }} F</th>
-                        <th>{{ number_format($commande->totalTtc(), 0, ',', ' ') }} F</th>
+                        <th>{{ montant($commande->totalTaxes()) }}</th>
+                        <th>{{ montant($commande->totalHt()) }}</th>
+                        <th>{{ montant($commande->totalTtc()) }}</th>
                     </tr>
                 </tfoot>
             </table>
@@ -144,7 +144,7 @@
                     @forelse ($commande->paiements as $paiement)
                         <tr>
                             <td>{{ $paiement->moyenPaiement->nom }}</td>
-                            <td class="text-end">{{ number_format($paiement->montant, 0, ',', ' ') }} F</td>
+                            <td class="text-end">{{ montant($paiement->montant) }}</td>
                         </tr>
                     @empty
                         <tr>
@@ -154,16 +154,16 @@
                     @foreach ($commande->reglementsFournisseur as $reglement)
                         <tr>
                             <td class="text-success">Règlement du {{ $reglement->created_at->format('d/m/Y') }}</td>
-                            <td class="text-end text-success">{{ number_format($reglement->montant, 0, ',', ' ') }} F</td>
+                            <td class="text-end text-success">{{ montant($reglement->montant) }}</td>
                         </tr>
                     @endforeach
                     <tr class="fw-medium border-top">
                         <td>Total réglé</td>
-                        <td class="text-end">{{ number_format($commande->montantRegle(), 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($commande->montantRegle()) }}</td>
                     </tr>
                     <tr class="fw-semibold {{ $commande->resteDu() > 0 ? 'text-danger' : '' }}">
                         <td>Reste dû au fournisseur</td>
-                        <td class="text-end">{{ number_format($commande->resteDu(), 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($commande->resteDu()) }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -182,7 +182,7 @@
                                 du {{ $retour->created_at->format('d/m/Y') }}
                                 par {{ $retour->auteur?->name ?? 'utilisateur supprimé' }}
                             </span>
-                            <span class="fw-medium">Avoir {{ number_format($retour->montant_total, 0, ',', ' ') }} F</span>
+                            <span class="fw-medium">Avoir {{ montant($retour->montant_total) }}</span>
                         </div>
                         @if ($retour->motif)
                             <div class="text-secondary ps-4 fst-italic">{{ $retour->motif }}</div>
@@ -190,7 +190,7 @@
                         @foreach ($retour->lignes as $ligneRetour)
                             <div class="d-flex justify-content-between text-secondary ps-4">
                                 <span>{{ $ligneRetour->produit->libelle_affichage }} × {{ $ligneRetour->quantite_pieces }}</span>
-                                <span>{{ number_format($ligneRetour->montant, 0, ',', ' ') }} F</span>
+                                <span>{{ montant($ligneRetour->montant) }}</span>
                             </div>
                         @endforeach
                     </div>
@@ -219,7 +219,7 @@
                         </div>
                         <div class="modal-body">
                             <p class="small text-secondary mb-2">
-                                Total TTC à régler : <strong>{{ number_format($commande->totalTtc(), 0, ',', ' ') }} F</strong><br>
+                                Total TTC à régler : <strong>{{ montant($commande->totalTtc()) }}</strong><br>
                                 Laissez vide pour ne rien encaisser maintenant (dette fournisseur intégrale).
                             </p>
                             <template x-for="(paiement, index) in paiements" :key="index">
@@ -246,7 +246,7 @@
                                 <i class="bi bi-plus-lg"></i> Ajouter un paiement
                             </button>
                             <div class="mt-2 small text-secondary">
-                                Reste dû après validation : <span class="fw-semibold" x-text="resteDu.toLocaleString('fr-FR') + ' F'"></span>
+                                Reste dû après validation : <span class="fw-semibold" x-text="resteDu.toLocaleString('fr-FR') + ' ' + window.DEVISE_ABREVIATION"></span>
                             </div>
                         </div>
                         <div class="modal-footer">
@@ -277,8 +277,8 @@
                         </div>
                         <div class="modal-body">
                             <p class="small text-secondary mb-2">
-                                Reste dû sur ce bon d'achat : <strong>{{ number_format($commande->resteDu(), 0, ',', ' ') }} F</strong><br>
-                                Solde total du fournisseur (toutes commandes confondues) : {{ number_format($commande->fournisseur->solde(), 0, ',', ' ') }} F
+                                Reste dû sur ce bon d'achat : <strong>{{ montant($commande->resteDu()) }}</strong><br>
+                                Solde total du fournisseur (toutes commandes confondues) : {{ montant($commande->fournisseur->solde()) }}
                             </p>
                             <template x-for="(paiement, index) in paiements" :key="index">
                                 <div class="row g-1 align-items-center mb-2">

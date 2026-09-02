@@ -152,10 +152,10 @@
                     <td>{{ $ligne->uniteVente->unite->nom_avec_abbreviation ?? $ligne->produit->unite_base_libelle }}</td>
                     <td>{{ $ligne->magasinDestination->nom }}</td>
                     <td class="text-end">{{ $ligne->quantite }}</td>
-                    <td class="text-end">{{ number_format($ligne->prix_achat, 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ montant($ligne->prix_achat) }}</td>
                     <td>{{ $ligne->taxe->nom ?? '—' }}</td>
-                    <td class="text-end">{{ number_format($ligne->montantHt(), 0, ',', ' ') }} F</td>
-                    <td class="text-end">{{ number_format($ligne->montantTtc(), 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ montant($ligne->montantHt()) }}</td>
+                    <td class="text-end">{{ montant($ligne->montantTtc()) }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -164,31 +164,31 @@
     <table class="totaux">
         <tr>
             <td>Total HT</td>
-            <td class="text-end">{{ number_format($commande->totalHt(), 0, ',', ' ') }} F</td>
+            <td class="text-end">{{ montant($commande->totalHt()) }}</td>
         </tr>
         <tr>
             <td>Total taxes</td>
-            <td class="text-end">{{ number_format($commande->totalTaxes(), 0, ',', ' ') }} F</td>
+            <td class="text-end">{{ montant($commande->totalTaxes()) }}</td>
         </tr>
         <tr class="net">
             <td>Total TTC</td>
-            <td class="text-end">{{ number_format($commande->totalTtc(), 0, ',', ' ') }} F</td>
+            <td class="text-end">{{ montant($commande->totalTtc()) }}</td>
         </tr>
         @foreach ($commande->paiements as $paiement)
             <tr>
                 <td>{{ $paiement->moyenPaiement->nom }}</td>
-                <td class="text-end">{{ number_format($paiement->montant, 0, ',', ' ') }} F</td>
+                <td class="text-end">{{ montant($paiement->montant) }}</td>
             </tr>
         @endforeach
         @if ($commande->statut === 'validee' && $commande->montantRegle() > 0)
             <tr>
                 <td>Montant réglé</td>
-                <td class="text-end">{{ number_format($commande->montantRegle(), 0, ',', ' ') }} F</td>
+                <td class="text-end">{{ montant($commande->montantRegle()) }}</td>
             </tr>
             @if ($commande->resteDu() > 0)
                 <tr class="credit">
                     <td>Reste dû au fournisseur</td>
-                    <td class="text-end">{{ number_format($commande->resteDu(), 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ montant($commande->resteDu()) }}</td>
                 </tr>
             @endif
         @endif

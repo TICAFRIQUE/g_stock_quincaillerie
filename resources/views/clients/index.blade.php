@@ -42,8 +42,8 @@
                             <td><a href="{{ route('clients.show', $client) }}">{{ $client->nom }}</a></td>
                             <td>{{ $client->typeClient->nom ?? '—' }}</td>
                             <td>{{ $client->telephone ?? '—' }}</td>
-                            <td class="{{ $solde > 0 ? 'text-danger fw-medium' : '' }}">{{ number_format($solde, 0, ',', ' ') }} F</td>
-                            <td>{{ $client->limite_credit !== null ? number_format($client->limite_credit, 0, ',', ' ').' F' : 'Illimitée' }}</td>
+                            <td class="{{ $solde > 0 ? 'text-danger fw-medium' : '' }}">{{ montant($solde) }}</td>
+                            <td>{{ $client->limite_credit !== null ? montant($client->limite_credit) : 'Illimitée' }}</td>
                             <td>
                                 @if ($client->actif)
                                     <span class="badge text-bg-success">Actif</span>

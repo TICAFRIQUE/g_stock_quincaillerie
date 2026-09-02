@@ -10,7 +10,7 @@
             <div class="card h-100">
                 <div class="card-body">
                     <div class="text-secondary small">Fond de caisse</div>
-                    <div class="fs-5 fw-medium">{{ number_format($session->fond_de_caisse, 0, ',', ' ') }} F</div>
+                    <div class="fs-5 fw-medium">{{ montant($session->fond_de_caisse) }}</div>
                 </div>
             </div>
         </div>
@@ -18,7 +18,7 @@
             <div class="card h-100">
                 <div class="card-body">
                     <div class="text-secondary small">Total de tous</div>
-                    <div class="fs-5 fw-medium">{{ number_format($totalVentes, 0, ',', ' ') }} F</div>
+                    <div class="fs-5 fw-medium">{{ montant($totalVentes) }}</div>
                 </div>
             </div>
         </div>
@@ -32,7 +32,7 @@
                     @foreach ($paiementsParMoyen as $paiement)
                         <div class="col-6 col-md-3">
                             <div class="text-secondary small">{{ $paiement->moyenPaiement->nom }}</div>
-                            <div class="fw-medium">{{ number_format($paiement->total, 0, ',', ' ') }} F</div>
+                            <div class="fw-medium">{{ montant($paiement->total) }}</div>
                         </div>
                     @endforeach
                 </div>
@@ -57,11 +57,11 @@
          }">
         <div class="card-body">
             <p class="text-secondary small mb-1">Seules les espèces sont comptées dans le tiroir.</p>
-            <p class="mb-1">Théorique (fond de caisse + ventes et règlements espèces + entrées − sorties) : <strong>{{ number_format($theorique, 0, ',', ' ') }} F</strong></p>
+            <p class="mb-1">Théorique (fond de caisse + ventes et règlements espèces + entrées − sorties) : <strong>{{ montant($theorique) }}</strong></p>
             @if ($detailTheorique['entrees'] > 0 || $detailTheorique['sorties'] > 0)
                 <p class="text-secondary small mb-3">
-                    dont entrées de caisse : {{ number_format($detailTheorique['entrees'], 0, ',', ' ') }} F,
-                    sorties de caisse : − {{ number_format($detailTheorique['sorties'], 0, ',', ' ') }} F
+                    dont entrées de caisse : {{ montant($detailTheorique['entrees']) }},
+                    sorties de caisse : − {{ montant($detailTheorique['sorties']) }}
                 </p>
             @else
                 <div class="mb-3"></div>

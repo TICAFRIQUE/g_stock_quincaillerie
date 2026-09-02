@@ -99,7 +99,7 @@
                                     <span class="badge text-bg-primary formule-pricing-card__badge">Votre formule actuelle</span>
                                 @endif
                                 <div class="formule-pricing-card__nom">{{ $formule->nom }}</div>
-                                <div class="formule-pricing-card__prix">{{ number_format($formule->prix, 0, ',', ' ') }} F</div>
+                                <div class="formule-pricing-card__prix">{{ montant($formule->prix) }}</div>
                                 <div class="formule-pricing-card__duree">
                                     <i class="bi bi-clock-history me-1"></i>
                                     {{ $formule->illimite ? 'Sans limite de durée' : $formule->jours.' jours' }}
@@ -163,7 +163,7 @@
                                     @endif
                                 @endif
                             </td>
-                            <td>{{ number_format($activation->montant, 0, ',', ' ') }} F</td>
+                            <td>{{ montant($activation->montant) }}</td>
                             <td>{{ $activation->date_fin?->format('d/m/Y') ?? 'Illimité' }}</td>
                             <td class="text-muted small">{{ $activation->note }}</td>
                         </tr>

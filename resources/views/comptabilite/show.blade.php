@@ -40,7 +40,7 @@
     <div class="row g-3 mb-3">
         <div class="col-12 col-md-4">
             <x-kpi-card label="Solde actuel (toujours global)" icon="bi-wallet2" color="success"
-                :value="number_format($solde, 0, ',', ' ') . ' F'" />
+                :value="montant($solde)" />
         </div>
     </div>
 
@@ -72,7 +72,7 @@
                                     </select>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <label for="montant" class="form-label small mb-1">Montant (F)</label>
+                                    <label for="montant" class="form-label small mb-1">Montant ({{ App\Models\Devise::abreviationActuelle() }})</label>
                                     <input type="number" name="montant" id="montant" min="1" class="form-control form-control-sm" required>
                                 </div>
                                 <div class="col-12 col-md-6">
@@ -147,7 +147,7 @@
                                         </select>
                                     </div>
                                     <div class="col-6 col-md-3">
-                                        <label for="montant_virement" class="form-label small mb-1">Montant (F)</label>
+                                        <label for="montant_virement" class="form-label small mb-1">Montant ({{ App\Models\Devise::abreviationActuelle() }})</label>
                                         <input type="number" name="montant" id="montant_virement" min="1" class="form-control form-control-sm" required>
                                     </div>
                                     <div class="col-6 col-md-4">
@@ -253,7 +253,7 @@
                                 <td>{{ $ecriture->motif ?? '—' }}</td>
                                 <td>{{ $ecriture->auteur?->name ?? 'Utilisateur supprimé' }}</td>
                                 <td class="text-end fw-medium {{ $ecriture->montant >= 0 ? 'text-success' : 'text-danger' }}">
-                                    {{ $ecriture->montant >= 0 ? '+' : '' }}{{ number_format($ecriture->montant, 0, ',', ' ') }} F
+                                    {{ $ecriture->montant >= 0 ? '+' : '' }}{{ montant($ecriture->montant) }}
                                 </td>
                             </tr>
                         @empty
@@ -266,9 +266,9 @@
                         <tr class="table-light">
                             <th colspan="4" class="text-end">Totaux (période filtrée)</th>
                             <th class="text-end">
-                                <span class="text-success">+ {{ number_format($totalEntrees, 0, ',', ' ') }} F</span>
+                                <span class="text-success">+ {{ montant($totalEntrees) }}</span>
                                 ·
-                                <span class="text-danger">− {{ number_format($totalSorties, 0, ',', ' ') }} F</span>
+                                <span class="text-danger">− {{ montant($totalSorties) }}</span>
                             </th>
                         </tr>
                     </tfoot>

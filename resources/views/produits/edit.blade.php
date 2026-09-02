@@ -42,7 +42,7 @@
                 <div class="card-body">
                     <h3 class="h6">Unités de vente</h3>
                     <p class="text-secondary small">
-                        L'unité de base « {{ $produit->unite_base_libelle }} » (prix : {{ number_format($produit->prix_piece, 0, ',', ' ') }} F) est toujours vendable.
+                        L'unité de base « {{ $produit->unite_base_libelle }} » (prix : {{ montant($produit->prix_piece) }}) est toujours vendable.
                         Ajoutez ici des variantes (ex. « 5L », « Carton de 24 ») avec leur propre libellé et prix total.
                     </p>
 
@@ -62,7 +62,7 @@
                                         <tr x-show="editingId !== {{ $uniteVente->id }}">
                                             <td>{{ $uniteVente->libelle }}</td>
                                             <td>{{ $uniteVente->facteur }} × {{ $produit->unite_base_libelle }}</td>
-                                            <td>{{ number_format($uniteVente->prix, 0, ',', ' ') }} F</td>
+                                            <td>{{ montant($uniteVente->prix) }}</td>
                                             <td class="text-end">
                                                 @if ($peutModifier)
                                                     <button type="button" class="btn btn-sm btn-icon btn-outline-secondary" title="Modifier"
@@ -93,7 +93,7 @@
                                                             <input type="number" name="facteur" class="form-control form-control-sm" value="{{ $uniteVente->facteur }}" min="2" required>
                                                         </div>
                                                         <div class="col-3">
-                                                            <label class="form-label small">Prix (F)<span class="required-marker">*</span></label>
+                                                            <label class="form-label small">Prix ({{ App\Models\Devise::abreviationActuelle() }})<span class="required-marker">*</span></label>
                                                             <input type="number" name="prix" class="form-control form-control-sm" value="{{ $uniteVente->prix }}" min="0" required>
                                                         </div>
                                                         <div class="col-2 d-flex gap-1">
@@ -135,7 +135,7 @@
                                 <input type="number" name="facteur" class="form-control form-control-sm" min="2" placeholder="Ex. 5" required>
                             </div>
                             <div class="col-3">
-                                <label class="form-label small">Prix (F)<span class="required-marker">*</span></label>
+                                <label class="form-label small">Prix ({{ App\Models\Devise::abreviationActuelle() }})<span class="required-marker">*</span></label>
                                 <input type="number" name="prix" class="form-control form-control-sm" min="0" required>
                             </div>
                             <div class="col-2">

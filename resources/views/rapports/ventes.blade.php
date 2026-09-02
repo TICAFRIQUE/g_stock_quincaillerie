@@ -85,7 +85,7 @@
         <div class="col-6 col-md-6">
             <div class="card h-100"><div class="card-body">
                 <div class="text-secondary small">Total net</div>
-                <div class="fs-5 fw-medium">{{ number_format($totalNet, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium">{{ montant($totalNet) }}</div>
             </div></div>
         </div>
     </div>
@@ -99,20 +99,20 @@
         <div class="col-6 col-md-4">
             <div class="card h-100"><div class="card-body">
                 <div class="text-secondary small">Total dû (crédit)</div>
-                <div class="fs-5 fw-medium {{ $totalDu > 0 ? 'text-warning-emphasis' : '' }}">{{ number_format($totalDu, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium {{ $totalDu > 0 ? 'text-warning-emphasis' : '' }}">{{ montant($totalDu) }}</div>
             </div></div>
         </div>
         <div class="col-6 col-md-4">
             <div class="card h-100"><div class="card-body">
                 <div class="text-secondary small">Avoirs appliqués</div>
-                <div class="fs-5 fw-medium">{{ number_format($totalAvoirApplique, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium">{{ montant($totalAvoirApplique) }}</div>
                 <div class="small text-secondary fst-italic">N'entre jamais dans le tiroir</div>
             </div></div>
         </div>
         <div class="col-6 col-md-4">
             <div class="card h-100"><div class="card-body">
                 <div class="text-secondary small">Total en caisse</div>
-                <div class="fs-5 fw-medium">{{ number_format($totalEspeces, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium">{{ montant($totalEspeces) }}</div>
                 <div class="small text-secondary fst-italic">Espèces réellement encaissées</div>
             </div></div>
         </div>
@@ -142,8 +142,8 @@
                             <td>{{ $vente->magasin->nom }}</td>
                             <td>{{ $vente->sessionCaisse->caisse->nom }}</td>
                             <td>{{ $vente->caissier->name }}</td>
-                            <td>{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
-                            <td class="text-secondary">{{ $vente->avoir_applique > 0 ? number_format($vente->avoir_applique, 0, ',', ' ').' F' : '—' }}</td>
+                            <td>{{ montant($vente->total_net) }}</td>
+                            <td class="text-secondary">{{ $vente->avoir_applique > 0 ? montant($vente->avoir_applique) : '—' }}</td>
                             <td>
                                 @if ($vente->livraisonEngagee())
                                     @if ($vente->entierementLivree())

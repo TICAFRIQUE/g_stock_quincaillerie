@@ -75,7 +75,7 @@
     <div class="row g-2 mb-2">
         <div class="col-6 col-md">
             <x-kpi-card compact label="Fond de caisse" icon="bi-cash-stack" color="primary"
-                :value="number_format($session->fond_de_caisse, 0, ',', ' ') . ' F'" />
+                :value="montant($session->fond_de_caisse)" />
         </div>
         <div class="col-6 col-md">
             <x-kpi-card compact label="Total ventes" icon="bi-receipt" color="info"
@@ -87,12 +87,12 @@
         </div>
         <div class="col-6 col-md">
             <x-kpi-card compact label="Chiffre d'affaires" icon="bi-graph-up-arrow" color="success"
-                :value="number_format($totalVentes, 0, ',', ' ') . ' F'" />
+                :value="montant($totalVentes)" />
         </div>
         @if ($soldeTheorique !== null)
             <div class="col-6 col-md">
                 <x-kpi-card compact label="Solde théorique du tiroir" icon="bi-wallet2" color="secondary"
-                    :value="number_format($soldeTheorique, 0, ',', ' ') . ' F'" />
+                    :value="montant($soldeTheorique)" />
             </div>
         @endif
     </div>
@@ -105,15 +105,15 @@
     <div class="row g-2 mb-3">
         <div class="col-6 col-md-4">
             <x-kpi-card compact label="Total dû (crédit)" icon="bi-credit-card" :color="$totalDu > 0 ? 'warning' : 'secondary'"
-                :value="number_format($totalDu, 0, ',', ' ') . ' F'" />
+                :value="montant($totalDu)" />
         </div>
         <div class="col-6 col-md-4">
             <x-kpi-card compact label="Avoirs appliqués" icon="bi-piggy-bank" color="info"
-                :value="number_format($avoirApplique, 0, ',', ' ') . ' F'" />
+                :value="montant($avoirApplique)" />
         </div>
         <div class="col-6 col-md-4">
             <x-kpi-card compact label="Total en caisse" icon="bi-cash-stack" color="success"
-                :value="number_format($totalEspeces, 0, ',', ' ') . ' F'" />
+                :value="montant($totalEspeces)" />
         </div>
     </div>
 
@@ -125,7 +125,7 @@
                     @foreach ($paiementsParMoyen as $paiement)
                         <div>
                             <div class="text-secondary" style="font-size: .75rem;">{{ $paiement->moyenPaiement->nom }}</div>
-                            <div class="fw-medium" style="font-size: 1.05rem;">{{ number_format($paiement->total, 0, ',', ' ') }} F</div>
+                            <div class="fw-medium" style="font-size: 1.05rem;">{{ montant($paiement->total) }}</div>
                         </div>
                     @endforeach
                 </div>
@@ -140,34 +140,34 @@
                 <div class="d-flex flex-wrap column-gap-4 row-gap-1">
                     <div>
                         <div class="text-secondary" style="font-size: .75rem;">Théorique</div>
-                        <div class="fw-medium" style="font-size: 1.05rem;">{{ number_format($session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes + $session->total_entrees_especes - $session->total_sorties_especes, 0, ',', ' ') }} F</div>
+                        <div class="fw-medium" style="font-size: 1.05rem;">{{ montant($session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes + $session->total_entrees_especes - $session->total_sorties_especes) }}</div>
                     </div>
                     @if ($session->total_reglements_especes > 0)
                         <div>
                             <div class="text-secondary" style="font-size: .75rem;">Règlements clients (espèces)</div>
-                            <div class="fw-medium" style="font-size: 1.05rem;">{{ number_format($session->total_reglements_especes, 0, ',', ' ') }} F</div>
+                            <div class="fw-medium" style="font-size: 1.05rem;">{{ montant($session->total_reglements_especes) }}</div>
                         </div>
                     @endif
                     @if ($session->total_entrees_especes > 0)
                         <div>
                             <div class="text-secondary" style="font-size: .75rem;">Entrées de caisse</div>
-                            <div class="fw-medium" style="font-size: 1.05rem;">{{ number_format($session->total_entrees_especes, 0, ',', ' ') }} F</div>
+                            <div class="fw-medium" style="font-size: 1.05rem;">{{ montant($session->total_entrees_especes) }}</div>
                         </div>
                     @endif
                     @if ($session->total_sorties_especes > 0)
                         <div>
                             <div class="text-secondary" style="font-size: .75rem;">Sorties de caisse</div>
-                            <div class="fw-medium" style="font-size: 1.05rem;">− {{ number_format($session->total_sorties_especes, 0, ',', ' ') }} F</div>
+                            <div class="fw-medium" style="font-size: 1.05rem;">− {{ montant($session->total_sorties_especes) }}</div>
                         </div>
                     @endif
                     <div>
                         <div class="text-secondary" style="font-size: .75rem;">Compté</div>
-                        <div class="fw-medium" style="font-size: 1.05rem;">{{ number_format($session->montant_compte, 0, ',', ' ') }} F</div>
+                        <div class="fw-medium" style="font-size: 1.05rem;">{{ montant($session->montant_compte) }}</div>
                     </div>
                     <div>
                         <div class="text-secondary" style="font-size: .75rem;">Écart</div>
                         <div class="fw-medium {{ $session->ecart === 0 ? '' : ($session->ecart > 0 ? 'text-success' : 'text-danger') }}" style="font-size: 1.05rem;">
-                            {{ $session->ecart > 0 ? '+' : '' }}{{ number_format($session->ecart, 0, ',', ' ') }} F
+                            {{ $session->ecart > 0 ? '+' : '' }}{{ montant($session->ecart) }}
                         </div>
                     </div>
                 </div>
@@ -203,7 +203,7 @@
                             </select>
                         </div>
                         <div class="col-6 col-md-3">
-                            <label for="montant" class="form-label small mb-1">Montant (F)</label>
+                            <label for="montant" class="form-label small mb-1">Montant ({{ App\Models\Devise::abreviationActuelle() }})</label>
                             <input type="number" name="montant" id="montant" min="1" class="form-control form-control-sm" required>
                         </div>
                         <div class="col-12 col-md-6">
@@ -250,7 +250,7 @@
                             {{ $mouvement->motif }}
                             <span class="text-secondary">— {{ $mouvement->auteur->name ?? 'utilisateur supprimé' }}, {{ $mouvement->created_at->format('d/m/Y H:i') }}</span>
                         </span>
-                        <span class="fw-medium">{{ $mouvement->type->value === 'entree' ? '+ ' : '− ' }}{{ number_format($mouvement->montant, 0, ',', ' ') }} F</span>
+                        <span class="fw-medium">{{ $mouvement->type->value === 'entree' ? '+ ' : '− ' }}{{ montant($mouvement->montant) }}</span>
                     </div>
                 @endforeach
             </div>
@@ -280,10 +280,10 @@
                         <tr>
                             <td><code>{{ $vente->numero }}</code></td>
                             <td>{{ $vente->created_at->format('d/m/Y H:i') }}</td>
-                            <td>{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
-                            <td class="text-end text-success">{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</td>
-                            <td class="text-end text-secondary">{{ $vente->avoir_applique > 0 ? number_format($vente->avoir_applique, 0, ',', ' ').' F' : '—' }}</td>
-                            <td class="text-end {{ $vente->soldeDuReel() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</td>
+                            <td>{{ montant($vente->total_net) }}</td>
+                            <td class="text-end text-success">{{ montant($vente->montantRegle()) }}</td>
+                            <td class="text-end text-secondary">{{ $vente->avoir_applique > 0 ? montant($vente->avoir_applique) : '—' }}</td>
+                            <td class="text-end {{ $vente->soldeDuReel() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ montant($vente->soldeDuReel()) }}</td>
                             <td><span class="badge text-bg-success">Validée</span></td>
                             <td>
                                 @if ($vente->livraisonEngagee())

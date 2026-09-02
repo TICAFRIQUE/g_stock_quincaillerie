@@ -28,7 +28,7 @@
                                 <option value="">— Choisir un client —</option>
                                 @foreach ($clients as $c)
                                     <option value="{{ $c->id }}" data-solde="{{ $c->solde }}">
-                                        {{ $c->nom }} — doit {{ number_format($c->solde, 0, ',', ' ') }} F
+                                        {{ $c->nom }} — doit {{ montant($c->solde) }}
                                     </option>
                                 @endforeach
                             </select>

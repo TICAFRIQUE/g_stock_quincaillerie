@@ -162,7 +162,7 @@
          via une permission Spatie — donc ce menu doit s'afficher pour ce
          compte même s'il n'a par ailleurs aucune permission d'administration
          (cas du compte développeur sans autre rôle). --}}
-    @if (auth()->user()->canAny(['administration.gerer', 'taxe.gerer', 'typeclient.gerer', 'motif.gerer',
+    @if (auth()->user()->canAny(['administration.gerer', 'taxe.gerer', 'devise.gerer', 'typeclient.gerer', 'motif.gerer',
         'parametre.gerer', 'utilisateur.gerer', 'role.gerer']) || auth()->user()->estGestionnaireAbonnement())
         <li class="nav-item dropdown">
             <a href="#"
@@ -203,6 +203,15 @@
                         <a href="{{ route('taxes.index') }}"
                             class="dropdown-item {{ request()->routeIs('taxes.*') ? 'active' : '' }}">
                             <i class="bi bi-percent me-2"></i>Taxes
+                        </a>
+                    </li>
+                @endcan
+
+                @can('devise.gerer')
+                    <li>
+                        <a href="{{ route('devises.index') }}"
+                            class="dropdown-item {{ request()->routeIs('devises.*') ? 'active' : '' }}">
+                            <i class="bi bi-cash-coin me-2"></i>Devises
                         </a>
                     </li>
                 @endcan

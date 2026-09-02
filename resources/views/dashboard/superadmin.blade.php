@@ -24,7 +24,7 @@
                     @forelse ($comparatifMagasins as $magasin)
                         <tr>
                             <td>{{ $magasin->nom }}</td>
-                            <td>{{ number_format($magasin->ventes_sum_total_net ?? 0, 0, ',', ' ') }} F</td>
+                            <td>{{ montant($magasin->ventes_sum_total_net ?? 0) }}</td>
                         </tr>
                     @empty
                         <tr>

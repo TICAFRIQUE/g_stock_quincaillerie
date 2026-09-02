@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Devise;
 use App\Models\Parametre;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,10 @@ class ParametreController extends Controller
 {
     public function edit(): View
     {
-        return view('parametres.edit', ['parametre' => Parametre::actuel()]);
+        return view('parametres.edit', [
+            'parametre' => Parametre::actuel(),
+            'devises' => Devise::where('actif', true)->orderBy('nom')->get(),
+        ]);
     }
 
     public function update(Request $request): RedirectResponse
@@ -26,6 +30,7 @@ class ParametreController extends Controller
             'numero' => ['nullable', 'string', 'max:50'],
             'adresse' => ['nullable', 'string', 'max:255'],
             'duree_validite_devis_jours' => ['required', 'integer', 'min:1', 'max:365'],
+            'devise_id' => ['nullable', 'exists:devises,id'],
             'logo' => ['nullable', 'image', 'max:2048'],
         ]);
 

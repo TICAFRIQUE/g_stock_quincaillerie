@@ -59,9 +59,9 @@
                                 @endif
                             </td>
                             @if ($commande->statut === 'validee')
-                                <td class="text-end">{{ number_format($commande->totalTtc(), 0, ',', ' ') }} F</td>
-                                <td class="text-end text-success">{{ number_format($commande->montantRegle(), 0, ',', ' ') }} F</td>
-                                <td class="text-end {{ $commande->resteDu() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ number_format($commande->resteDu(), 0, ',', ' ') }} F</td>
+                                <td class="text-end">{{ montant($commande->totalTtc()) }}</td>
+                                <td class="text-end text-success">{{ montant($commande->montantRegle()) }}</td>
+                                <td class="text-end {{ $commande->resteDu() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ montant($commande->resteDu()) }}</td>
                             @else
                                 <td class="text-end text-secondary">—</td>
                                 <td class="text-end text-secondary">—</td>

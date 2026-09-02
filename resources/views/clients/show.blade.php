@@ -39,11 +39,11 @@
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-4 col-lg-2">
             <x-kpi-card label="Solde du compte" icon="bi-cash-stack" :color="$solde > 0 ? 'danger' : 'success'"
-                :value="number_format($solde, 0, ',', ' ') . ' F' . ($solde < 0 ? ' (avoir)' : '')" />
+                :value="montant($solde) . ($solde < 0 ? ' (avoir)' : '')" />
         </div>
         <div class="col-6 col-md-4 col-lg-2">
             <x-kpi-card label="Chiffre d'affaires" icon="bi-graph-up-arrow" color="info"
-                :value="number_format($totalVentes, 0, ',', ' ') . ' F'" />
+                :value="montant($totalVentes)" />
         </div>
         <div class="col-6 col-md-4 col-lg-2">
             <x-kpi-card label="Ventes" icon="bi-receipt" color="primary"
@@ -51,15 +51,15 @@
         </div>
         <div class="col-6 col-md-4 col-lg-2">
             <x-kpi-card label="Total réglé" icon="bi-check2-circle" color="success"
-                :value="number_format($totalRegle, 0, ',', ' ') . ' F'" />
+                :value="montant($totalRegle)" />
         </div>
         <div class="col-6 col-md-4 col-lg-2">
             <x-kpi-card label="Panier moyen" icon="bi-basket" color="warning"
-                :value="number_format($client->ventes_count > 0 ? intdiv($totalVentes, $client->ventes_count) : 0, 0, ',', ' ') . ' F'" />
+                :value="montant($client->ventes_count > 0 ? intdiv($totalVentes, $client->ventes_count) : 0)" />
         </div>
         <div class="col-6 col-md-4 col-lg-2">
             <x-kpi-card label="Limite de crédit" icon="bi-shield-check" color="secondary"
-                :value="$client->limite_credit !== null ? number_format($client->limite_credit, 0, ',', ' ') . ' F' : 'Illimitée'" />
+                :value="$client->limite_credit !== null ? montant($client->limite_credit) : 'Illimitée'" />
         </div>
     </div>
 
@@ -98,10 +98,10 @@
                                     <span class="badge text-bg-success">Validée</span>
                                 @endif
                             </td>
-                            <td class="text-end">{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
+                            <td class="text-end">{{ montant($vente->total_net) }}</td>
                             @if (! $vente->trashed())
-                                <td class="text-end text-success">{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</td>
-                                <td class="text-end {{ $vente->soldeDuReel() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</td>
+                                <td class="text-end text-success">{{ montant($vente->montantRegle()) }}</td>
+                                <td class="text-end {{ $vente->soldeDuReel() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ montant($vente->soldeDuReel()) }}</td>
                             @else
                                 <td class="text-end text-secondary">—</td>
                                 <td class="text-end text-secondary">—</td>
@@ -233,7 +233,7 @@
                                     <div class="small text-success mt-1">
                                         <i class="bi bi-piggy-bank me-1"></i>
                                         @if ($venteLiee->soldeDuReel() > 0)
-                                            {{ number_format($venteLiee->avoir_applique, 0, ',', ' ') }} F couverts par avoir
+                                            {{ montant($venteLiee->avoir_applique) }} couverts par avoir
                                         @else
                                             Couverte par avoir — aucune dette restante
                                         @endif
@@ -251,7 +251,7 @@
                             </td>
                             <td>{{ $ecriture->auteur?->name ?? 'Utilisateur supprimé' }}</td>
                             <td class="text-end fw-medium {{ $ecriture->montant > 0 ? 'text-danger' : 'text-success' }}">
-                                {{ $ecriture->montant > 0 ? '+' : '' }}{{ number_format($ecriture->montant, 0, ',', ' ') }} F
+                                {{ $ecriture->montant > 0 ? '+' : '' }}{{ montant($ecriture->montant) }}
                             </td>
                         </tr>
                     @empty
@@ -307,10 +307,10 @@
                             <div class="modal-body">
                                 <p class="small text-secondary">
                                     <template x-if="venteNumero">
-                                        <span>Reste dû sur la facture <strong x-text="venteNumero"></strong> : <strong x-text="detteAffichee.toLocaleString('fr-FR')"></strong> F</span>
+                                        <span>Reste dû sur la facture <strong x-text="venteNumero"></strong> : <strong x-text="detteAffichee.toLocaleString('fr-FR') + ' ' + window.DEVISE_ABREVIATION"></strong></span>
                                     </template>
                                     <template x-if="!venteNumero">
-                                        <span>Dette totale du client : <strong>{{ number_format($solde, 0, ',', ' ') }} F</strong></span>
+                                        <span>Dette totale du client : <strong>{{ montant($solde) }}</strong></span>
                                     </template>
                                 </p>
 
@@ -381,7 +381,7 @@
                             </div>
                             <div class="modal-body">
                                 <p class="small text-secondary">
-                                    Avoir disponible : <strong>{{ number_format(-$solde, 0, ',', ' ') }} F</strong>
+                                    Avoir disponible : <strong>{{ montant(-$solde) }}</strong>
                                     — l'argent remis au client, jamais plus que cet avoir.
                                 </p>
 

@@ -38,7 +38,7 @@
             <div class="card h-100">
                 <div class="card-body">
                     <div class="text-secondary small">Valeur du stock (CMP)</div>
-                    <div class="fs-5 fw-medium">{{ number_format($kpis['valeurStock'], 0, ',', ' ') }} F</div>
+                    <div class="fs-5 fw-medium">{{ montant($kpis['valeurStock']) }}</div>
                 </div>
             </div>
         </div>
@@ -131,8 +131,8 @@
                                 @endif
                             </td>
                             <td>{{ $stock->produit->seuil_alerte }}</td>
-                            <td>{{ number_format($stock->produit->prix_piece, 0, ',', ' ') }} F</td>
-                            <td>{{ number_format($stock->cout_moyen_pondere, 0, ',', ' ') }} F</td>
+                            <td>{{ montant($stock->produit->prix_piece) }}</td>
+                            <td>{{ montant($stock->cout_moyen_pondere) }}</td>
                         </tr>
                     @empty
                         <tr>

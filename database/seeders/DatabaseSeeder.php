@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class,
             MoyenPaiementSeeder::class,
             ParametreSeeder::class,
+            DeviseSeeder::class,
             UniteSeeder::class,
             TaxeSeeder::class,
             CompteTresorerieSeeder::class,

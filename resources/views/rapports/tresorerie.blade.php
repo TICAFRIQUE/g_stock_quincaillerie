@@ -74,15 +74,15 @@
         </div>
         <div class="col-6 col-md-3">
             <x-kpi-card label="Total entrées" icon="bi-box-arrow-in-down" color="success"
-                :value="number_format($totalEntrees, 0, ',', ' ') . ' F'" />
+                :value="montant($totalEntrees)" />
         </div>
         <div class="col-6 col-md-3">
             <x-kpi-card label="Total sorties" icon="bi-box-arrow-up" color="danger"
-                :value="number_format($totalSorties, 0, ',', ' ') . ' F'" />
+                :value="montant($totalSorties)" />
         </div>
         <div class="col-6 col-md-3">
             <x-kpi-card label="Solde net" icon="bi-wallet2" :color="$soldeNet >= 0 ? 'success' : 'danger'"
-                :value="($soldeNet > 0 ? '+ ' : ($soldeNet < 0 ? '− ' : '')) . number_format(abs($soldeNet), 0, ',', ' ') . ' F'" />
+                :value="($soldeNet > 0 ? '+ ' : ($soldeNet < 0 ? '− ' : '')) . montant(abs($soldeNet))" />
         </div>
     </div>
 
@@ -107,7 +107,7 @@
                             <td><span class="badge {{ $ecriture->type->classeBadge() }}">{{ $ecriture->type->libelle() }}</span></td>
                             <td>{{ $ecriture->motif ?? '—' }}</td>
                             <td class="text-end fw-medium {{ $ecriture->montant >= 0 ? 'text-success' : 'text-danger' }}">
-                                {{ $ecriture->montant >= 0 ? '+ ' : '− ' }}{{ number_format(abs($ecriture->montant), 0, ',', ' ') }} F
+                                {{ $ecriture->montant >= 0 ? '+ ' : '− ' }}{{ montant(abs($ecriture->montant)) }}
                             </td>
                             <td>{{ $ecriture->auteur?->name ?? 'Utilisateur supprimé' }}</td>
                         </tr>

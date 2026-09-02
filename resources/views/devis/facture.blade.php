@@ -144,9 +144,9 @@
                     <td>{{ $ligne->produit->libelle_affichage }}</td>
                     <td>{{ $ligne->uniteVente->libelle ?? $ligne->produit->unite_base_libelle }}</td>
                     <td class="text-end">{{ $ligne->quantite }}</td>
-                    <td class="text-end">{{ number_format($prixUnitaire, 0, ',', ' ') }} F</td>
-                    <td class="text-end">{{ $remiseLigne > 0 ? '− '.number_format($remiseLigne, 0, ',', ' ').' F' : '—' }}</td>
-                    <td class="text-end">{{ number_format($sousTotalLigne - $remiseLigne, 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ montant($prixUnitaire) }}</td>
+                    <td class="text-end">{{ $remiseLigne > 0 ? '− '.montant($remiseLigne) : '—' }}</td>
+                    <td class="text-end">{{ montant($sousTotalLigne - $remiseLigne) }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -155,7 +155,7 @@
     <table class="totaux">
         <tr class="net">
             <td>Total net</td>
-            <td class="text-end">{{ number_format($montants['total_net'], 0, ',', ' ') }} F</td>
+            <td class="text-end">{{ montant($montants['total_net']) }}</td>
         </tr>
     </table>
 

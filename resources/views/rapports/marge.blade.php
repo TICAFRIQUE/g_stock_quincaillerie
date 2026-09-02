@@ -61,19 +61,19 @@
         <div class="col-6 col-md-3">
             <div class="card h-100"><div class="card-body">
                 <div class="text-secondary small">Ventes</div>
-                <div class="fs-5 fw-medium">{{ number_format($totalVentes, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium">{{ montant($totalVentes) }}</div>
             </div></div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card h-100"><div class="card-body">
                 <div class="text-secondary small">Coût</div>
-                <div class="fs-5 fw-medium">{{ number_format($totalCout, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium">{{ montant($totalCout) }}</div>
             </div></div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card h-100 border-success"><div class="card-body">
                 <div class="text-secondary small">Marge</div>
-                <div class="fs-5 fw-medium text-success">{{ number_format($totalMarge, 0, ',', ' ') }} F</div>
+                <div class="fs-5 fw-medium text-success">{{ montant($totalMarge) }}</div>
             </div></div>
         </div>
     </div>
@@ -95,10 +95,10 @@
                         <tr>
                             <td>{{ $ligne->nom }} <code class="small">{{ $ligne->sku }}</code></td>
                             <td>{{ $ligne->pieces }}</td>
-                            <td>{{ number_format($ligne->ventes_total, 0, ',', ' ') }} F</td>
-                            <td>{{ number_format($ligne->cout_total, 0, ',', ' ') }} F</td>
+                            <td>{{ montant($ligne->ventes_total) }}</td>
+                            <td>{{ montant($ligne->cout_total) }}</td>
                             <td class="{{ $ligne->marge >= 0 ? 'text-success' : 'text-danger' }} fw-medium">
-                                {{ number_format($ligne->marge, 0, ',', ' ') }} F
+                                {{ montant($ligne->marge) }}
                             </td>
                         </tr>
                     @empty

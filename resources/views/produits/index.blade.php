@@ -49,7 +49,7 @@
                             <td><code>{{ $produit->sku }}</code></td>
                             <td>{{ $produit->libelle_affichage }}</td>
                             <td>{{ $produit->categorie->nom }}</td>
-                            <td>{{ number_format($produit->prix_piece, 0, ',', ' ') }} F / {{ $produit->unite_base_libelle }}</td>
+                            <td>{{ montant($produit->prix_piece) }} / {{ $produit->unite_base_libelle }}</td>
                             <td>{{ $produit->seuil_alerte }}</td>
                             <td>
                                 @if ($produit->actif)

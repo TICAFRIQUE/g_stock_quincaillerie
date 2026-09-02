@@ -42,7 +42,7 @@
                                 @endif
                             </div>
                             <div class="text-secondary small">Solde</div>
-                            <div class="fs-5 fw-semibold">{{ number_format($soldesComptes[$compte->id], 0, ',', ' ') }} F</div>
+                            <div class="fs-5 fw-semibold">{{ montant($soldesComptes[$compte->id]) }}</div>
                         </div>
                     </div>
                 </a>
@@ -77,7 +77,7 @@
                                 </p>
                                 @if ($sessionOuverte)
                                     <div class="text-secondary small">Solde théorique du tiroir</div>
-                                    <div class="fs-5 fw-semibold">{{ number_format($soldesTheoriques[$caisse->id], 0, ',', ' ') }} F</div>
+                                    <div class="fs-5 fw-semibold">{{ montant($soldesTheoriques[$caisse->id]) }}</div>
                                 @else
                                     <div class="text-secondary small fst-italic">Aucune session ouverte</div>
                                 @endif

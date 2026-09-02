@@ -36,11 +36,11 @@
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-3">
             <x-kpi-card label="Solde du compte" icon="bi-cash-stack" :color="$solde > 0 ? 'danger' : 'success'"
-                :value="number_format($solde, 0, ',', ' ') . ' F' . ($solde < 0 ? ' (avoir)' : '')" />
+                :value="montant($solde) . ($solde < 0 ? ' (avoir)' : '')" />
         </div>
         <div class="col-6 col-md-3">
             <x-kpi-card label="Total achats" icon="bi-graph-up-arrow" color="info"
-                :value="number_format($totalAchats, 0, ',', ' ') . ' F'" />
+                :value="montant($totalAchats)" />
         </div>
         <div class="col-6 col-md-3">
             <x-kpi-card label="Bons d'achat" icon="bi-truck" color="primary"
@@ -48,7 +48,7 @@
         </div>
         <div class="col-6 col-md-3">
             <x-kpi-card label="Total réglé" icon="bi-check2-circle" color="success"
-                :value="number_format($totalRegle, 0, ',', ' ') . ' F'" />
+                :value="montant($totalRegle)" />
         </div>
     </div>
 
@@ -85,10 +85,10 @@
                                     <span class="badge text-bg-secondary">Brouillon</span>
                                 @endif
                             </td>
-                            <td class="text-end">{{ number_format($commande->totalTtc(), 0, ',', ' ') }} F</td>
+                            <td class="text-end">{{ montant($commande->totalTtc()) }}</td>
                             @if ($commande->statut === 'validee')
-                                <td class="text-end text-success">{{ number_format($commande->montantRegle(), 0, ',', ' ') }} F</td>
-                                <td class="text-end {{ $commande->resteDu() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ number_format($commande->resteDu(), 0, ',', ' ') }} F</td>
+                                <td class="text-end text-success">{{ montant($commande->montantRegle()) }}</td>
+                                <td class="text-end {{ $commande->resteDu() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ montant($commande->resteDu()) }}</td>
                             @else
                                 <td class="text-end text-secondary">—</td>
                                 <td class="text-end text-secondary">—</td>
@@ -167,7 +167,7 @@
                             </td>
                             <td>{{ $ecriture->auteur?->name ?? 'Utilisateur supprimé' }}</td>
                             <td class="text-end fw-medium {{ $ecriture->montant > 0 ? 'text-danger' : 'text-success' }}">
-                                {{ $ecriture->montant > 0 ? '+' : '' }}{{ number_format($ecriture->montant, 0, ',', ' ') }} F
+                                {{ $ecriture->montant > 0 ? '+' : '' }}{{ montant($ecriture->montant) }}
                             </td>
                             <td class="text-end">
                                 @if ($commandeLiee)
@@ -245,11 +245,11 @@
                             <div class="modal-body">
                                 <p class="small text-secondary">
                                     <template x-if="commandeNumero">
-                                        <span>Reste dû sur le bon d'achat <strong x-text="commandeNumero"></strong> : <strong x-text="detteAffichee.toLocaleString('fr-FR')"></strong> F</span>
+                                        <span>Reste dû sur le bon d'achat <strong x-text="commandeNumero"></strong> : <strong x-text="detteAffichee.toLocaleString('fr-FR') + ' ' + window.DEVISE_ABREVIATION"></strong></span>
                                     </template>
                                     <template x-if="!commandeNumero">
                                         <span>
-                                            Dette totale du fournisseur : <strong>{{ number_format($solde, 0, ',', ' ') }} F</strong> — ce règlement
+                                            Dette totale du fournisseur : <strong>{{ montant($solde) }}</strong> — ce règlement
                                             soldera l'intégralité de la dette, répartie automatiquement sur chaque bon d'achat encore dû
                                             (le plus ancien d'abord). Pour un paiement partiel, réglez un bon d'achat précis depuis la liste ci-dessous.
                                         </span>
@@ -291,7 +291,7 @@
                                         <span x-show="totalPaiements > detteAffichee">— dépasse le montant dû.</span>
                                     </template>
                                     <template x-if="!commandeAchatId">
-                                        <span x-show="!montantValide">— un règlement global doit couvrir exactement la dette totale ({{ number_format($solde, 0, ',', ' ') }} F).</span>
+                                        <span x-show="!montantValide">— un règlement global doit couvrir exactement la dette totale ({{ montant($solde) }}).</span>
                                     </template>
                                 </div>
                             </div>
@@ -332,7 +332,7 @@
                             </div>
                             <div class="modal-body">
                                 <p class="small text-secondary">
-                                    Avoir disponible : <strong>{{ number_format(-$solde, 0, ',', ' ') }} F</strong>
+                                    Avoir disponible : <strong>{{ montant(-$solde) }}</strong>
                                     — l'argent que le fournisseur nous reverse, jamais plus que cet avoir.
                                 </p>
 

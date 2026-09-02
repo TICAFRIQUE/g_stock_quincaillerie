@@ -54,7 +54,7 @@
                             <tr>
                                 <td><code>{{ $vente->numero }}</code></td>
                                 <td>{{ $vente->created_at->format('d/m/Y H:i') }}</td>
-                                <td class="text-end">{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
+                                <td class="text-end">{{ montant($vente->total_net) }}</td>
                             </tr>
                         @empty
                             <tr>
@@ -79,7 +79,7 @@
                         <div class="card-body pt-2">
                             <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
                                 <span>Fond de caisse</span>
-                                <span>{{ number_format($session->fond_de_caisse, 0, ',', ' ') }} F</span>
+                                <span>{{ montant($session->fond_de_caisse) }}</span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
                                 <span>Nombre de ventes</span>
@@ -87,12 +87,12 @@
                             </div>
                             <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2 fw-semibold">
                                 <span>Total net</span>
-                                <span>{{ number_format($totalVentes, 0, ',', ' ') }} F</span>
+                                <span>{{ montant($totalVentes) }}</span>
                             </div>
                             @foreach ($paiementsParMoyen as $paiement)
                                 <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
                                     <span>{{ $paiement->moyenPaiement->nom }}</span>
-                                    <span>{{ number_format($paiement->total, 0, ',', ' ') }} F</span>
+                                    <span>{{ montant($paiement->total) }}</span>
                                 </div>
                             @endforeach
                         </div>
@@ -111,29 +111,29 @@
                             <div class="card-body pt-2">
                                 <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
                                     <span>Théorique</span>
-                                    <span>{{ number_format($session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes + $session->total_entrees_especes - $session->total_sorties_especes, 0, ',', ' ') }} F</span>
+                                    <span>{{ montant($session->fond_de_caisse + $session->total_ventes_especes + $session->total_reglements_especes + $session->total_entrees_especes - $session->total_sorties_especes) }}</span>
                                 </div>
                                 @if ($session->total_reglements_especes > 0)
                                     <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
                                         <span>Règlements clients (espèces)</span>
-                                        <span>{{ number_format($session->total_reglements_especes, 0, ',', ' ') }} F</span>
+                                        <span>{{ montant($session->total_reglements_especes) }}</span>
                                     </div>
                                 @endif
                                 <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
                                     <span>Entrées de caisse</span>
-                                    <span class="text-success">{{ number_format($session->total_entrees_especes, 0, ',', ' ') }} F</span>
+                                    <span class="text-success">{{ montant($session->total_entrees_especes) }}</span>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2">
                                     <span>Sorties de caisse</span>
-                                    <span class="text-danger">{{ number_format($session->total_sorties_especes, 0, ',', ' ') }} F</span>
+                                    <span class="text-danger">{{ montant($session->total_sorties_especes) }}</span>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2 fw-semibold">
                                     <span>Compté</span>
-                                    <span>{{ number_format($session->montant_compte, 0, ',', ' ') }} F</span>
+                                    <span>{{ montant($session->montant_compte) }}</span>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2 mb-2 fw-bold text-{{ $couleurEcart }}">
                                     <span>Écart</span>
-                                    <span>{{ $session->ecart > 0 ? '+' : '' }}{{ number_format($session->ecart, 0, ',', ' ') }} F</span>
+                                    <span>{{ $session->ecart > 0 ? '+' : '' }}{{ montant($session->ecart) }}</span>
                                 </div>
                             </div>
                         </div>

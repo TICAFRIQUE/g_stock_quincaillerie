@@ -53,6 +53,22 @@
                             @error('adresse') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
 
+                        <div class="mb-3">
+                            <label for="devise_id" class="form-label">Devise</label>
+                            <select name="devise_id" id="devise_id" class="form-select @error('devise_id') is-invalid @enderror">
+                                @foreach ($devises as $devise)
+                                    <option value="{{ $devise->id }}" @selected(old('devise_id', $parametre->devise_id) == $devise->id)>
+                                        {{ $devise->nom }} ({{ $devise->abreviation }})
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">
+                                Affichage uniquement — les montants restent des nombres entiers, aucune conversion.
+                                <a href="{{ route('devises.index') }}">Gérer les devises</a>
+                            </div>
+                            @error('devise_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+
                         <div class="mb-4">
                             <label for="duree_validite_devis_jours" class="form-label">Durée de validité d'un devis (jours)<span class="required-marker">*</span></label>
                             <input type="number" name="duree_validite_devis_jours" id="duree_validite_devis_jours" min="1" max="365"

@@ -120,9 +120,9 @@
                                                         :class="{ 'is-invalid': estDoublon(index) || ligne.unite_vente_id === undefined }"
                                                         @change="changerVarianteDepuisSelect(ligne, $event.target.value)" required>
                                                     <option value="" :selected="ligne.unite_vente_id === undefined">— Choisir —</option>
-                                                    <option value="piece" :selected="ligne.unite_vente_id === null" x-text="produitDe(ligne).unite_base_libelle_complet + ' — ' + produitDe(ligne).prix_piece + ' F'"></option>
+                                                    <option value="piece" :selected="ligne.unite_vente_id === null" x-text="produitDe(ligne).unite_base_libelle_complet + ' — ' + produitDe(ligne).prix_piece + ' ' + window.DEVISE_ABREVIATION"></option>
                                                     <template x-for="unite in produitDe(ligne).unites" :key="unite.id">
-                                                        <option :value="unite.id" :selected="unite.id === ligne.unite_vente_id" x-text="unite.libelle + ' — ' + unite.prix + ' F'"></option>
+                                                        <option :value="unite.id" :selected="unite.id === ligne.unite_vente_id" x-text="unite.libelle + ' — ' + unite.prix + ' ' + window.DEVISE_ABREVIATION"></option>
                                                     </template>
                                                 </select>
                                                 <div class="text-danger small mt-1" x-show="estDoublon(index)" x-cloak>Déjà dans le panier avec la même unité et la même source.</div>
@@ -133,7 +133,7 @@
                                                         <select :value="ligne.prixPersonnalise ? 'prix' : ligne.remise_type"
                                                                 @change="choisirTypeRemise(ligne, $event.target.value)" class="form-select form-select-sm">
                                                             <option value="">Sans remise</option>
-                                                            <option value="montant">Remise (F)</option>
+                                                            <option value="montant">Remise ({{ App\Models\Devise::abreviationActuelle() }})</option>
                                                             <option value="pourcentage">Remise (%)</option>
                                                             <option value="prix">Prix personnalisé</option>
                                                         </select>
@@ -153,7 +153,7 @@
                                                     </div>
                                                 </td>
                                             @endcan
-                                            <td class="text-end fw-medium" x-text="totalLigne(ligne) + ' F'"></td>
+                                            <td class="text-end fw-medium" x-text="totalLigne(ligne) + ' ' + window.DEVISE_ABREVIATION"></td>
                                             <td>
                                                 <div class="d-flex gap-1">
                                                     <button type="button" class="btn btn-sm btn-icon btn-outline-secondary" title="Dupliquer (pour ajouter une autre variante de ce produit)" @click="dupliquerLigne(index)">
@@ -186,7 +186,7 @@
                                         <div class="col-6">
                                             <select x-model="remiseTotaleType" class="form-select form-select-sm">
                                                 <option value="">Sans remise</option>
-                                                <option value="montant">Remise (F)</option>
+                                                <option value="montant">Remise ({{ App\Models\Devise::abreviationActuelle() }})</option>
                                                 <option value="pourcentage">Remise (%)</option>
                                             </select>
                                         </div>
@@ -202,17 +202,17 @@
                             <table class="table table-sm mt-3 mb-0">
                                 <tr>
                                     <td>Sous-total</td>
-                                    <td class="text-end" x-text="sousTotal + ' F'"></td>
+                                    <td class="text-end" x-text="sousTotal + ' ' + window.DEVISE_ABREVIATION"></td>
                                 </tr>
                                 @can('vente.remise')
                                     <tr>
                                         <td>Remise totale</td>
-                                        <td class="text-end" x-text="'− ' + remiseTotaleMontant + ' F'"></td>
+                                        <td class="text-end" x-text="'− ' + remiseTotaleMontant + ' ' + window.DEVISE_ABREVIATION"></td>
                                     </tr>
                                 @endcan
                                 <tr class="fw-bold">
                                     <td>Net à payer</td>
-                                    <td class="text-end" x-text="totalNet + ' F'"></td>
+                                    <td class="text-end" x-text="totalNet + ' ' + window.DEVISE_ABREVIATION"></td>
                                 </tr>
                             </table>
                         </div>
@@ -256,7 +256,7 @@
                                     Le solde restant dû sera porté au compte de ce client.
                                 </div>
                                 <div class="form-text small text-success" x-show="clientId && avoirDisponible > 0" x-cloak>
-                                    <i class="bi bi-piggy-bank me-1"></i>Ce client a un avoir de <strong x-text="avoirDisponible + ' F'"></strong>.
+                                    <i class="bi bi-piggy-bank me-1"></i>Ce client a un avoir de <strong x-text="avoirDisponible + ' ' + window.DEVISE_ABREVIATION"></strong>.
                                     <button type="button" class="btn btn-link btn-sm p-0 align-baseline" @click="appliquerAvoir()">
                                         Appliquer l'avoir à cette facture
                                     </button>
@@ -264,9 +264,9 @@
                                 <div class="form-text small fw-semibold" :class="netApresAvoir > 0 ? 'text-warning' : 'text-success'"
                                      x-show="clientId && avoirDisponible > 0 && totalNet > 0" x-cloak>
                                     <i class="bi bi-check-circle me-1"></i>
-                                    <span x-text="avoirApplicable + ' F'"></span> de l'avoir couvriront cette facture de <span x-text="totalNet + ' F'"></span>.
+                                    <span x-text="avoirApplicable + ' ' + window.DEVISE_ABREVIATION"></span> de l'avoir couvriront cette facture de <span x-text="totalNet + ' ' + window.DEVISE_ABREVIATION"></span>.
                                     <template x-if="netApresAvoir > 0">
-                                        <span>Il restera <strong x-text="netApresAvoir + ' F'"></strong> à régler (en paiement et/ou en solde à crédit).</span>
+                                        <span>Il restera <strong x-text="netApresAvoir + ' ' + window.DEVISE_ABREVIATION"></strong> à régler (en paiement et/ou en solde à crédit).</span>
                                     </template>
                                     <template x-if="netApresAvoir === 0">
                                         <span>Facture entièrement couverte par l'avoir, aucun paiement n'est nécessaire.</span>
@@ -320,10 +320,10 @@
                                  x-show="clientId && avoirDisponible > 0 && totalPaiements < totalNet" x-cloak>
                                 <i class="bi bi-piggy-bank me-1"></i>
                                 <template x-if="resteApresAvoir > 0">
-                                    <span>Avoir appliqué : <span x-text="avoirUtiliseSurCetteVente + ' F'"></span>. Il restera <strong x-text="resteApresAvoir + ' F'"></strong> de solde à crédit sur le compte du client.</span>
+                                    <span>Avoir appliqué : <span x-text="avoirUtiliseSurCetteVente + ' ' + window.DEVISE_ABREVIATION"></span>. Il restera <strong x-text="resteApresAvoir + ' ' + window.DEVISE_ABREVIATION"></strong> de solde à crédit sur le compte du client.</span>
                                 </template>
                                 <template x-if="resteApresAvoir === 0">
-                                    <span>Couvert par l'avoir du client (<span x-text="avoirUtiliseSurCetteVente + ' F'"></span>) — aucune dette ne sera créée.</span>
+                                    <span>Couvert par l'avoir du client (<span x-text="avoirUtiliseSurCetteVente + ' ' + window.DEVISE_ABREVIATION"></span>) — aucune dette ne sera créée.</span>
                                 </template>
                             </div>
                             <div class="mt-1 small fw-medium text-primary" x-show="monnaieARendre > 0" x-cloak>

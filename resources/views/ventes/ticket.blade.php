@@ -80,13 +80,13 @@
             <div class="card h-100 bg-reglement-subtle border-0">
                 <div class="card-body">
                     <div class="text-secondary small">Montant à régler</div>
-                    <div class="fs-4 fw-bold">{{ number_format($vente->total_net, 0, ',', ' ') }} F</div>
+                    <div class="fs-4 fw-bold">{{ montant($vente->total_net) }}</div>
                     @if ($vente->trashed())
                         <div class="small text-secondary">Vente annulée</div>
                     @else
                         <div class="small text-secondary">
-                            Déjà réglé : {{ number_format($vente->montantRegle(), 0, ',', ' ') }} F
-                            · Reste : <span class="{{ $vente->soldeDuReel() > 0 ? 'text-danger fw-medium' : '' }}">{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</span>
+                            Déjà réglé : {{ montant($vente->montantRegle()) }}
+                            · Reste : <span class="{{ $vente->soldeDuReel() > 0 ? 'text-danger fw-medium' : '' }}">{{ montant($vente->soldeDuReel()) }}</span>
                         </div>
                     @endif
                 </div>
@@ -188,9 +188,9 @@
                                 <span class="text-secondary small">({{ $ligne->uniteVente?->libelle ?? $ligne->produit->unite_base_libelle }})</span>
                             </td>
                             <td>{{ $ligne->quantite }}</td>
-                            <td class="text-end">{{ number_format($ligne->prixUnitaireEffectif(), 0, ',', ' ') }} F</td>
-                            <td class="text-end text-danger">{{ (! $ligne->prix_personnalise && $ligne->remise_ligne_montant > 0) ? '− '.number_format($ligne->remise_ligne_montant, 0, ',', ' ').' F' : '—' }}</td>
-                            <td class="text-end fw-medium">{{ number_format($ligne->total_ligne, 0, ',', ' ') }} F</td>
+                            <td class="text-end">{{ montant($ligne->prixUnitaireEffectif()) }}</td>
+                            <td class="text-end text-danger">{{ (! $ligne->prix_personnalise && $ligne->remise_ligne_montant > 0) ? '− '.montant($ligne->remise_ligne_montant) : '—' }}</td>
+                            <td class="text-end fw-medium">{{ montant($ligne->total_ligne) }}</td>
                             @php $ligneDejaLivre = $dejaLivreParLigne[$ligne->id] ?? 0; @endphp
                             <td>
                                 <span class="{{ $ligneDejaLivre >= $ligne->quantite_pieces ? 'text-success' : ($ligneDejaLivre > 0 ? 'text-warning-emphasis' : 'text-secondary') }}">
@@ -212,44 +212,44 @@
             <tbody>
                 <tr>
                     <td>Sous-total</td>
-                    <td class="text-end">{{ number_format($vente->sous_total, 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ montant($vente->sous_total) }}</td>
                 </tr>
                 @if ($vente->remise_totale_montant > 0)
                     <tr>
                         <td>Remise</td>
-                        <td class="text-end text-danger">− {{ number_format($vente->remise_totale_montant, 0, ',', ' ') }} F</td>
+                        <td class="text-end text-danger">− {{ montant($vente->remise_totale_montant) }}</td>
                     </tr>
                 @endif
                 <tr class="fw-bold border-top">
                     <td>Net à payer</td>
-                    <td class="text-end">{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ montant($vente->total_net) }}</td>
                 </tr>
                 @foreach ($vente->paiements as $paiement)
                     <tr>
                         <td>{{ $paiement->moyenPaiement->nom }}</td>
-                        <td class="text-end">{{ number_format($paiement->montant, 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($paiement->montant) }}</td>
                     </tr>
                 @endforeach
                 @if ($vente->monnaie_rendue > 0)
                     <tr>
                         <td>Monnaie rendue</td>
-                        <td class="text-end">{{ number_format($vente->monnaie_rendue, 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($vente->monnaie_rendue) }}</td>
                     </tr>
                 @endif
                 @if ($vente->soldeDu() > 0)
                     <tr>
                         <td>Montant payé</td>
-                        <td class="text-end">{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($vente->montantRegle()) }}</td>
                     </tr>
                     @if ($vente->avoir_applique > 0)
                         <tr>
                             <td>Avoir appliqué</td>
-                            <td class="text-end">{{ number_format($vente->avoir_applique, 0, ',', ' ') }} F</td>
+                            <td class="text-end">{{ montant($vente->avoir_applique) }}</td>
                         </tr>
                     @endif
                     <tr class="fw-semibold {{ $vente->soldeDuReel() > 0 ? 'text-danger' : '' }}">
                         <td>Reste à payer</td>
-                        <td class="text-end">{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($vente->soldeDuReel()) }}</td>
                     </tr>
                 @endif
             </tbody>
@@ -268,7 +268,7 @@
                                 du {{ $retour->created_at->format('d/m/Y') }}
                                 par {{ $retour->auteur?->name ?? 'utilisateur supprimé' }}
                             </span>
-                            <span class="fw-medium">Avoir {{ number_format($retour->montant_total, 0, ',', ' ') }} F</span>
+                            <span class="fw-medium">Avoir {{ montant($retour->montant_total) }}</span>
                         </div>
                         @if ($retour->motif)
                             <div class="text-secondary ps-4 fst-italic">{{ $retour->motif }}</div>
@@ -276,7 +276,7 @@
                         @foreach ($retour->lignes as $ligneRetour)
                             <div class="d-flex justify-content-between text-secondary ps-4">
                                 <span>{{ $ligneRetour->produit->libelle_affichage }} × {{ $ligneRetour->quantite_pieces }}</span>
-                                <span>{{ number_format($ligneRetour->montant, 0, ',', ' ') }} F</span>
+                                <span>{{ montant($ligneRetour->montant) }}</span>
                             </div>
                         @endforeach
                     </div>
@@ -401,12 +401,12 @@
                                 {{ $ligne->produit->libelle_affichage }}
                                 <span class="text-secondary small">({{ $ligne->uniteVente?->libelle ?? $ligne->produit->unite_base_libelle }})</span>
                                 <br>
-                                <span class="text-secondary small">{{ $ligne->quantite }} × {{ number_format($ligne->prixUnitaireEffectif(), 0, ',', ' ') }} F</span>
+                                <span class="text-secondary small">{{ $ligne->quantite }} × {{ montant($ligne->prixUnitaireEffectif()) }}</span>
                                 @if (! $ligne->prix_personnalise && $ligne->remise_ligne_montant > 0)
-                                    <br><span class="text-danger small">Remise : − {{ number_format($ligne->remise_ligne_montant, 0, ',', ' ') }} F</span>
+                                    <br><span class="text-danger small">Remise : − {{ montant($ligne->remise_ligne_montant) }}</span>
                                 @endif
                             </td>
-                            <td class="text-end align-top">{{ number_format($ligne->total_ligne, 0, ',', ' ') }} F</td>
+                            <td class="text-end align-top">{{ montant($ligne->total_ligne) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -415,17 +415,17 @@
             <table class="table table-sm mb-0">
                 <tr>
                     <td>Sous-total</td>
-                    <td class="text-end">{{ number_format($vente->sous_total, 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ montant($vente->sous_total) }}</td>
                 </tr>
                 @if ($vente->remise_totale_montant > 0)
                     <tr>
                         <td>Remise</td>
-                        <td class="text-end text-danger">− {{ number_format($vente->remise_totale_montant, 0, ',', ' ') }} F</td>
+                        <td class="text-end text-danger">− {{ montant($vente->remise_totale_montant) }}</td>
                     </tr>
                 @endif
                 <tr class="fw-bold fs-5">
                     <td>Net à payer</td>
-                    <td class="text-end">{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ montant($vente->total_net) }}</td>
                 </tr>
             </table>
 
@@ -435,33 +435,33 @@
                 @foreach ($vente->paiements as $paiement)
                     <tr>
                         <td>{{ $paiement->moyenPaiement->nom }}</td>
-                        <td class="text-end">{{ number_format($paiement->montant, 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($paiement->montant) }}</td>
                     </tr>
                 @endforeach
                 @if ($vente->monnaie_rendue > 0)
                     <tr>
                         <td>Reçu</td>
-                        <td class="text-end">{{ number_format($vente->montant_recu, 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($vente->montant_recu) }}</td>
                     </tr>
                     <tr class="fw-medium">
                         <td>Monnaie rendue</td>
-                        <td class="text-end">{{ number_format($vente->monnaie_rendue, 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($vente->monnaie_rendue) }}</td>
                     </tr>
                 @endif
                 @if ($vente->soldeDu() > 0)
                     <tr class="fw-medium">
                         <td>Montant payé</td>
-                        <td class="text-end">{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($vente->montantRegle()) }}</td>
                     </tr>
                     @if ($vente->avoir_applique > 0)
                         <tr>
                             <td>Avoir appliqué</td>
-                            <td class="text-end">{{ number_format($vente->avoir_applique, 0, ',', ' ') }} F</td>
+                            <td class="text-end">{{ montant($vente->avoir_applique) }}</td>
                         </tr>
                     @endif
                     <tr class="fw-bold {{ $vente->soldeDuReel() > 0 ? 'text-danger' : '' }}">
                         <td>Reste à payer</td>
-                        <td class="text-end">{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($vente->soldeDuReel()) }}</td>
                     </tr>
                 @endif
             </table>
@@ -540,9 +540,9 @@
                         <td>{{ $ligne->produit->libelle_affichage }}</td>
                         <td>{{ $ligne->uniteVente->libelle ?? $ligne->produit->unite_base_libelle }}</td>
                         <td class="text-end">{{ $ligne->quantite }}</td>
-                        <td class="text-end">{{ number_format($ligne->prix_unitaire_applique, 0, ',', ' ') }} F</td>
-                        <td class="text-end">{{ $ligne->remise_ligne_montant > 0 ? '− '.number_format($ligne->remise_ligne_montant, 0, ',', ' ').' F' : '—' }}</td>
-                        <td class="text-end">{{ number_format($ligne->total_ligne, 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($ligne->prix_unitaire_applique) }}</td>
+                        <td class="text-end">{{ $ligne->remise_ligne_montant > 0 ? '− '.montant($ligne->remise_ligne_montant) : '—' }}</td>
+                        <td class="text-end">{{ montant($ligne->total_ligne) }}</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -551,44 +551,44 @@
         <table class="totaux">
             <tr>
                 <td>Sous-total</td>
-                <td class="text-end">{{ number_format($vente->sous_total, 0, ',', ' ') }} F</td>
+                <td class="text-end">{{ montant($vente->sous_total) }}</td>
             </tr>
             @if ($vente->remise_totale_montant > 0)
                 <tr>
                     <td>Remise</td>
-                    <td class="text-end">− {{ number_format($vente->remise_totale_montant, 0, ',', ' ') }} F</td>
+                    <td class="text-end">− {{ montant($vente->remise_totale_montant) }}</td>
                 </tr>
             @endif
             <tr class="net">
                 <td>Net à payer</td>
-                <td class="text-end">{{ number_format($vente->total_net, 0, ',', ' ') }} F</td>
+                <td class="text-end">{{ montant($vente->total_net) }}</td>
             </tr>
             @foreach ($vente->paiements as $paiement)
                 <tr>
                     <td>{{ $paiement->moyenPaiement->nom }}</td>
-                    <td class="text-end">{{ number_format($paiement->montant, 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ montant($paiement->montant) }}</td>
                 </tr>
             @endforeach
             @if ($vente->monnaie_rendue > 0)
                 <tr>
                     <td>Monnaie rendue</td>
-                    <td class="text-end">{{ number_format($vente->monnaie_rendue, 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ montant($vente->monnaie_rendue) }}</td>
                 </tr>
             @endif
             @if ($vente->soldeDu() > 0)
                 <tr>
                     <td>Montant payé</td>
-                    <td class="text-end">{{ number_format($vente->montantRegle(), 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ montant($vente->montantRegle()) }}</td>
                 </tr>
                 @if ($vente->avoir_applique > 0)
                     <tr>
                         <td>Avoir appliqué</td>
-                        <td class="text-end">{{ number_format($vente->avoir_applique, 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($vente->avoir_applique) }}</td>
                     </tr>
                 @endif
                 <tr class="{{ $vente->soldeDuReel() > 0 ? 'credit' : '' }}">
                     <td>Reste à payer</td>
-                    <td class="text-end">{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ montant($vente->soldeDuReel()) }}</td>
                 </tr>
             @endif
         </table>
@@ -617,8 +617,8 @@
                         </div>
                         <div class="modal-body">
                             <p class="small text-secondary mb-2">
-                                Reste dû sur cette facture : <strong>{{ number_format($vente->soldeDuReel(), 0, ',', ' ') }} F</strong><br>
-                                Solde total du client (toutes factures confondues) : {{ number_format($vente->client->solde(), 0, ',', ' ') }} F
+                                Reste dû sur cette facture : <strong>{{ montant($vente->soldeDuReel()) }}</strong><br>
+                                Solde total du client (toutes factures confondues) : {{ montant($vente->client->solde()) }}
                             </p>
                             <template x-for="(paiement, index) in paiements" :key="index">
                                 <div class="row g-1 align-items-center mb-2">

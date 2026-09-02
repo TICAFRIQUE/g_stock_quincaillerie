@@ -32,6 +32,7 @@ return [
         'fournisseur.gerer',
         'fournisseur.reglement',
         'taxe.gerer',
+        'devise.gerer',
         'vente.voir',
         'vente.creer',
         'vente.remise',

@@ -95,15 +95,15 @@
         </div>
         <div class="col-6 col-md-3">
             <x-kpi-card label="Ventes en espèces" icon="bi-cash-stack" color="success"
-                :value="number_format($totalVentes, 0, ',', ' ') . ' F'" />
+                :value="montant($totalVentes)" />
         </div>
         <div class="col-6 col-md-3">
             <x-kpi-card label="Total entrées (manuelles)" icon="bi-box-arrow-in-down" color="success"
-                :value="number_format($totalEntrees, 0, ',', ' ') . ' F'" />
+                :value="montant($totalEntrees)" />
         </div>
         <div class="col-6 col-md-3">
             <x-kpi-card label="Total sorties" icon="bi-box-arrow-up" color="danger"
-                :value="number_format($totalSorties, 0, ',', ' ') . ' F'" />
+                :value="montant($totalSorties)" />
         </div>
     </div>
 
@@ -130,7 +130,7 @@
                             <td><span class="badge {{ $mouvement->type_badge }}">{{ $mouvement->type_libelle }}</span></td>
                             <td>{{ $mouvement->motif }}</td>
                             <td class="text-end fw-medium">
-                                {{ $mouvement->signe_positif ? '+ ' : '− ' }}{{ number_format($mouvement->montant, 0, ',', ' ') }} F
+                                {{ $mouvement->signe_positif ? '+ ' : '− ' }}{{ montant($mouvement->montant) }}
                             </td>
                             <td>{{ $mouvement->auteur_nom ?? 'Utilisateur supprimé' }}</td>
                         </tr>

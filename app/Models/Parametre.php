@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Cache;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -16,7 +17,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * pour bénéficier du cache (lu sur presque chaque page : sidebar, connexion,
  * tickets, e-mails).
  */
-#[Fillable(['nom', 'slogan', 'numero', 'adresse', 'duree_validite_devis_jours'])]
+#[Fillable(['nom', 'slogan', 'numero', 'adresse', 'duree_validite_devis_jours', 'devise_id'])]
 class Parametre extends Model implements HasMedia
 {
     use InteractsWithMedia, LogsActivity;
@@ -66,9 +67,21 @@ class Parametre extends Model implements HasMedia
         return $this->getFirstMediaUrl('logo') ?: asset('images/logo-defaut.svg');
     }
 
+    public function devise(): BelongsTo
+    {
+        return $this->belongsTo(Devise::class);
+    }
+
     protected static function booted(): void
     {
-        static::saved(fn () => self::invaliderCache());
+        static::saved(function () {
+            self::invaliderCache();
+            // La devise affichée partout (fonction montant()) dépend de ce
+            // singleton — sans ça, changer la devise active dans Paramètres
+            // resterait sans effet jusqu'à l'expiration (jamais, en pratique,
+            // Cache::rememberForever) du cache de Devise::abreviationActuelle().
+            Devise::invaliderCache();
+        });
         static::deleted(fn () => self::invaliderCache());
     }
 }

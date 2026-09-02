@@ -155,16 +155,16 @@
                                 </div>
                             </td>
                             <td>{{ $ligne->quantite }}</td>
-                            <td class="text-end">{{ number_format($prixUnitaire, 0, ',', ' ') }} F</td>
-                            <td class="text-end text-danger">{{ $remiseLigne > 0 ? '− '.number_format($remiseLigne, 0, ',', ' ').' F' : '—' }}</td>
-                            <td class="text-end fw-medium">{{ number_format($sousTotalLigne - $remiseLigne, 0, ',', ' ') }} F</td>
+                            <td class="text-end">{{ montant($prixUnitaire) }}</td>
+                            <td class="text-end text-danger">{{ $remiseLigne > 0 ? '− '.montant($remiseLigne) : '—' }}</td>
+                            <td class="text-end fw-medium">{{ montant($sousTotalLigne - $remiseLigne) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
                 <tfoot>
                     <tr class="fw-bold fs-5">
                         <th colspan="5" class="text-end">Total indicatif</th>
-                        <th class="text-end">{{ number_format($montants['total_net'], 0, ',', ' ') }} F</th>
+                        <th class="text-end">{{ montant($montants['total_net']) }}</th>
                     </tr>
                 </tfoot>
             </table>
@@ -226,9 +226,9 @@
                         <td>{{ $ligne->produit->libelle_affichage }}</td>
                         <td>{{ $ligne->uniteVente->libelle ?? $ligne->produit->unite_base_libelle }}</td>
                         <td class="text-end">{{ $ligne->quantite }}</td>
-                        <td class="text-end">{{ number_format($prixUnitaire, 0, ',', ' ') }} F</td>
-                        <td class="text-end">{{ $remiseLigne > 0 ? '− '.number_format($remiseLigne, 0, ',', ' ').' F' : '—' }}</td>
-                        <td class="text-end">{{ number_format($sousTotalLigne - $remiseLigne, 0, ',', ' ') }} F</td>
+                        <td class="text-end">{{ montant($prixUnitaire) }}</td>
+                        <td class="text-end">{{ $remiseLigne > 0 ? '− '.montant($remiseLigne) : '—' }}</td>
+                        <td class="text-end">{{ montant($sousTotalLigne - $remiseLigne) }}</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -237,7 +237,7 @@
         <table class="totaux">
             <tr class="net">
                 <td>Total net</td>
-                <td class="text-end">{{ number_format($montants['total_net'], 0, ',', ' ') }} F</td>
+                <td class="text-end">{{ montant($montants['total_net']) }}</td>
             </tr>
         </table>
 

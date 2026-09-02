@@ -135,7 +135,7 @@
                             <input type="number" :name="'unites_vente['+index+'][facteur]'" x-model="lot.facteur" class="form-control form-control-sm" min="2" placeholder="Ex. 5" required>
                         </div>
                         <div class="col-3">
-                            <label class="form-label small">Prix (F)<span class="required-marker">*</span></label>
+                            <label class="form-label small">Prix ({{ App\Models\Devise::abreviationActuelle() }})<span class="required-marker">*</span></label>
                             <input type="number" :name="'unites_vente['+index+'][prix]'" x-model="lot.prix" class="form-control form-control-sm" min="0" required>
                         </div>
                         <div class="col-2">

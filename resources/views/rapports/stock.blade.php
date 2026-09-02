@@ -19,7 +19,7 @@
     <div class="card mb-3" style="max-width: 320px;">
         <div class="card-body">
             <div class="text-secondary small">Valeur globale (CMP)</div>
-            <div class="fs-4 fw-medium">{{ number_format($valeurGlobale, 0, ',', ' ') }} F</div>
+            <div class="fs-4 fw-medium">{{ montant($valeurGlobale) }}</div>
         </div>
     </div>
 
@@ -38,7 +38,7 @@
                         <tr>
                             <td>{{ $ligne->magasin_nom }}</td>
                             <td>{{ $ligne->quantite_totale }}</td>
-                            <td>{{ number_format($ligne->valeur_totale, 0, ',', ' ') }} F</td>
+                            <td>{{ montant($ligne->valeur_totale) }}</td>
                         </tr>
                     @empty
                         <tr>

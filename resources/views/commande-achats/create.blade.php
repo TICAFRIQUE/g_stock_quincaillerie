@@ -155,7 +155,7 @@
                                 </select>
                                 @error('fournisseur_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                                 <div class="form-text small text-success fw-semibold" x-show="fournisseurId && fournisseurSoldes[fournisseurId] < 0" x-cloak>
-                                    <i class="bi bi-piggy-bank me-1"></i>Avoir de <span x-text="(-fournisseurSoldes[fournisseurId]) + ' F'"></span> sur ce fournisseur — il sera automatiquement déduit de la dette de cet achat.
+                                    <i class="bi bi-piggy-bank me-1"></i>Avoir de <span x-text="(-fournisseurSoldes[fournisseurId]) + ' ' + window.DEVISE_ABREVIATION"></span> sur ce fournisseur — il sera automatiquement déduit de la dette de cet achat.
                                 </div>
                             </div>
 
@@ -256,7 +256,7 @@
                                         </div>
                                         <div class="col-6 col-md-3">
                                             <label class="form-label small">Total TTC</label>
-                                            <input type="text" class="form-control form-control-sm fw-semibold" :value="montantTtcLigne(ligne).toLocaleString('fr-FR') + ' F'" disabled>
+                                            <input type="text" class="form-control form-control-sm fw-semibold" :value="montantTtcLigne(ligne).toLocaleString('fr-FR') + ' ' + window.DEVISE_ABREVIATION" disabled>
                                         </div>
                                     </div>
                                 </div>
@@ -280,9 +280,9 @@
 
                         <div class="d-flex justify-content-end mb-3">
                             <div class="text-end">
-                                <div class="text-secondary">Total HT : <span class="fw-semibold" x-text="totalHt.toLocaleString('fr-FR') + ' F'"></span></div>
-                                <div class="text-secondary">Total taxes : <span class="fw-semibold" x-text="totalTaxes.toLocaleString('fr-FR') + ' F'"></span></div>
-                                <div class="h5 mb-0">Total TTC : <span class="fw-bold" x-text="totalTtc.toLocaleString('fr-FR') + ' F'"></span></div>
+                                <div class="text-secondary">Total HT : <span class="fw-semibold" x-text="totalHt.toLocaleString('fr-FR') + ' ' + window.DEVISE_ABREVIATION"></span></div>
+                                <div class="text-secondary">Total taxes : <span class="fw-semibold" x-text="totalTaxes.toLocaleString('fr-FR') + ' ' + window.DEVISE_ABREVIATION"></span></div>
+                                <div class="h5 mb-0">Total TTC : <span class="fw-bold" x-text="totalTtc.toLocaleString('fr-FR') + ' ' + window.DEVISE_ABREVIATION"></span></div>
                             </div>
                         </div>
 
@@ -318,7 +318,7 @@
                                         <i class="bi bi-plus-lg"></i> Ajouter un paiement
                                     </button>
                                     <div class="mb-0 small text-secondary">
-                                        Reste dû au fournisseur après validation : <span class="fw-semibold" x-text="resteDu.toLocaleString('fr-FR') + ' F'"></span>
+                                        Reste dû au fournisseur après validation : <span class="fw-semibold" x-text="resteDu.toLocaleString('fr-FR') + ' ' + window.DEVISE_ABREVIATION"></span>
                                     </div>
                                 </div>
                             </div>

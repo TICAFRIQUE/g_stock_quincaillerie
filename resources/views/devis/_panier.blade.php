@@ -62,9 +62,9 @@
                                         :class="{ 'is-invalid': estDoublon(index) || ligne.unite_vente_id === undefined }"
                                         @change="changerVarianteDepuisSelect(ligne, $event.target.value)" required>
                                     <option value="" :selected="ligne.unite_vente_id === undefined">— Choisir —</option>
-                                    <option value="piece" :selected="ligne.unite_vente_id === null" x-text="produitDe(ligne).unite_base_libelle_complet + ' — ' + produitDe(ligne).prix_piece + ' F'"></option>
+                                    <option value="piece" :selected="ligne.unite_vente_id === null" x-text="produitDe(ligne).unite_base_libelle_complet + ' — ' + produitDe(ligne).prix_piece + ' ' + window.DEVISE_ABREVIATION"></option>
                                     <template x-for="unite in produitDe(ligne).unites" :key="unite.id">
-                                        <option :value="unite.id" :selected="unite.id === ligne.unite_vente_id" x-text="unite.libelle + ' — ' + unite.prix + ' F'"></option>
+                                        <option :value="unite.id" :selected="unite.id === ligne.unite_vente_id" x-text="unite.libelle + ' — ' + unite.prix + ' ' + window.DEVISE_ABREVIATION"></option>
                                     </template>
                                 </select>
                                 <div class="text-danger small mt-1" x-show="estDoublon(index)" x-cloak>Déjà dans le devis avec la même variante.</div>
@@ -74,7 +74,7 @@
                                     <div class="d-flex flex-column gap-1" style="min-width: 130px;">
                                         <select x-model="ligne.remise_type" class="form-select form-select-sm">
                                             <option value="">Sans remise</option>
-                                            <option value="montant">Remise (F)</option>
+                                            <option value="montant">Remise ({{ App\Models\Devise::abreviationActuelle() }})</option>
                                             <option value="pourcentage">Remise (%)</option>
                                         </select>
                                         <input type="number" x-model.number="ligne.remise_valeur"
@@ -83,7 +83,7 @@
                                     </div>
                                 </td>
                             @endcan
-                            <td class="text-end fw-medium" x-text="totalLigne(ligne) + ' F'"></td>
+                            <td class="text-end fw-medium" x-text="totalLigne(ligne) + ' ' + window.DEVISE_ABREVIATION"></td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-icon btn-outline-danger" @click="retirerLigne(index)">
                                     <i class="bi bi-x-lg"></i>
@@ -95,7 +95,7 @@
                 <tfoot>
                     <tr>
                         <th colspan="{{ $colonnesPanier - 1 }}" class="text-end">Total indicatif</th>
-                        <th x-text="sousTotal + ' F'"></th>
+                        <th x-text="sousTotal + ' ' + window.DEVISE_ABREVIATION"></th>
                     </tr>
                 </tfoot>
             </table>

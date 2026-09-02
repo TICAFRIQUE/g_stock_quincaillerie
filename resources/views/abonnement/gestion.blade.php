@@ -60,7 +60,7 @@
                                     <option value="{{ $formule->id }}">
                                         {{ $formule->nom }}
                                         ({{ $formule->illimite ? 'illimité' : $formule->jours.' j' }} —
-                                        {{ number_format($formule->prix, 0, ',', ' ') }} F)
+                                        {{ montant($formule->prix) }})
                                     </option>
                                 @endforeach
                             </select>
@@ -92,7 +92,7 @@
                             </div>
                         @endif
                         <div class="mb-3">
-                            <label class="form-label">Montant payé (F)</label>
+                            <label class="form-label">Montant payé ({{ App\Models\Devise::abreviationActuelle() }})</label>
                             <input type="number" name="montant" class="form-control" min="0" required x-ref="montant">
                         </div>
                         <div class="mb-3">
@@ -150,7 +150,7 @@
                                 <tr>
                                     <td>{{ $formule->nom }}</td>
                                     <td>{{ $formule->illimite ? 'Illimité' : $formule->jours.' jours' }}</td>
-                                    <td>{{ number_format($formule->prix, 0, ',', ' ') }} F</td>
+                                    <td>{{ montant($formule->prix) }}</td>
                                     <td>
                                         @if ($formule->actif)
                                             <span class="badge text-bg-success">Active</span>
@@ -200,7 +200,7 @@
                             </div>
                         </div>
                         <div class="col-sm-2">
-                            <label class="form-label small mb-1">Prix (F)</label>
+                            <label class="form-label small mb-1">Prix ({{ App\Models\Devise::abreviationActuelle() }})</label>
                             <input type="number" name="prix" class="form-control form-control-sm" min="0" required>
                         </div>
                         <div class="col-sm-2">
@@ -246,7 +246,7 @@
                                     <label class="form-check-label" for="modifierFormuleIllimite">Illimité</label>
                                 </div>
                                 <div class="mb-0">
-                                    <label class="form-label">Prix (F)</label>
+                                    <label class="form-label">Prix ({{ App\Models\Devise::abreviationActuelle() }})</label>
                                     <input type="number" name="prix" class="form-control" min="0" required x-model="prix">
                                 </div>
                             </div>
@@ -292,7 +292,7 @@
                                             @endif
                                         @endif
                                     </td>
-                                    <td>{{ number_format($activation->montant, 0, ',', ' ') }} F</td>
+                                    <td>{{ montant($activation->montant) }}</td>
                                     <td>{{ $activation->date_fin?->format('d/m/Y') ?? 'Illimité' }}</td>
                                     <td>{{ $activation->auteur?->name }}</td>
                                     <td class="text-muted small">{{ $activation->note }}</td>

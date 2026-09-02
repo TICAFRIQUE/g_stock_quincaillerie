@@ -66,8 +66,8 @@
                         @endif
                     </td>
                     <td class="text-end">{{ $stock->produit->seuil_alerte }}</td>
-                    <td class="text-end">{{ number_format($stock->produit->prix_piece, 0, ',', ' ') }} F</td>
-                    <td class="text-end">{{ number_format($stock->cout_moyen_pondere, 0, ',', ' ') }} F</td>
+                    <td class="text-end">{{ montant($stock->produit->prix_piece) }}</td>
+                    <td class="text-end">{{ montant($stock->cout_moyen_pondere) }}</td>
                 </tr>
             @empty
                 <tr>

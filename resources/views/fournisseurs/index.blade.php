@@ -41,7 +41,7 @@
                             <td><a href="{{ route('fournisseurs.show', $fournisseur) }}">{{ $fournisseur->nom }}</a></td>
                             <td>{{ $fournisseur->telephone ?? '—' }}</td>
                             <td>{{ $fournisseur->email ?? '—' }}</td>
-                            <td class="{{ $solde > 0 ? 'text-danger fw-medium' : '' }}">{{ number_format($solde, 0, ',', ' ') }} F</td>
+                            <td class="{{ $solde > 0 ? 'text-danger fw-medium' : '' }}">{{ montant($solde) }}</td>
                             <td>
                                 @if ($fournisseur->actif)
                                     <span class="badge text-bg-success">Actif</span>
