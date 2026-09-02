@@ -240,6 +240,12 @@ input[type='number'] {
     --bs-btn-disabled-color: #fff;
 }
 
+// Même souci sur les badges pleins (.badge.text-bg-primary — "Caisse
+// Générale", rôle, formule actuelle…) : texte noir illisible sur cet orange.
+.text-bg-primary {
+    color: #fff !important;
+}
+
 // --- Bouton d'action "règlement" (paiement d'une dette fournisseur) ---
 // Le jaune $warning plat manque de contraste et se lit mal avec du texte
 // blanc ; les actions financières (régler) utilisent un dégradé violet
