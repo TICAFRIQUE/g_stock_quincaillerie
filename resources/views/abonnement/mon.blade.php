@@ -82,50 +82,54 @@
     </div>
 
     @unless ($estGestionnaire)
-        <div class="card mb-4">
-            <div class="card-header">Formules disponibles</div>
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
-                    <thead>
-                        <tr>
-                            <th>Formule</th>
-                            <th>Durée</th>
-                            <th>Prix</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($formules as $formule)
-                            <tr>
-                                <td>{{ $formule->nom }}</td>
-                                <td>{{ $formule->illimite ? 'Illimité' : $formule->jours.' jours' }}</td>
-                                <td>{{ number_format($formule->prix, 0, ',', ' ') }} F</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="3" class="text-center text-muted py-4">Aucune formule disponible pour le moment.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-            <div class="card-footer text-muted small">
-                <i class="bi bi-info-circle me-1"></i>
-                Le paiement en ligne n'est pas encore disponible — pour
-                choisir une formule ou reconduire votre abonnement actuel,
-                contactez l'administrateur
-                @if ($configuration->telephone)
-                    au <strong>{{ $configuration->telephone }}</strong>
-                @endif
-                @if ($configuration->whatsapp)
-                    (WhatsApp : <strong>{{ $configuration->whatsapp }}</strong>)
-                @endif
-                @if (! $configuration->telephone && ! $configuration->whatsapp)
-                    ou le développeur
-                @endif
-                .
-                @if ($configuration->message)
-                    <br>{{ $configuration->message }}
-                @endif
+        <div class="mb-4">
+            <h3 class="h5 mb-3">Formules disponibles</h3>
+
+            @if ($formules->isEmpty())
+                <div class="card">
+                    <div class="card-body text-center text-muted py-4">Aucune formule disponible pour le moment.</div>
+                </div>
+            @else
+                <div class="row g-3 mb-3">
+                    @foreach ($formules as $formule)
+                        @php $estActuelle = $derniere?->formule_id === $formule->id; @endphp
+                        <div class="col-sm-6 col-lg-4">
+                            <div class="formule-pricing-card @if($estActuelle) formule-pricing-card--actuelle @endif">
+                                @if ($estActuelle)
+                                    <span class="badge text-bg-primary formule-pricing-card__badge">Votre formule actuelle</span>
+                                @endif
+                                <div class="formule-pricing-card__nom">{{ $formule->nom }}</div>
+                                <div class="formule-pricing-card__prix">{{ number_format($formule->prix, 0, ',', ' ') }} F</div>
+                                <div class="formule-pricing-card__duree">
+                                    <i class="bi bi-clock-history me-1"></i>
+                                    {{ $formule->illimite ? 'Sans limite de durée' : $formule->jours.' jours' }}
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
+            <div class="card">
+                <div class="card-body text-muted small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Le paiement en ligne n'est pas encore disponible — pour
+                    choisir une formule ou reconduire votre abonnement actuel,
+                    contactez l'administrateur
+                    @if ($configuration->telephone)
+                        au <strong>{{ $configuration->telephone }}</strong>
+                    @endif
+                    @if ($configuration->whatsapp)
+                        (WhatsApp : <strong>{{ $configuration->whatsapp }}</strong>)
+                    @endif
+                    @if (! $configuration->telephone && ! $configuration->whatsapp)
+                        ou le développeur
+                    @endif
+                    .
+                    @if ($configuration->message)
+                        <br>{{ $configuration->message }}
+                    @endif
+                </div>
             </div>
         </div>
     @endunless
