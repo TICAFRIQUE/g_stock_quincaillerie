@@ -90,9 +90,10 @@ window.dataTableFrLang = {
  * côté client pour griser en amont (voir CLAUDE.md), le serveur revalide tout
  * de toute façon dans VenteService avant d'écrire le moindre mouvement.
  */
-window.posApp = function (produits, panierInitial = [], libelleInitial = '', clientIdInitial = '', magasinCaisseId = null, magasinCaisseNom = '', clientSoldes = {}) {
+window.posApp = function (produits, panierInitial = [], libelleInitial = '', clientIdInitial = '', magasinCaisseId = null, magasinCaisseNom = '', clientSoldes = {}, taxes = []) {
     return {
         produits,
+        taxes,
         panier: panierInitial,
         remiseTotaleType: '',
         remiseTotaleValeur: null,
@@ -287,6 +288,7 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
             this.panier.push({
                 produit_id: produit.id,
                 unite_vente_id: undefined,
+                taxe_id: '',
                 produitLibelle: produit.libelle_affichage,
                 uniteLibelle: null,
                 facteur: null,
@@ -306,6 +308,7 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
             this.panier.splice(index + 1, 0, {
                 produit_id: original.produit_id,
                 unite_vente_id: undefined,
+                taxe_id: original.taxe_id ?? '',
                 produitLibelle: original.produitLibelle,
                 uniteLibelle: null,
                 facteur: null,
@@ -524,12 +527,33 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
             return this.panier.reduce((somme, l) => somme + this.totalLigne(l), 0);
         },
 
+        tauxLigne(ligne) {
+            const taxe = this.taxes.find((t) => String(t.id) === String(ligne.taxe_id || ''));
+            return taxe ? taxe.taux : 0;
+        },
+
+        // totalLigne(ligne) est déjà HT (remise/prix personnalisé appliqués) :
+        // la taxe s'ajoute par-dessus, jamais recalculée dessus une seconde
+        // fois — même principe que côté achat (montantTtcLigne).
+        montantTtcLigne(ligne) {
+            const ht = this.totalLigne(ligne);
+            return Math.round(ht + ht * this.tauxLigne(ligne) / 100);
+        },
+
+        get totalTaxes() {
+            return this.panier.reduce((somme, l) => somme + (this.montantTtcLigne(l) - this.totalLigne(l)), 0);
+        },
+
+        // La remise totale porte sur le TTC (sous-total + taxes), pas
+        // seulement le HT — voir VenteService::vendre() côté serveur, même
+        // calcul reproduit ici pour que le total affiché corresponde
+        // exactement à ce qui sera enregistré.
         get remiseTotaleMontant() {
-            return this.calculerRemise(this.remiseTotaleType, this.remiseTotaleValeur, this.sousTotal);
+            return this.calculerRemise(this.remiseTotaleType, this.remiseTotaleValeur, this.sousTotal + this.totalTaxes);
         },
 
         get totalNet() {
-            return this.sousTotal - this.remiseTotaleMontant;
+            return this.sousTotal + this.totalTaxes - this.remiseTotaleMontant;
         },
 
         get totalPaiements() {
@@ -606,9 +630,10 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
  * de stock (un devis ne mouvemente rien, voir CLAUDE.md) ni section
  * paiement — juste des montants indicatifs.
  */
-window.devisApp = function (produits, panierInitial = []) {
+window.devisApp = function (produits, panierInitial = [], taxes = []) {
     return {
         produits,
+        taxes,
         panier: panierInitial,
 
         // Stock par lieu affiché à côté de chaque ligne — purement informatif
@@ -653,6 +678,7 @@ window.devisApp = function (produits, panierInitial = []) {
             this.panier.push({
                 produit_id: produit.id,
                 unite_vente_id: undefined,
+                taxe_id: '',
                 produitLibelle: produit.libelle_affichage,
                 uniteLibelle: null,
                 facteur: null,
@@ -759,6 +785,27 @@ window.devisApp = function (produits, panierInitial = []) {
 
         get sousTotal() {
             return this.panier.reduce((somme, l) => somme + this.totalLigne(l), 0);
+        },
+
+        tauxLigne(ligne) {
+            const taxe = this.taxes.find((t) => String(t.id) === String(ligne.taxe_id || ''));
+            return taxe ? taxe.taux : 0;
+        },
+
+        montantTtcLigne(ligne) {
+            const ht = this.totalLigne(ligne);
+            return Math.round(ht + ht * this.tauxLigne(ligne) / 100);
+        },
+
+        get totalTaxes() {
+            return this.panier.reduce((somme, l) => somme + (this.montantTtcLigne(l) - this.totalLigne(l)), 0);
+        },
+
+        // Pas de remise sur le total pour un devis (contrairement à une
+        // vente) : total net = sous-total HT + taxes, voir
+        // Devis::calculerMontants() côté serveur.
+        get totalNet() {
+            return this.sousTotal + this.totalTaxes;
         },
 
         declencherEnregistrement(event, formId) {

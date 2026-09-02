@@ -10,7 +10,8 @@
         {{ \Illuminate\Support\Js::from(old('client_id', $devisTransformation->client_id ?? $venteEnAttente->client_id ?? '')) }},
         {{ \Illuminate\Support\Js::from($session->caisse->magasin_id) }},
         {{ \Illuminate\Support\Js::from($session->caisse->magasin->nom) }},
-        {{ \Illuminate\Support\Js::from($clientSoldes) }}
+        {{ \Illuminate\Support\Js::from($clientSoldes) }},
+        {{ \Illuminate\Support\Js::from($taxes->map(fn ($t) => ['id' => $t->id, 'libelle' => $t->nom, 'taux' => $t->taux])) }}
     )">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
             <div>
@@ -67,7 +68,7 @@
                         <h3 class="h6">Panier</h3>
 
                         <div class="table-responsive" style="max-height: 65vh; overflow-y: auto;">
-                            @php $colonnesPanier = auth()->user()->can('vente.remise') ? 6 : 5; @endphp
+                            @php $colonnesPanier = 4 + (auth()->user()->can('vente.remise') ? 1 : 0) + ($taxes->isNotEmpty() ? 1 : 0); @endphp
                             <table class="table table-sm align-middle mb-0">
                                 <thead>
                                     <tr>
@@ -77,6 +78,9 @@
                                         @can('vente.remise')
                                             <th>Remise</th>
                                         @endcan
+                                        @if ($taxes->isNotEmpty())
+                                            <th>Taxe</th>
+                                        @endif
                                         <th class="text-end">Total</th>
                                         <th></th>
                                     </tr>
@@ -153,6 +157,16 @@
                                                     </div>
                                                 </td>
                                             @endcan
+                                            @if ($taxes->isNotEmpty())
+                                                <td>
+                                                    <select x-model="ligne.taxe_id" class="form-select form-select-sm" style="min-width: 120px;">
+                                                        <option value="">Aucune</option>
+                                                        @foreach ($taxes as $taxe)
+                                                            <option value="{{ $taxe->id }}">{{ $taxe->nom }} ({{ $taxe->taux }}%)</option>
+                                                        @endforeach
+                                                    </select>
+                                                </td>
+                                            @endif
                                             <td class="text-end fw-medium" x-text="totalLigne(ligne) + ' ' + window.DEVISE_ABREVIATION"></td>
                                             <td>
                                                 <div class="d-flex gap-1">
@@ -201,8 +215,12 @@
 
                             <table class="table table-sm mt-3 mb-0">
                                 <tr>
-                                    <td>Sous-total</td>
+                                    <td>Sous-total (HT)</td>
                                     <td class="text-end" x-text="sousTotal + ' ' + window.DEVISE_ABREVIATION"></td>
+                                </tr>
+                                <tr x-show="totalTaxes > 0" x-cloak>
+                                    <td>Total taxes</td>
+                                    <td class="text-end" x-text="totalTaxes + ' ' + window.DEVISE_ABREVIATION"></td>
                                 </tr>
                                 @can('vente.remise')
                                     <tr>
@@ -357,6 +375,7 @@
                                 <span>
                                     <input type="hidden" :name="'lignes['+index+'][produit_id]'" :value="ligne.produit_id">
                                     <input type="hidden" :name="'lignes['+index+'][unite_vente_id]'" :value="ligne.unite_vente_id">
+                                    <input type="hidden" :name="'lignes['+index+'][taxe_id]'" :value="ligne.taxe_id">
                                     <input type="hidden" :name="'lignes['+index+'][magasin_source_id]'" :value="ligne.magasin_source_id">
                                     <input type="hidden" :name="'lignes['+index+'][quantite]'" :value="ligne.quantite">
                                     <input type="hidden" :name="'lignes['+index+'][remise_type]'" :value="ligne.prixPersonnalise ? 'montant' : ligne.remise_type">

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Arrondi;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
-    'vente_id', 'produit_id', 'unite_vente_id', 'magasin_source_id', 'quantite', 'quantite_pieces',
+    'vente_id', 'produit_id', 'unite_vente_id', 'taxe_id', 'magasin_source_id', 'quantite', 'quantite_pieces',
     'prix_unitaire_applique', 'cout_applique', 'sous_total_ligne',
     'remise_ligne_type', 'remise_ligne_valeur', 'remise_ligne_montant', 'prix_personnalise', 'total_ligne',
 ])]
@@ -71,6 +72,16 @@ class LigneVente extends Model
     }
 
     /**
+     * withTrashed() : ligne historique, doit rester affichable même si la
+     * taxe a été désactivée/supprimée depuis (même principe que
+     * LigneCommandeAchat::taxe()).
+     */
+    public function taxe(): BelongsTo
+    {
+        return $this->belongsTo(Taxe::class)->withTrashed();
+    }
+
+    /**
      * withTrashed() : ligne historique, doit rester affichable même si le
      * magasin/dépôt source a été supprimé depuis.
      */
@@ -82,5 +93,14 @@ class LigneVente extends Model
     public function retours(): HasMany
     {
         return $this->hasMany(LigneRetourVente::class);
+    }
+
+    /**
+     * total_ligne est HT (comme prix_achat côté achat, voir CLAUDE.md) : le
+     * TTC de la ligne s'obtient en ajoutant la taxe choisie, si renseignée.
+     */
+    public function montantTtc(): int
+    {
+        return $this->total_ligne + Arrondi::entier($this->total_ligne * ($this->taxe?->taux ?? 0) / 100);
     }
 }

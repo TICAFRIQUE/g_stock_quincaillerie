@@ -130,6 +130,9 @@
                 <th class="text-end">Qté</th>
                 <th class="text-end">Prix unitaire</th>
                 <th class="text-end">Remise</th>
+                @if ($montants['total_taxes'] > 0)
+                    <th>Taxe</th>
+                @endif
                 <th class="text-end">Total</th>
             </tr>
         </thead>
@@ -146,6 +149,9 @@
                     <td class="text-end">{{ $ligne->quantite }}</td>
                     <td class="text-end">{{ montant($prixUnitaire) }}</td>
                     <td class="text-end">{{ $remiseLigne > 0 ? '− '.montant($remiseLigne) : '—' }}</td>
+                    @if ($montants['total_taxes'] > 0)
+                        <td>{{ $ligne->taxe->nom ?? '—' }}</td>
+                    @endif
                     <td class="text-end">{{ montant($sousTotalLigne - $remiseLigne) }}</td>
                 </tr>
             @endforeach
@@ -153,6 +159,16 @@
     </table>
 
     <table class="totaux">
+        @if ($montants['total_taxes'] > 0)
+            <tr>
+                <td>Sous-total (HT)</td>
+                <td class="text-end">{{ montant($montants['sous_total']) }}</td>
+            </tr>
+            <tr>
+                <td>Total taxes</td>
+                <td class="text-end">{{ montant($montants['total_taxes']) }}</td>
+            </tr>
+        @endif
         <tr class="net">
             <td>Total net</td>
             <td class="text-end">{{ montant($montants['total_net']) }}</td>

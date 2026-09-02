@@ -124,6 +124,9 @@
                         <th>Qté</th>
                         <th class="text-end">Prix unitaire</th>
                         <th class="text-end">Remise</th>
+                        @if ($montants['total_taxes'] > 0)
+                            <th>Taxe</th>
+                        @endif
                         <th class="text-end">Total</th>
                     </tr>
                 </thead>
@@ -157,13 +160,27 @@
                             <td>{{ $ligne->quantite }}</td>
                             <td class="text-end">{{ montant($prixUnitaire) }}</td>
                             <td class="text-end text-danger">{{ $remiseLigne > 0 ? '− '.montant($remiseLigne) : '—' }}</td>
+                            @if ($montants['total_taxes'] > 0)
+                                <td>{{ $ligne->taxe->nom ?? '—' }}</td>
+                            @endif
                             <td class="text-end fw-medium">{{ montant($sousTotalLigne - $remiseLigne) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
+                @php $colspanTotaux = $montants['total_taxes'] > 0 ? 6 : 5; @endphp
                 <tfoot>
+                    @if ($montants['total_taxes'] > 0)
+                        <tr>
+                            <th colspan="{{ $colspanTotaux }}" class="text-end">Sous-total (HT)</th>
+                            <th class="text-end">{{ montant($montants['sous_total']) }}</th>
+                        </tr>
+                        <tr>
+                            <th colspan="{{ $colspanTotaux }}" class="text-end">Total taxes</th>
+                            <th class="text-end">{{ montant($montants['total_taxes']) }}</th>
+                        </tr>
+                    @endif
                     <tr class="fw-bold fs-5">
-                        <th colspan="5" class="text-end">Total indicatif</th>
+                        <th colspan="{{ $colspanTotaux }}" class="text-end">Total indicatif</th>
                         <th class="text-end">{{ montant($montants['total_net']) }}</th>
                     </tr>
                 </tfoot>

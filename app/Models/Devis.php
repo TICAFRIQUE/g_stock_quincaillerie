@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\DevisStatut;
+use App\Support\Arrondi;
 use App\Support\Remise;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -93,23 +94,30 @@ class Devis extends Model
 
     /**
      * Montants indicatifs, recalculés à partir du prix courant du catalogue
-     * (jamais figés, règle 15) — suppose lignes.produit et lignes.uniteVente
-     * chargées.
+     * (jamais figés, règle 15) — suppose lignes.produit, lignes.uniteVente et
+     * lignes.taxe chargées. sous_total reste HT (comme total_ligne côté
+     * vente) ; total_taxes/total_net ajoutent la taxe choisie par ligne (elle
+     * n'est, elle, jamais recalculée au catalogue courant — voir
+     * LigneDevis::taxe()). Pas de remise sur le total pour un devis
+     * (contrairement à une vente), donc total_net = sous_total + total_taxes.
      *
-     * @return array{sous_total:int, total_net:int}
+     * @return array{sous_total:int, total_taxes:int, total_net:int}
      */
     public function calculerMontants(): array
     {
         $sousTotal = 0;
+        $totalTaxes = 0;
 
         foreach ($this->lignes as $ligne) {
             $prixUnitaire = $ligne->uniteVente?->prix ?? $ligne->produit->prix_piece;
             $sousTotalLigne = $prixUnitaire * $ligne->quantite;
             $remiseLigne = Remise::resoudre($ligne->remise_type, $ligne->remise_valeur, $sousTotalLigne);
-            $sousTotal += $sousTotalLigne - $remiseLigne;
+            $totalLigne = $sousTotalLigne - $remiseLigne;
+            $sousTotal += $totalLigne;
+            $totalTaxes += Arrondi::entier($totalLigne * ($ligne->taxe?->taux ?? 0) / 100);
         }
 
-        return ['sous_total' => $sousTotal, 'total_net' => $sousTotal];
+        return ['sous_total' => $sousTotal, 'total_taxes' => $totalTaxes, 'total_net' => $sousTotal + $totalTaxes];
     }
 
     /**

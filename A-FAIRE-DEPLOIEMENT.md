@@ -91,6 +91,35 @@ pas supprimer les entrées cochées (historique).
     de fin dépassée (peut se tester en activant une formule très courte),
     et que Superadmin garde un accès complet malgré l'expiration.
 
+- [ ] **Nouveau : TVA optionnelle sur la vente et le devis** — deuxième étape
+  de l'ouverture hors zone FCFA (après la devise), même principe que côté
+  achat : `taxe_id` optionnel par ligne (référentiel `Taxe` déjà existant,
+  Administration → Taxes), TTC dérivé, jamais stocké. Déploiement standard,
+  plus :
+  ```
+  php artisan migrate --force
+  ```
+  Deux nouvelles migrations (`ligne_ventes.taxe_id`, `ligne_devis.taxe_id`,
+  toutes deux nullables), aucune donnée existante touchée — une vente/un
+  devis sans taxe choisie se comporte exactement comme avant (0 F de taxe,
+  mêmes montants qu'aujourd'hui). Aucune nouvelle permission (réutilise
+  `taxe.gerer`, déjà seedé côté achat).
+  - [ ] **Changement de comportement à connaître** : `Vente.total_net` (le
+    montant réellement dû/encaissé/porté en dette) inclut désormais la taxe
+    quand une ligne en porte une — la remise sur le total s'applique au
+    montant TTC (HT + taxes), pas seulement au HT. Sans taxe configurée sur
+    aucune ligne, ce calcul reste identique à avant.
+  - [ ] Le sélecteur "Taxe" par ligne (écran de vente, devis) ne s'affiche
+    que si au moins une taxe active existe — invisible par défaut pour tout
+    client qui n'utilise pas cette fonctionnalité.
+  - [ ] **Tester après déploiement** : créer une taxe (ex. "TVA", 18%) dans
+    Administration → Taxes ; sur l'écran de vente, ajouter une ligne avec
+    cette taxe → vérifier que le récapitulatif affiche "Total taxes" et que
+    le ticket/la facture affichent la ventilation HT/Taxes/Net ; même
+    vérification côté devis (création + transformation en vente, la taxe
+    choisie doit être reprise telle quelle) ; vérifier qu'une vente sans
+    taxe reste identique à avant (aucune ligne "Total taxes" affichée).
+
 - [ ] **Nouveau : Devise configurable (affichage uniquement, pas de
   conversion)** — permet d'utiliser l'application hors zone FCFA (Euro,
   Dollar…). Un référentiel `Devise` (nom + abréviation) remplace le "F"

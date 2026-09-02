@@ -163,6 +163,7 @@ class DevisService
             $devis->lignes()->create([
                 'produit_id' => $ligne['produit_id'],
                 'unite_vente_id' => $ligne['unite_vente_id'] ?? null,
+                'taxe_id' => $ligne['taxe_id'] ?? null,
                 'quantite' => $ligne['quantite'],
                 'remise_type' => $ligne['remise_type'] ?? null,
                 'remise_valeur' => $ligne['remise_valeur'] ?? null,

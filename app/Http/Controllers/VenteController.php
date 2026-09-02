@@ -20,6 +20,7 @@ use App\Models\Parametre;
 use App\Models\Produit;
 use App\Models\SessionCaisse;
 use App\Models\Stock;
+use App\Models\Taxe;
 use App\Models\TypeClient;
 use App\Models\User;
 use App\Models\Vente;
@@ -121,6 +122,7 @@ class VenteController extends Controller
                 $donnees = [
                     'produit_id' => (int) $ligne['produit_id'],
                     'unite_vente_id' => $uniteVenteId,
+                    'taxe_id' => ($ligne['taxe_id'] ?? '') !== '' ? (int) $ligne['taxe_id'] : '',
                     'produitLibelle' => $produit['libelle_affichage'] ?? '',
                     'uniteLibelle' => $unite['libelle'] ?? null,
                     'facteur' => $unite['facteur'] ?? 1,
@@ -141,6 +143,11 @@ class VenteController extends Controller
             $devisTransformation !== null => $devisTransformation->lignes->map(fn ($ligne) => [
                 'produit_id' => $ligne->produit_id,
                 'unite_vente_id' => $ligne->unite_vente_id,
+                // Contrairement au prix/à la remise (indicatifs, recalculés au
+                // catalogue courant), la taxe est un choix explicite du
+                // vendeur : reprise telle quelle du devis (règle 15), modifiable
+                // avant finalisation comme n'importe quelle ligne de vente.
+                'taxe_id' => $ligne->taxe_id ?? '',
                 'produitLibelle' => $ligne->produit->libelle_affichage,
                 'uniteLibelle' => $ligne->uniteVente?->libelle,
                 'facteur' => $ligne->uniteVente?->facteur ?? 1,
@@ -155,6 +162,7 @@ class VenteController extends Controller
                 $donnees = [
                     'produit_id' => $ligne->produit_id,
                     'unite_vente_id' => $ligne->unite_vente_id,
+                    'taxe_id' => '',
                     'produitLibelle' => $ligne->produit->libelle_affichage,
                     'uniteLibelle' => $ligne->uniteVente?->libelle,
                     'facteur' => $ligne->uniteVente?->facteur ?? 1,
@@ -189,6 +197,7 @@ class VenteController extends Controller
         return view('ventes.create', [
             'session' => $session,
             'produits' => $produits,
+            'taxes' => Taxe::where('actif', true)->orderBy('nom')->get(),
             'moyensPaiement' => MoyenPaiement::actifs(),
             'venteEnAttentesCount' => $venteEnAttentesCount,
             'venteEnAttente' => $venteEnAttente,
@@ -224,6 +233,7 @@ class VenteController extends Controller
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
+            'lignes.*.taxe_id' => ['nullable', 'exists:taxes,id'],
             'lignes.*.magasin_source_id' => ['required', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
@@ -277,6 +287,7 @@ class VenteController extends Controller
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
+            'lignes.*.taxe_id' => ['nullable', 'exists:taxes,id'],
             'lignes.*.magasin_source_id' => ['required', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
@@ -321,7 +332,7 @@ class VenteController extends Controller
         $this->assurerMagasin($vente->magasin_id);
 
         $vente->load([
-            'lignes.produit', 'lignes.uniteVente', 'lignes.magasinSource', 'paiements.moyenPaiement',
+            'lignes.produit', 'lignes.uniteVente', 'lignes.taxe', 'lignes.magasinSource', 'paiements.moyenPaiement',
             'reglementsClient.paiements.moyenPaiement', 'reglementsClient.caissier',
             'retours.lignes.produit', 'retours.auteur',
             'bonsLivraison' => fn ($q) => $q->withTrashed(),
@@ -411,7 +422,7 @@ class VenteController extends Controller
     {
         $this->assurerMagasin($vente->magasin_id);
 
-        $vente->load(['client', 'magasin', 'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement', 'reglementsClient', 'bonsLivraison.lignes']);
+        $vente->load(['client', 'magasin', 'lignes.produit', 'lignes.uniteVente', 'lignes.taxe', 'paiements.moyenPaiement', 'reglementsClient', 'bonsLivraison.lignes']);
 
         $dejaLivreParLigne = $vente->bonsLivraison
             ->flatMap(fn ($bonLivraison) => $bonLivraison->lignes)
@@ -439,9 +450,9 @@ class VenteController extends Controller
         $feuille->setCellValue('A9', $vente->client->adresse ?? '');
 
         $ligneEnTete = 11;
-        $entetes = ['A' => 'Désignation', 'B' => 'Unité', 'C' => 'Quantité', 'D' => 'Prix unitaire', 'E' => 'Remise', 'F' => 'Total'];
+        $entetes = ['A' => 'Désignation', 'B' => 'Unité', 'C' => 'Quantité', 'D' => 'Prix unitaire', 'E' => 'Remise', 'F' => 'Taxe', 'G' => 'Total'];
         if ($livraisonEngagee) {
-            $entetes['G'] = 'Livré';
+            $entetes['H'] = 'Livré';
         }
         foreach ($entetes as $colonne => $libelle) {
             $feuille->setCellValue("{$colonne}{$ligneEnTete}", $libelle);
@@ -454,30 +465,44 @@ class VenteController extends Controller
             $feuille->setCellValue("C{$ligne}", $ligneVente->quantite);
             $feuille->setCellValue("D{$ligne}", $ligneVente->prixUnitaireEffectif());
             $feuille->setCellValue("E{$ligne}", $ligneVente->prix_personnalise ? 0 : $ligneVente->remise_ligne_montant);
-            $feuille->setCellValue("F{$ligne}", $ligneVente->total_ligne);
+            $feuille->setCellValue("F{$ligne}", $ligneVente->taxe->nom ?? '—');
+            $feuille->setCellValue("G{$ligne}", $ligneVente->total_ligne);
             if ($livraisonEngagee) {
-                $feuille->setCellValue("G{$ligne}", ($dejaLivreParLigne[$ligneVente->id] ?? 0).'/'.$ligneVente->quantite_pieces);
+                $feuille->setCellValue("H{$ligne}", ($dejaLivreParLigne[$ligneVente->id] ?? 0).'/'.$ligneVente->quantite_pieces);
             }
             $ligne++;
         }
 
         $ligne++;
-        $feuille->setCellValue("E{$ligne}", 'Total net');
-        $feuille->setCellValue("F{$ligne}", $vente->total_net);
+        $feuille->setCellValue("F{$ligne}", 'Sous-total (HT)');
+        $feuille->setCellValue("G{$ligne}", $vente->sous_total);
+        $ligne++;
+        if ($vente->totalTaxes() > 0) {
+            $feuille->setCellValue("F{$ligne}", 'Total taxes');
+            $feuille->setCellValue("G{$ligne}", $vente->totalTaxes());
+            $ligne++;
+        }
+        if ($vente->remise_totale_montant > 0) {
+            $feuille->setCellValue("F{$ligne}", 'Remise');
+            $feuille->setCellValue("G{$ligne}", $vente->remise_totale_montant);
+            $ligne++;
+        }
+        $feuille->setCellValue("F{$ligne}", 'Total net');
+        $feuille->setCellValue("G{$ligne}", $vente->total_net);
         $ligne++;
         foreach ($vente->paiements as $paiement) {
-            $feuille->setCellValue("E{$ligne}", $paiement->moyenPaiement->nom);
-            $feuille->setCellValue("F{$ligne}", $paiement->montant);
+            $feuille->setCellValue("F{$ligne}", $paiement->moyenPaiement->nom);
+            $feuille->setCellValue("G{$ligne}", $paiement->montant);
             $ligne++;
         }
         if ($vente->avoir_applique > 0) {
-            $feuille->setCellValue("E{$ligne}", 'Avoir appliqué');
-            $feuille->setCellValue("F{$ligne}", $vente->avoir_applique);
+            $feuille->setCellValue("F{$ligne}", 'Avoir appliqué');
+            $feuille->setCellValue("G{$ligne}", $vente->avoir_applique);
             $ligne++;
         }
         if ($vente->soldeDuReel() > 0) {
-            $feuille->setCellValue("E{$ligne}", 'Solde à crédit');
-            $feuille->setCellValue("F{$ligne}", $vente->soldeDuReel());
+            $feuille->setCellValue("F{$ligne}", 'Solde à crédit');
+            $feuille->setCellValue("G{$ligne}", $vente->soldeDuReel());
         }
 
         foreach (array_keys($entetes) as $colonne) {
@@ -498,7 +523,7 @@ class VenteController extends Controller
      */
     private function chargerDonneesFacture(Vente $vente): array
     {
-        $vente->load(['client', 'magasin', 'caissier', 'sessionCaisse.caisse', 'lignes.produit', 'lignes.uniteVente', 'paiements.moyenPaiement', 'reglementsClient', 'bonsLivraison.lignes']);
+        $vente->load(['client', 'magasin', 'caissier', 'sessionCaisse.caisse', 'lignes.produit', 'lignes.uniteVente', 'lignes.taxe', 'paiements.moyenPaiement', 'reglementsClient', 'bonsLivraison.lignes']);
 
         // bonsLivraison exclut déjà les BL annulés (scope global SoftDeletes) :
         // pas de filtre deleted_at à refaire ici, contrairement à ticket() qui
@@ -630,6 +655,7 @@ class VenteController extends Controller
     {
         $lignes = collect($request->input('lignes', []))->map(function (array $ligne) {
             $ligne['unite_vente_id'] = ($ligne['unite_vente_id'] ?? null) ?: null;
+            $ligne['taxe_id'] = ($ligne['taxe_id'] ?? null) ?: null;
             $ligne['magasin_source_id'] = ($ligne['magasin_source_id'] ?? null) ?: null;
             $ligne['remise_type'] = ($ligne['remise_type'] ?? null) ?: null;
             $ligne['remise_valeur'] = ($ligne['remise_valeur'] ?? null) ?: null;

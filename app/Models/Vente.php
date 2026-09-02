@@ -82,6 +82,17 @@ class Vente extends Model
         return $this->hasMany(LigneVente::class);
     }
 
+    /**
+     * Total des taxes des lignes (0 si aucune ligne taxée) — total_net (déjà
+     * stocké, voir VenteService::vendre()) inclut déjà ce montant dans le net
+     * à payer ; cette méthode ne sert qu'à l'affichage du détail HT/TVA/TTC
+     * (ticket, facture). Suppose `lignes.taxe` chargée.
+     */
+    public function totalTaxes(): int
+    {
+        return $this->lignes->sum(fn (LigneVente $ligne) => $ligne->montantTtc() - $ligne->total_ligne);
+    }
+
     public function retours(): HasMany
     {
         return $this->hasMany(RetourVente::class);

@@ -15,7 +15,7 @@
         <p class="text-secondary small">Montants indicatifs, calculés au prix courant du catalogue — jamais figés.</p>
 
         <div class="table-responsive">
-            @php $colonnesPanier = auth()->user()->can('vente.remise') ? 7 : 6; @endphp
+            @php $colonnesPanier = 5 + (auth()->user()->can('vente.remise') ? 1 : 0) + ($taxes->isNotEmpty() ? 1 : 0); @endphp
             <table class="table table-sm align-middle mb-0">
                 <thead>
                     <tr>
@@ -26,6 +26,9 @@
                         @can('vente.remise')
                             <th>Remise</th>
                         @endcan
+                        @if ($taxes->isNotEmpty())
+                            <th>Taxe</th>
+                        @endif
                         <th class="text-end">Total</th>
                         <th></th>
                     </tr>
@@ -83,6 +86,16 @@
                                     </div>
                                 </td>
                             @endcan
+                            @if ($taxes->isNotEmpty())
+                                <td>
+                                    <select x-model="ligne.taxe_id" class="form-select form-select-sm" style="min-width: 120px;">
+                                        <option value="">Aucune</option>
+                                        @foreach ($taxes as $taxe)
+                                            <option value="{{ $taxe->id }}">{{ $taxe->nom }} ({{ $taxe->taux }}%)</option>
+                                        @endforeach
+                                    </select>
+                                </td>
+                            @endif
                             <td class="text-end fw-medium" x-text="totalLigne(ligne) + ' ' + window.DEVISE_ABREVIATION"></td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-icon btn-outline-danger" @click="retirerLigne(index)">
@@ -94,8 +107,16 @@
                 </tbody>
                 <tfoot>
                     <tr>
-                        <th colspan="{{ $colonnesPanier - 1 }}" class="text-end">Total indicatif</th>
+                        <th colspan="{{ $colonnesPanier - 1 }}" class="text-end">Sous-total (HT)</th>
                         <th x-text="sousTotal + ' ' + window.DEVISE_ABREVIATION"></th>
+                    </tr>
+                    <tr x-show="totalTaxes > 0" x-cloak>
+                        <th colspan="{{ $colonnesPanier - 1 }}" class="text-end">Total taxes</th>
+                        <th x-text="totalTaxes + ' ' + window.DEVISE_ABREVIATION"></th>
+                    </tr>
+                    <tr x-show="totalTaxes > 0" x-cloak>
+                        <th colspan="{{ $colonnesPanier - 1 }}" class="text-end">Total net (indicatif)</th>
+                        <th x-text="totalNet + ' ' + window.DEVISE_ABREVIATION"></th>
                     </tr>
                 </tfoot>
             </table>

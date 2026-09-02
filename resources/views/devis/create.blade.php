@@ -3,7 +3,7 @@
 @section('title', 'Nouveau devis')
 
 @section('content')
-    <div x-data="devisApp({{ \Illuminate\Support\Js::from($produits) }}, {{ \Illuminate\Support\Js::from($panierInitial) }})">
+    <div x-data="devisApp({{ \Illuminate\Support\Js::from($produits) }}, {{ \Illuminate\Support\Js::from($panierInitial) }}, {{ \Illuminate\Support\Js::from($taxes->map(fn ($t) => ['id' => $t->id, 'libelle' => $t->nom, 'taux' => $t->taux])) }})">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2 class="h4 mb-0">Nouveau devis</h2>
             <a href="{{ route('devis.index') }}" class="btn btn-link">
@@ -48,6 +48,7 @@
                                 <span>
                                     <input type="hidden" :name="'lignes['+index+'][produit_id]'" :value="ligne.produit_id">
                                     <input type="hidden" :name="'lignes['+index+'][unite_vente_id]'" :value="ligne.unite_vente_id">
+                                    <input type="hidden" :name="'lignes['+index+'][taxe_id]'" :value="ligne.taxe_id">
                                     <input type="hidden" :name="'lignes['+index+'][quantite]'" :value="ligne.quantite">
                                     <input type="hidden" :name="'lignes['+index+'][remise_type]'" :value="ligne.remise_type">
                                     <input type="hidden" :name="'lignes['+index+'][remise_valeur]'" :value="ligne.remise_valeur">

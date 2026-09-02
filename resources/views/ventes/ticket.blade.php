@@ -167,6 +167,7 @@
         </div>
     @endif
 
+    @php $venteTotalTaxes = $vente->totalTaxes(); @endphp
     <div class="card mb-3 d-print-none bg-white">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
@@ -176,6 +177,9 @@
                         <th>Qté</th>
                         <th class="text-end">Prix unitaire</th>
                         <th class="text-end">Remise</th>
+                        @if ($venteTotalTaxes > 0)
+                            <th>Taxe</th>
+                        @endif
                         <th class="text-end">Total</th>
                         <th>Livraison</th>
                     </tr>
@@ -190,6 +194,9 @@
                             <td>{{ $ligne->quantite }}</td>
                             <td class="text-end">{{ montant($ligne->prixUnitaireEffectif()) }}</td>
                             <td class="text-end text-danger">{{ (! $ligne->prix_personnalise && $ligne->remise_ligne_montant > 0) ? '− '.montant($ligne->remise_ligne_montant) : '—' }}</td>
+                            @if ($venteTotalTaxes > 0)
+                                <td>{{ $ligne->taxe->nom ?? '—' }}</td>
+                            @endif
                             <td class="text-end fw-medium">{{ montant($ligne->total_ligne) }}</td>
                             @php $ligneDejaLivre = $dejaLivreParLigne[$ligne->id] ?? 0; @endphp
                             <td>
@@ -211,9 +218,15 @@
         <table class="table table-sm mb-0" style="max-width: 380px;">
             <tbody>
                 <tr>
-                    <td>Sous-total</td>
+                    <td>Sous-total (HT)</td>
                     <td class="text-end">{{ montant($vente->sous_total) }}</td>
                 </tr>
+                @if ($venteTotalTaxes > 0)
+                    <tr>
+                        <td>Total taxes</td>
+                        <td class="text-end">{{ montant($venteTotalTaxes) }}</td>
+                    </tr>
+                @endif
                 @if ($vente->remise_totale_montant > 0)
                     <tr>
                         <td>Remise</td>
@@ -405,6 +418,9 @@
                                 @if (! $ligne->prix_personnalise && $ligne->remise_ligne_montant > 0)
                                     <br><span class="text-danger small">Remise : − {{ montant($ligne->remise_ligne_montant) }}</span>
                                 @endif
+                                @if ($ligne->taxe)
+                                    <br><span class="text-secondary small">{{ $ligne->taxe->nom }} ({{ $ligne->taxe->taux }}%)</span>
+                                @endif
                             </td>
                             <td class="text-end align-top">{{ montant($ligne->total_ligne) }}</td>
                         </tr>
@@ -414,9 +430,15 @@
 
             <table class="table table-sm mb-0">
                 <tr>
-                    <td>Sous-total</td>
+                    <td>Sous-total (HT)</td>
                     <td class="text-end">{{ montant($vente->sous_total) }}</td>
                 </tr>
+                @if ($venteTotalTaxes > 0)
+                    <tr>
+                        <td>Total taxes</td>
+                        <td class="text-end">{{ montant($venteTotalTaxes) }}</td>
+                    </tr>
+                @endif
                 @if ($vente->remise_totale_montant > 0)
                     <tr>
                         <td>Remise</td>

@@ -166,6 +166,7 @@
         @if ($vente->client?->adresse) {{ $vente->client->adresse }} @endif
     </div>
 
+    @php $venteTotalTaxes = $vente->totalTaxes(); @endphp
     <table class="lignes">
         <thead>
             <tr>
@@ -174,6 +175,9 @@
                 <th class="text-end">Qté</th>
                 <th class="text-end">Prix unitaire</th>
                 <th class="text-end">Remise</th>
+                @if ($venteTotalTaxes > 0)
+                    <th>Taxe</th>
+                @endif
                 <th class="text-end">Total</th>
                 @if ($livraisonEngagee)
                     <th class="text-end">Livré</th>
@@ -188,6 +192,9 @@
                     <td class="text-end">{{ $ligne->quantite }}</td>
                     <td class="text-end">{{ montant($ligne->prixUnitaireEffectif()) }}</td>
                     <td class="text-end">{{ (! $ligne->prix_personnalise && $ligne->remise_ligne_montant > 0) ? '− '.montant($ligne->remise_ligne_montant) : '—' }}</td>
+                    @if ($venteTotalTaxes > 0)
+                        <td>{{ $ligne->taxe->nom ?? '—' }}</td>
+                    @endif
                     <td class="text-end">{{ montant($ligne->total_ligne) }}</td>
                     @if ($livraisonEngagee)
                         <td class="text-end">{{ $dejaLivreParLigne[$ligne->id] ?? 0 }}/{{ $ligne->quantite_pieces }}</td>
@@ -199,9 +206,15 @@
 
     <table class="totaux">
         <tr>
-            <td>Sous-total</td>
+            <td>Sous-total (HT)</td>
             <td class="text-end">{{ montant($vente->sous_total) }}</td>
         </tr>
+        @if ($venteTotalTaxes > 0)
+            <tr>
+                <td>Total taxes</td>
+                <td class="text-end">{{ montant($venteTotalTaxes) }}</td>
+            </tr>
+        @endif
         @if ($vente->remise_totale_montant > 0)
             <tr>
                 <td>Remise</td>

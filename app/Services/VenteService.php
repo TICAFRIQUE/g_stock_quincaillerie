@@ -9,9 +9,11 @@ use App\Models\Client;
 use App\Models\Magasin;
 use App\Models\Produit;
 use App\Models\SessionCaisse;
+use App\Models\Taxe;
 use App\Models\UniteVente;
 use App\Models\User;
 use App\Models\Vente;
+use App\Support\Arrondi;
 use App\Support\Remise;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -63,10 +65,18 @@ class VenteService
             $caisse->increment('sequence_ventes');
             $numero = sprintf('M%d-C%02d-%06d', $magasin->id, $caisse->id, $caisse->sequence_ventes);
 
-            [$lignesResolues, $sousTotal] = $this->resoudreLignes($lignes);
+            [$lignesResolues, $sousTotal, $totalTaxes] = $this->resoudreLignes($lignes);
 
-            $remiseTotaleMontant = $this->resoudreRemise($remiseTotaleType, $remiseTotaleValeur, $sousTotal);
-            $totalNet = $sousTotal - $remiseTotaleMontant;
+            // La remise totale porte sur le montant TTC (HT + taxes des
+            // lignes), pas seulement sur le HT : sans ça, appliquer une
+            // remise totale à une vente comportant des lignes taxées
+            // laisserait la taxe intacte alors que le client paie moins —
+            // sans taxe sur aucune ligne (cas actuel de tous les clients
+            // existants), totalTaxes = 0 et ce calcul reste identique à
+            // avant (aucune régression).
+            $totalAvantRemiseTotale = $sousTotal + $totalTaxes;
+            $remiseTotaleMontant = $this->resoudreRemise($remiseTotaleType, $remiseTotaleValeur, $totalAvantRemiseTotale);
+            $totalNet = $totalAvantRemiseTotale - $remiseTotaleMontant;
 
             $totalPaiements = array_sum(array_column($paiements, 'montant'));
             $soldeDu = $totalNet - $totalPaiements;
@@ -124,6 +134,7 @@ class VenteService
                 $vente->lignes()->create([
                     'produit_id' => $l['produit']->id,
                     'unite_vente_id' => $l['unite_vente']?->id,
+                    'taxe_id' => $l['taxe']?->id,
                     'magasin_source_id' => $l['magasin_source']->id,
                     'quantite' => $l['quantite'],
                     'quantite_pieces' => $l['quantite_pieces'],
@@ -174,9 +185,10 @@ class VenteService
      */
     public function calculerTotalNet(array $lignes, ?string $remiseTotaleType, ?int $remiseTotaleValeur): int
     {
-        [, $sousTotal] = $this->resoudreLignes($lignes);
+        [, $sousTotal, $totalTaxes] = $this->resoudreLignes($lignes);
+        $totalAvantRemiseTotale = $sousTotal + $totalTaxes;
 
-        return $sousTotal - $this->resoudreRemise($remiseTotaleType, $remiseTotaleValeur, $sousTotal);
+        return $totalAvantRemiseTotale - $this->resoudreRemise($remiseTotaleType, $remiseTotaleValeur, $totalAvantRemiseTotale);
     }
 
     /**
@@ -184,7 +196,7 @@ class VenteService
      * ligne — pas de repli implicite sur le magasin de la vente (voir
      * CLAUDE.md) : chaque ligne doit porter un magasin_source_id valide.
      *
-     * @return array{0: array<int, array<string, mixed>>, 1: int}
+     * @return array{0: array<int, array<string, mixed>>, 1: int, 2: int}
      */
     private function resoudreLignes(array $lignes): array
     {
@@ -193,14 +205,21 @@ class VenteService
             ? Magasin::whereIn('id', $magasinSourceIds)->get()->keyBy('id')
             : collect();
 
+        $taxeIds = collect($lignes)->pluck('taxe_id')->filter()->unique();
+        $taxesParId = $taxeIds->isNotEmpty()
+            ? Taxe::whereIn('id', $taxeIds)->get()->keyBy('id')
+            : collect();
+
         $resolues = [];
         $sousTotal = 0;
+        $totalTaxes = 0;
 
         foreach ($lignes as $ligne) {
             $produit = Produit::findOrFail($ligne['produit_id']);
             $uniteVente = ! empty($ligne['unite_vente_id'])
                 ? UniteVente::findOrFail($ligne['unite_vente_id'])
                 : null;
+            $taxe = ! empty($ligne['taxe_id']) ? $taxesParId->get($ligne['taxe_id']) : null;
 
             $magasinSource = $magasinsParId->get($ligne['magasin_source_id'] ?? null);
             if ($magasinSource === null) {
@@ -222,12 +241,16 @@ class VenteService
                 $sousTotalLigne,
             );
 
+            // total_ligne reste HT (comme prix_achat côté achat, voir
+            // CLAUDE.md) : la taxe s'ajoute par-dessus, jamais incluse dedans.
             $totalLigne = $sousTotalLigne - $remiseLigneMontant;
             $sousTotal += $totalLigne;
+            $totalTaxes += Arrondi::entier($totalLigne * ($taxe?->taux ?? 0) / 100);
 
             $resolues[] = [
                 'produit' => $produit,
                 'unite_vente' => $uniteVente,
+                'taxe' => $taxe,
                 'magasin_source' => $magasinSource,
                 'quantite' => $quantite,
                 'quantite_pieces' => $quantitePieces,
@@ -246,7 +269,7 @@ class VenteService
             ];
         }
 
-        return [$resolues, $sousTotal];
+        return [$resolues, $sousTotal, $totalTaxes];
     }
 
     private function resoudreRemise(?string $type, ?int $valeur, int $base): int

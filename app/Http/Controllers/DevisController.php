@@ -10,6 +10,7 @@ use App\Models\Devis;
 use App\Models\Parametre;
 use App\Models\Produit;
 use App\Models\SessionCaisse;
+use App\Models\Taxe;
 use App\Models\TypeClient;
 use App\Services\DevisService;
 use App\Services\StockService;
@@ -56,6 +57,7 @@ class DevisController extends Controller
             'clients' => Client::where('actif', true)->orderBy('nom')->get(['id', 'nom', 'telephone']),
             'panierInitial' => collect(),
             'typesClient' => TypeClient::where('actif', true)->orderBy('nom')->get(),
+            'taxes' => Taxe::where('actif', true)->orderBy('nom')->get(),
         ]);
     }
 
@@ -69,6 +71,7 @@ class DevisController extends Controller
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
+            'lignes.*.taxe_id' => ['nullable', 'exists:taxes,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
@@ -85,7 +88,7 @@ class DevisController extends Controller
 
     public function show(Devis $devis, StockService $stockService): View
     {
-        $devis->load(['client', 'auteur', 'lignes.produit', 'lignes.uniteVente', 'vente']);
+        $devis->load(['client', 'auteur', 'lignes.produit', 'lignes.uniteVente', 'lignes.taxe', 'vente']);
 
         $sessionOuverte = SessionCaisse::where('caissier_id', request()->user()->id)
             ->whereNull('date_fermeture')
@@ -128,6 +131,7 @@ class DevisController extends Controller
         $panierInitial = $devis->lignes->map(fn ($ligne) => [
             'produit_id' => $ligne->produit_id,
             'unite_vente_id' => $ligne->unite_vente_id,
+            'taxe_id' => $ligne->taxe_id ?? '',
             'produitLibelle' => $ligne->produit->libelle_affichage,
             'uniteLibelle' => $ligne->uniteVente?->libelle,
             'facteur' => $ligne->uniteVente?->facteur ?? 1,
@@ -141,6 +145,7 @@ class DevisController extends Controller
             'devis' => $devis,
             'produits' => Produit::catalogueVente(),
             'panierInitial' => $panierInitial,
+            'taxes' => Taxe::where('actif', true)->orderBy('nom')->get(),
         ]);
     }
 
@@ -153,6 +158,7 @@ class DevisController extends Controller
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
+            'lignes.*.taxe_id' => ['nullable', 'exists:taxes,id'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
@@ -203,7 +209,7 @@ class DevisController extends Controller
 
     public function excel(Devis $devis): StreamedResponse
     {
-        $devis->load(['client', 'lignes.produit', 'lignes.uniteVente']);
+        $devis->load(['client', 'lignes.produit', 'lignes.uniteVente', 'lignes.taxe']);
         $montants = $devis->calculerMontants();
 
         $spreadsheet = new Spreadsheet();
@@ -226,7 +232,7 @@ class DevisController extends Controller
         $feuille->setCellValue('A9', $devis->client->adresse);
 
         $ligneEnTete = 11;
-        foreach (['A' => 'Désignation', 'B' => 'Unité', 'C' => 'Quantité', 'D' => 'Prix unitaire', 'E' => 'Remise', 'F' => 'Total'] as $colonne => $libelle) {
+        foreach (['A' => 'Désignation', 'B' => 'Unité', 'C' => 'Quantité', 'D' => 'Prix unitaire', 'E' => 'Remise', 'F' => 'Taxe', 'G' => 'Total'] as $colonne => $libelle) {
             $feuille->setCellValue("{$colonne}{$ligneEnTete}", $libelle);
         }
 
@@ -241,14 +247,24 @@ class DevisController extends Controller
             $feuille->setCellValue("C{$ligne}", $ligneDevis->quantite);
             $feuille->setCellValue("D{$ligne}", $prixUnitaire);
             $feuille->setCellValue("E{$ligne}", $remiseLigne);
-            $feuille->setCellValue("F{$ligne}", $sousTotalLigne - $remiseLigne);
+            $feuille->setCellValue("F{$ligne}", $ligneDevis->taxe->nom ?? '—');
+            $feuille->setCellValue("G{$ligne}", $sousTotalLigne - $remiseLigne);
             $ligne++;
         }
 
-        $feuille->setCellValue("E{$ligne}", 'Total net');
-        $feuille->setCellValue("F{$ligne}", $montants['total_net']);
+        $ligne++;
+        $feuille->setCellValue("F{$ligne}", 'Total HT');
+        $feuille->setCellValue("G{$ligne}", $montants['sous_total']);
+        if ($montants['total_taxes'] > 0) {
+            $ligne++;
+            $feuille->setCellValue("F{$ligne}", 'Total taxes');
+            $feuille->setCellValue("G{$ligne}", $montants['total_taxes']);
+        }
+        $ligne++;
+        $feuille->setCellValue("F{$ligne}", 'Total net');
+        $feuille->setCellValue("G{$ligne}", $montants['total_net']);
 
-        foreach (['A', 'B', 'C', 'D', 'E', 'F'] as $colonne) {
+        foreach (['A', 'B', 'C', 'D', 'E', 'F', 'G'] as $colonne) {
             $feuille->getColumnDimension($colonne)->setAutoSize(true);
         }
 
@@ -268,7 +284,7 @@ class DevisController extends Controller
      */
     private function chargerDonneesFacture(Devis $devis): array
     {
-        $devis->load(['client', 'lignes.produit', 'lignes.uniteVente']);
+        $devis->load(['client', 'lignes.produit', 'lignes.uniteVente', 'lignes.taxe']);
 
         $parametre = Parametre::actuel();
         $logo = $parametre->getFirstMedia('logo');
@@ -288,6 +304,7 @@ class DevisController extends Controller
     {
         $lignes = collect($request->input('lignes', []))->map(function (array $ligne) {
             $ligne['unite_vente_id'] = ($ligne['unite_vente_id'] ?? null) ?: null;
+            $ligne['taxe_id'] = ($ligne['taxe_id'] ?? null) ?: null;
             $ligne['remise_type'] = ($ligne['remise_type'] ?? null) ?: null;
             $ligne['remise_valeur'] = ($ligne['remise_valeur'] ?? null) ?: null;
 
