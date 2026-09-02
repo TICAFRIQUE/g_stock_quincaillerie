@@ -80,9 +80,12 @@ class Abonnement
     }
 
     /**
-     * Renouvellement additif : les jours restants de l'abonnement actuel
-     * s'ajoutent aux jours de la nouvelle formule, sauf si la nouvelle
-     * formule est illimitée (l'illimité prime, jours restants ignorés).
+     * Renouvellement additif par défaut : les jours restants de l'abonnement
+     * actuel s'ajoutent aux jours de la nouvelle formule, sauf si la
+     * nouvelle formule est illimitée (l'illimité prime, jours restants
+     * ignorés) ou si $remplacer est vrai — un vrai changement d'offre
+     * (upgrade/downgrade délibéré, ex. repasser un client en Essai malgré
+     * des jours restants) doit pouvoir ignorer volontairement ce report.
      */
     public static function activer(
         ?FormuleAbonnement $formule,
@@ -91,9 +94,10 @@ class Abonnement
         bool $illimite,
         ?string $note,
         User $auteur,
+        bool $remplacer = false,
     ): AbonnementActivation {
-        return DB::transaction(function () use ($formule, $montant, $jours, $illimite, $note, $auteur) {
-            $joursRestantsReportes = self::joursRestants() ?? 0;
+        return DB::transaction(function () use ($formule, $montant, $jours, $illimite, $note, $auteur, $remplacer) {
+            $joursRestantsReportes = $remplacer ? 0 : (self::joursRestants() ?? 0);
             $dateDebut = today();
 
             $activation = AbonnementActivation::create([

@@ -78,6 +78,19 @@
                             <label class="form-label">Jours</label>
                             <input type="number" name="jours" class="form-control" min="1" x-ref="jours">
                         </div>
+                        @if ($joursRestants)
+                            <div class="form-check mb-3">
+                                <input type="checkbox" name="remplacer" value="1" class="form-check-input" id="remplacer">
+                                <label class="form-check-label" for="remplacer">
+                                    Remplacer la durée actuelle (ignorer les {{ $joursRestants }}
+                                    jour{{ $joursRestants > 1 ? 's' : '' }} restant{{ $joursRestants > 1 ? 's' : '' }})
+                                </label>
+                                <div class="form-text">
+                                    À cocher pour un vrai changement d'offre (ex. repasser en Essai) —
+                                    sinon les jours restants s'ajoutent à la nouvelle durée (renouvellement).
+                                </div>
+                            </div>
+                        @endif
                         <div class="mb-3">
                             <label class="form-label">Montant payé (F)</label>
                             <input type="number" name="montant" class="form-control" min="0" required x-ref="montant">

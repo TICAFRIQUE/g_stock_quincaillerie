@@ -68,6 +68,7 @@ class AbonnementController extends Controller
             illimite: $illimite,
             note: $donnees['note'] ?? null,
             auteur: $request->user(),
+            remplacer: $request->boolean('remplacer'),
         );
 
         return redirect()->route('abonnement.gestion')->with('succes', 'Abonnement activé.');
