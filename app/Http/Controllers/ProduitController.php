@@ -96,7 +96,7 @@ class ProduitController extends Controller
                 $p->sku,
                 $p->libelle_affichage,
                 $p->categorie->nom,
-                number_format($p->prix_piece, 0, ',', ' ').' F',
+                montant($p->prix_piece),
                 $p->actif ? 'Actif' : 'Inactif',
             ]);
     }

@@ -101,9 +101,9 @@
                             <td><code>{{ $ligne->produit->sku }}</code></td>
                             <td>{{ $ligne->produit->libelle_affichage }}</td>
                             <td>
-                                {{ $ligne->quantite }} × {{ $ligne->uniteVente->unite->nom_avec_abbreviation ?? $ligne->produit->unite_base_libelle }}
+                                {{ quantite($ligne->quantite) }} × {{ $ligne->uniteVente->unite->nom_avec_abbreviation ?? $ligne->produit->unite_base_libelle }}
                             </td>
-                            <td>{{ $ligne->quantite_pieces }} {{ $ligne->produit->unite_base_libelle }}</td>
+                            <td>{{ quantite($ligne->quantite_pieces) }} {{ $ligne->produit->unite_base_libelle }}</td>
                             <td>
                                 {{ $ligne->magasinDestination->nom }}
                                 @if ($ligne->magasinDestination->estDepot())
@@ -189,7 +189,7 @@
                         @endif
                         @foreach ($retour->lignes as $ligneRetour)
                             <div class="d-flex justify-content-between text-secondary ps-4">
-                                <span>{{ $ligneRetour->produit->libelle_affichage }} × {{ $ligneRetour->quantite_pieces }}</span>
+                                <span>{{ $ligneRetour->produit->libelle_affichage }} × {{ quantite($ligneRetour->quantite_pieces) }}</span>
                                 <span>{{ montant($ligneRetour->montant) }}</span>
                             </div>
                         @endforeach
@@ -382,12 +382,12 @@
                                                     {{ $ligne->produit->libelle_affichage }}
                                                     <input type="hidden" name="lignes[{{ $ligne->id }}][ligne_commande_achat_id]" value="{{ $ligne->id }}">
                                                 </td>
-                                                <td class="text-end">{{ $ligne->quantite_pieces }}</td>
-                                                <td class="text-end">{{ $dejaRetourne }}</td>
+                                                <td class="text-end">{{ quantite($ligne->quantite_pieces) }}</td>
+                                                <td class="text-end">{{ quantite($dejaRetourne) }}</td>
                                                 <td>
                                                     <input type="number" name="lignes[{{ $ligne->id }}][quantite_pieces]"
                                                            x-model.number="lignes[{{ $ligne->id }}]"
-                                                           min="0" max="{{ $ligne->quantite_pieces - $dejaRetourne }}"
+                                                           min="0" step="0.001" max="{{ (float) $ligne->quantite_pieces - $dejaRetourne }}"
                                                            class="form-control form-control-sm text-end">
                                                 </td>
                                             </tr>

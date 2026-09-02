@@ -14,12 +14,12 @@ class QuantiteRetourInvalideException extends RuntimeException
 {
     public function __construct(
         public readonly Model $ligne,
-        public readonly int $quantiteDemandee,
-        public readonly int $quantiteRestante,
+        public readonly int|float $quantiteDemandee,
+        public readonly int|float $quantiteRestante,
     ) {
         parent::__construct(
             "Quantité de retour invalide pour {$ligne->produit->sku} : ".
-            "demandé {$quantiteDemandee} pièce(s), retournable {$quantiteRestante}."
+            'demandé '.quantite($quantiteDemandee)." pièce(s), retournable ".quantite($quantiteRestante).'.'
         );
     }
 }

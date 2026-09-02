@@ -8,6 +8,7 @@ use App\Models\Produit;
 use App\Models\Stock;
 use App\Models\Transfert;
 use App\Services\TransfertService;
+use App\Support\Decimal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -49,11 +50,13 @@ class TransfertController extends Controller
 
     public function store(Request $request, TransfertService $transfertService): RedirectResponse
     {
+        $request->merge(['quantite' => Decimal::normaliser($request->input('quantite'))]);
+
         $donnees = $request->validate([
             'produit_id' => ['required', 'exists:produits,id'],
             'magasin_source_id' => ['required', 'exists:magasins,id', 'different:magasin_destination_id'],
             'magasin_destination_id' => ['required', 'exists:magasins,id'],
-            'quantite' => ['required', 'integer', 'min:1'],
+            'quantite' => ['required', 'numeric', 'min:0.001'],
         ]);
 
         try {
@@ -61,7 +64,7 @@ class TransfertController extends Controller
                 Produit::findOrFail($donnees['produit_id']),
                 Magasin::findOrFail($donnees['magasin_source_id']),
                 Magasin::findOrFail($donnees['magasin_destination_id']),
-                $donnees['quantite'],
+                (float) $donnees['quantite'],
                 $request->user(),
             );
         } catch (StockInsuffisantException $e) {

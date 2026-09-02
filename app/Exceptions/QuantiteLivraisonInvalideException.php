@@ -9,12 +9,12 @@ class QuantiteLivraisonInvalideException extends RuntimeException
 {
     public function __construct(
         public readonly LigneVente $ligne,
-        public readonly int $quantiteDemandee,
-        public readonly int $quantiteRestante,
+        public readonly int|float $quantiteDemandee,
+        public readonly int|float $quantiteRestante,
     ) {
         parent::__construct(
             "Quantité de livraison invalide pour {$ligne->produit->sku} : ".
-            "demandé {$quantiteDemandee} pièce(s), livrable {$quantiteRestante}."
+            'demandé '.quantite($quantiteDemandee)." pièce(s), livrable ".quantite($quantiteRestante).'.'
         );
     }
 }

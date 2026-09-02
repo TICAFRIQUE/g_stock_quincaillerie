@@ -226,14 +226,14 @@ class VenteService
                 throw new InvalidArgumentException('Magasin source introuvable pour une ligne de vente.');
             }
 
-            $quantite = $ligne['quantite'];
+            $quantite = Arrondi::quantite((float) $ligne['quantite']);
             if ($quantite <= 0) {
                 throw new InvalidArgumentException('La quantité d\'une ligne de vente doit être positive.');
             }
 
-            $quantitePieces = $quantite * ($uniteVente->facteur ?? 1);
+            $quantitePieces = Arrondi::quantite($quantite * ($uniteVente->facteur ?? 1));
             $prixUnitaireApplique = $uniteVente ? $uniteVente->prix : $produit->prix_piece;
-            $sousTotalLigne = $prixUnitaireApplique * $quantite;
+            $sousTotalLigne = Arrondi::entier($prixUnitaireApplique * $quantite);
 
             $remiseLigneMontant = $this->resoudreRemise(
                 $ligne['remise_type'] ?? null,

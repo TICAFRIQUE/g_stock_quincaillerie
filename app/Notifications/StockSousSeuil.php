@@ -19,7 +19,7 @@ class StockSousSeuil extends Notification
     public function __construct(
         private readonly Produit $produit,
         private readonly Magasin $magasin,
-        private readonly int $quantite,
+        private readonly int|float $quantite,
     ) {}
 
     public function via(object $notifiable): array

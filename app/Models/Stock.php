@@ -15,7 +15,7 @@ class Stock extends Model
     protected function casts(): array
     {
         return [
-            'quantite' => 'integer',
+            'quantite' => 'decimal:3',
             'cout_moyen_pondere' => 'integer',
             'alerte_seuil_envoyee_at' => 'datetime',
         ];

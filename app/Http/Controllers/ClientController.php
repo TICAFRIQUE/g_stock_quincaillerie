@@ -100,8 +100,8 @@ class ClientController extends Controller
             $c->nom,
             $c->typeClient->nom ?? '—',
             $c->telephone ?? '—',
-            number_format($soldes[$c->id] ?? 0, 0, ',', ' ').' F',
-            $c->limite_credit !== null ? number_format($c->limite_credit, 0, ',', ' ').' F' : 'Illimitée',
+            montant($soldes[$c->id] ?? 0),
+            $c->limite_credit !== null ? montant($c->limite_credit) : 'Illimitée',
             $c->actif ? 'Actif' : 'Inactif',
         ]);
     }
@@ -230,7 +230,7 @@ class ClientController extends Controller
             $feuille->setCellValue("E{$ligne}", $vente->trashed() ? 'Annulée' : 'Validée');
             $feuille->setCellValue("F{$ligne}", ! $vente->livraisonEngagee() ? '—' : ($vente->entierementLivree()
                 ? 'Entièrement livrée'
-                : $vente->quantiteLivreePieces().'/'.$vente->lignes->sum('quantite_pieces').' pièce(s)'));
+                : quantite($vente->quantiteLivreePieces()).'/'.quantite($vente->lignes->sum('quantite_pieces')).' pièce(s)'));
             $ligne++;
         }
 

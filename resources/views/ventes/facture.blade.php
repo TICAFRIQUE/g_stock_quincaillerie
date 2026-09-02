@@ -189,7 +189,7 @@
                 <tr>
                     <td>{{ $ligne->produit->libelle_affichage }}</td>
                     <td>{{ $ligne->uniteVente->libelle ?? $ligne->produit->unite_base_libelle }}</td>
-                    <td class="text-end">{{ $ligne->quantite }}</td>
+                    <td class="text-end">{{ quantite($ligne->quantite) }}</td>
                     <td class="text-end">{{ montant($ligne->prixUnitaireEffectif()) }}</td>
                     <td class="text-end">{{ (! $ligne->prix_personnalise && $ligne->remise_ligne_montant > 0) ? '− '.montant($ligne->remise_ligne_montant) : '—' }}</td>
                     @if ($venteTotalTaxes > 0)
@@ -197,7 +197,7 @@
                     @endif
                     <td class="text-end">{{ montant($ligne->total_ligne) }}</td>
                     @if ($livraisonEngagee)
-                        <td class="text-end">{{ $dejaLivreParLigne[$ligne->id] ?? 0 }}/{{ $ligne->quantite_pieces }}</td>
+                        <td class="text-end">{{ quantite($dejaLivreParLigne[$ligne->id] ?? 0) }}/{{ quantite($ligne->quantite_pieces) }}</td>
                     @endif
                 </tr>
             @endforeach

@@ -14,6 +14,8 @@ use App\Models\Taxe;
 use App\Models\TypeClient;
 use App\Services\DevisService;
 use App\Services\StockService;
+use App\Support\Arrondi;
+use App\Support\Decimal;
 use App\Support\Remise;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -72,7 +74,7 @@ class DevisController extends Controller
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
             'lignes.*.taxe_id' => ['nullable', 'exists:taxes,id'],
-            'lignes.*.quantite' => ['required', 'integer', 'min:1'],
+            'lignes.*.quantite' => ['required', 'numeric', 'min:0.001'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
         ]);
@@ -135,7 +137,7 @@ class DevisController extends Controller
             'produitLibelle' => $ligne->produit->libelle_affichage,
             'uniteLibelle' => $ligne->uniteVente?->libelle,
             'facteur' => $ligne->uniteVente?->facteur ?? 1,
-            'quantite' => $ligne->quantite,
+            'quantite' => (float) $ligne->quantite,
             'prixUnitaire' => $ligne->uniteVente?->prix ?? $ligne->produit->prix_piece,
             'remise_type' => $ligne->remise_type ?? '',
             'remise_valeur' => $ligne->remise_valeur,
@@ -159,7 +161,7 @@ class DevisController extends Controller
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
             'lignes.*.taxe_id' => ['nullable', 'exists:taxes,id'],
-            'lignes.*.quantite' => ['required', 'integer', 'min:1'],
+            'lignes.*.quantite' => ['required', 'numeric', 'min:0.001'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
         ]);
@@ -239,12 +241,12 @@ class DevisController extends Controller
         $ligne = $ligneEnTete + 1;
         foreach ($devis->lignes as $ligneDevis) {
             $prixUnitaire = $ligneDevis->uniteVente->prix ?? $ligneDevis->produit->prix_piece;
-            $sousTotalLigne = $prixUnitaire * $ligneDevis->quantite;
+            $sousTotalLigne = Arrondi::entier($prixUnitaire * (float) $ligneDevis->quantite);
             $remiseLigne = Remise::resoudre($ligneDevis->remise_type, $ligneDevis->remise_valeur, $sousTotalLigne);
 
             $feuille->setCellValue("A{$ligne}", $ligneDevis->produit->libelle_affichage);
             $feuille->setCellValue("B{$ligne}", $ligneDevis->uniteVente->libelle ?? $ligneDevis->produit->unite_base_libelle);
-            $feuille->setCellValue("C{$ligne}", $ligneDevis->quantite);
+            $feuille->setCellValue("C{$ligne}", (float) $ligneDevis->quantite);
             $feuille->setCellValue("D{$ligne}", $prixUnitaire);
             $feuille->setCellValue("E{$ligne}", $remiseLigne);
             $feuille->setCellValue("F{$ligne}", $ligneDevis->taxe->nom ?? '—');
@@ -307,6 +309,7 @@ class DevisController extends Controller
             $ligne['taxe_id'] = ($ligne['taxe_id'] ?? null) ?: null;
             $ligne['remise_type'] = ($ligne['remise_type'] ?? null) ?: null;
             $ligne['remise_valeur'] = ($ligne['remise_valeur'] ?? null) ?: null;
+            $ligne['quantite'] = Decimal::normaliser($ligne['quantite'] ?? null);
 
             return $ligne;
         })->all();

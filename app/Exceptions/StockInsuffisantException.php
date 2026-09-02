@@ -11,12 +11,12 @@ class StockInsuffisantException extends RuntimeException
     public function __construct(
         public readonly Produit $produit,
         public readonly Magasin $magasin,
-        public readonly int $quantiteDemandee,
-        public readonly int $quantiteDisponible,
+        public readonly int|float $quantiteDemandee,
+        public readonly int|float $quantiteDisponible,
     ) {
         parent::__construct(
             "Stock insuffisant pour {$produit->sku} au magasin {$magasin->nom} : ".
-            "demandé {$quantiteDemandee} pièce(s), disponible {$quantiteDisponible}."
+            'demandé '.quantite($quantiteDemandee)." pièce(s), disponible ".quantite($quantiteDisponible).'.'
         );
     }
 }

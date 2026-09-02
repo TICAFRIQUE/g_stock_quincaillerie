@@ -94,7 +94,7 @@ class FournisseurController extends Controller
             $f->nom,
             $f->telephone ?? '—',
             $f->email ?? '—',
-            number_format($soldes[$f->id] ?? 0, 0, ',', ' ').' F',
+            montant($soldes[$f->id] ?? 0),
             $f->actif ? 'Actif' : 'Inactif',
         ]);
     }

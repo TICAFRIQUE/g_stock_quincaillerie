@@ -24,14 +24,14 @@ use InvalidArgumentException;
 class StockService
 {
     /**
-     * @param  int  $quantite  Signé : positif = entrée, négatif = sortie.
+     * @param  int|float  $quantite  Signé : positif = entrée, négatif = sortie.
      * @param  int|null  $prixAchat  Requis uniquement pour un mouvement de type Reception
      *                               (sert au recalcul du coût moyen pondéré).
      */
     public function enregistrerMouvement(
         Produit $produit,
         Magasin $magasin,
-        int $quantite,
+        int|float $quantite,
         MouvementStockType $type,
         User $auteur,
         ?Model $reference = null,
@@ -41,6 +41,8 @@ class StockService
         if ($type === MouvementStockType::Reception && $prixAchat === null) {
             throw new InvalidArgumentException('prixAchat est requis pour un mouvement de type réception.');
         }
+
+        $quantite = Arrondi::quantite((float) $quantite);
 
         return DB::transaction(function () use ($produit, $magasin, $quantite, $type, $auteur, $reference, $motif, $prixAchat) {
             $stock = Stock::query()
@@ -58,17 +60,17 @@ class StockService
                 ]);
             }
 
-            $ancienneQuantite = $stock->quantite;
-            $nouvelleQuantite = $ancienneQuantite + $quantite;
+            $ancienneQuantite = (float) $stock->quantite;
+            $nouvelleQuantite = Arrondi::quantite($ancienneQuantite + $quantite);
 
             if ($nouvelleQuantite < 0) {
-                throw new StockInsuffisantException($produit, $magasin, abs($quantite), $stock->quantite);
+                throw new StockInsuffisantException($produit, $magasin, abs($quantite), $ancienneQuantite);
             }
 
             if ($type === MouvementStockType::Reception) {
-                $stock->cout_moyen_pondere = $stock->quantite > 0
+                $stock->cout_moyen_pondere = $ancienneQuantite > 0
                     ? Arrondi::entier(
-                        ($stock->quantite * $stock->cout_moyen_pondere + $quantite * $prixAchat) / $nouvelleQuantite
+                        ($ancienneQuantite * $stock->cout_moyen_pondere + $quantite * $prixAchat) / $nouvelleQuantite
                     )
                     : $prixAchat;
             }
@@ -106,12 +108,12 @@ class StockService
         });
     }
 
-    public function quantiteDisponible(Produit $produit, Magasin $magasin): int
+    public function quantiteDisponible(Produit $produit, Magasin $magasin): float
     {
-        return Stock::query()
+        return (float) (Stock::query()
             ->where('produit_id', $produit->id)
             ->where('magasin_id', $magasin->id)
-            ->value('quantite') ?? 0;
+            ->value('quantite') ?? 0);
     }
 
     public function coutMoyenPondere(Produit $produit, Magasin $magasin): int
@@ -129,7 +131,7 @@ class StockService
      * requête, tous les magasins actifs même sans ligne `stocks` (0 par
      * défaut) pour que la liste des lieux proposés reste complète.
      *
-     * @return \Illuminate\Support\Collection<int, array{id:int, nom:string, type:string, quantite:int}>
+     * @return \Illuminate\Support\Collection<int, array{id:int, nom:string, type:string, quantite:float}>
      */
     public function disponibiliteParMagasin(Produit $produit): \Illuminate\Support\Collection
     {
@@ -142,11 +144,11 @@ class StockService
                 'id' => $magasin->id,
                 'nom' => $magasin->nom,
                 'type' => $magasin->type,
-                'quantite' => (int) ($quantitesParMagasin[$magasin->id] ?? 0),
+                'quantite' => (float) ($quantitesParMagasin[$magasin->id] ?? 0),
             ]);
     }
 
-    private function notifierStockSousSeuil(Produit $produit, Magasin $magasin, int $quantite): void
+    private function notifierStockSousSeuil(Produit $produit, Magasin $magasin, int|float $quantite): void
     {
         $destinataires = User::gerantsEtSuperadmins($magasin->id);
 

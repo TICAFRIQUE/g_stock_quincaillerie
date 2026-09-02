@@ -26,7 +26,7 @@ class RetourVenteService
     ) {}
 
     /**
-     * @param  array<int, array{ligne_vente_id:int, quantite_pieces:int}>  $lignes
+     * @param  array<int, array{ligne_vente_id:int, quantite_pieces:int|float}>  $lignes
      */
     public function retourner(Vente $vente, array $lignes, User $auteur, ?string $motif = null): RetourVente
     {
@@ -74,9 +74,9 @@ class RetourVenteService
                     throw new InvalidArgumentException('Ligne de vente introuvable sur cette facture.');
                 }
 
-                $quantiteAvant = (int) ($dejaRetourne[$ligneVente->id] ?? 0);
-                $quantiteRestante = $ligneVente->quantite_pieces - $quantiteAvant;
-                $quantiteRetour = (int) $demande['quantite_pieces'];
+                $quantiteAvant = (float) ($dejaRetourne[$ligneVente->id] ?? 0);
+                $quantiteRestante = (float) $ligneVente->quantite_pieces - $quantiteAvant;
+                $quantiteRetour = (float) $demande['quantite_pieces'];
 
                 if ($quantiteRetour > $quantiteRestante) {
                     throw new QuantiteRetourInvalideException($ligneVente, $quantiteRetour, $quantiteRestante);
@@ -124,7 +124,7 @@ class RetourVenteService
      * (pas incrément par incrément) pour que la somme de plusieurs retours
      * partiels converge exactement vers total_ligne sans dérive d'arrondi.
      */
-    private function montantTelescope(int $totalLigne, int $quantitePiecesTotal, int $quantiteAvant, int $quantiteRetour): int
+    private function montantTelescope(int $totalLigne, int|float $quantitePiecesTotal, int|float $quantiteAvant, int|float $quantiteRetour): int
     {
         if ($quantitePiecesTotal <= 0) {
             return 0;

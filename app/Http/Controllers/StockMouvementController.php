@@ -9,6 +9,7 @@ use App\Models\MouvementStock;
 use App\Models\Produit;
 use App\Models\Stock;
 use App\Services\StockService;
+use App\Support\Decimal;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -62,12 +63,14 @@ class StockMouvementController extends Controller
 
     public function store(Request $request, StockService $stockService): RedirectResponse
     {
+        $request->merge(['quantite' => Decimal::normaliser($request->input('quantite'))]);
+
         $donnees = $request->validate([
             'type' => ['required', 'in:casse,ajustement'],
             'direction' => ['required_if:type,ajustement', 'in:entree,sortie'],
             'produit_id' => ['required', 'exists:produits,id'],
             'magasin_id' => ['required', 'exists:magasins,id'],
-            'quantite' => ['required', 'integer', 'min:1'],
+            'quantite' => ['required', 'numeric', 'min:0.001'],
             'motif' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -79,7 +82,7 @@ class StockMouvementController extends Controller
             $stockService->enregistrerMouvement(
                 produit: Produit::findOrFail($donnees['produit_id']),
                 magasin: Magasin::findOrFail($donnees['magasin_id']),
-                quantite: $signe * $donnees['quantite'],
+                quantite: $signe * (float) $donnees['quantite'],
                 type: $type,
                 auteur: $request->user(),
                 motif: $donnees['motif'] ?: ($estCasse ? 'Casse' : 'Ajustement manuel'),

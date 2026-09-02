@@ -94,7 +94,7 @@
                     @forelse ($lignes as $ligne)
                         <tr>
                             <td>{{ $ligne->nom }} <code class="small">{{ $ligne->sku }}</code></td>
-                            <td>{{ $ligne->pieces }}</td>
+                            <td>{{ quantite($ligne->pieces) }}</td>
                             <td>{{ montant($ligne->ventes_total) }}</td>
                             <td>{{ montant($ligne->cout_total) }}</td>
                             <td class="{{ $ligne->marge >= 0 ? 'text-success' : 'text-danger' }} fw-medium">

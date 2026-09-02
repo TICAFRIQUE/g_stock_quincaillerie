@@ -54,12 +54,12 @@
                     <td>{{ $stock->produit->sku }}</td>
                     <td>{{ $stock->magasin->nom }}</td>
                     <td class="text-end">
-                        {{ $stock->quantite }} {{ $stock->produit->unite_base_libelle_complet }}
+                        {{ quantite($stock->quantite) }} {{ $stock->produit->unite_base_libelle_complet }}
                         @if ($repartition)
                             <br><span style="font-style: italic; font-size: 9px; color: #666;">
                                 dont
                                 @if ($repartition['reste'] > 0)
-                                    {{ $repartition['reste'] }} {{ $stock->produit->unite_base_libelle_complet }} et
+                                    {{ quantite($repartition['reste']) }} {{ $stock->produit->unite_base_libelle_complet }} et
                                 @endif
                                 {{ $repartition['nombre'] }} {{ $repartition['unite']->libelle }}
                             </span>

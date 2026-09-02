@@ -12,7 +12,7 @@ class LigneDevis extends Model
     protected function casts(): array
     {
         return [
-            'quantite' => 'integer',
+            'quantite' => 'decimal:3',
             'remise_valeur' => 'integer',
         ];
     }

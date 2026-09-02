@@ -7,6 +7,7 @@ use App\Models\Magasin;
 use App\Models\Produit;
 use App\Models\Transfert;
 use App\Models\User;
+use App\Support\Arrondi;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -23,12 +24,14 @@ class TransfertService
         Produit $produit,
         Magasin $magasinSource,
         Magasin $magasinDestination,
-        int $quantite,
+        int|float $quantite,
         User $auteur,
     ): Transfert {
         if ($magasinSource->is($magasinDestination)) {
             throw new InvalidArgumentException('Le magasin source et le magasin destination doivent être différents.');
         }
+
+        $quantite = Arrondi::quantite((float) $quantite);
 
         if ($quantite <= 0) {
             throw new InvalidArgumentException('La quantité transférée doit être positive.');

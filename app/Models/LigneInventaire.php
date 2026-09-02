@@ -15,9 +15,9 @@ class LigneInventaire extends Model
     protected function casts(): array
     {
         return [
-            'quantite_theorique' => 'integer',
-            'quantite_comptee' => 'integer',
-            'ecart' => 'integer',
+            'quantite_theorique' => 'decimal:3',
+            'quantite_comptee' => 'decimal:3',
+            'ecart' => 'decimal:3',
         ];
     }
 

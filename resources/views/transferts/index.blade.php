@@ -30,7 +30,7 @@
                             <td>{{ $transfert->produit->libelle_affichage }} <code class="small">{{ $transfert->produit->sku }}</code></td>
                             <td>{{ $transfert->magasinSource->nom }}</td>
                             <td>{{ $transfert->magasinDestination->nom }}</td>
-                            <td>{{ $transfert->quantite }} pièces</td>
+                            <td>{{ quantite($transfert->quantite) }} pièces</td>
                             <td>{{ $transfert->auteur->name }}</td>
                         </tr>
                     @empty

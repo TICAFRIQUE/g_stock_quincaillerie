@@ -30,7 +30,7 @@
             <div class="card h-100">
                 <div class="card-body">
                     <div class="text-secondary small">Pièces en stock</div>
-                    <div class="fs-5 fw-medium">{{ number_format($kpis['totalPieces'], 0, ',', ' ') }}</div>
+                    <div class="fs-5 fw-medium">{{ quantite($kpis['totalPieces']) }}</div>
                 </div>
             </div>
         </div>
@@ -115,7 +115,7 @@
                             <td>{{ $stock->produit->libelle_affichage }} <code class="small">{{ $stock->produit->sku }}</code></td>
                             <td>{{ $stock->magasin->nom }}</td>
                             <td>
-                                {{ $stock->quantite }} {{ $stock->produit->unite_base_libelle_complet }}
+                                {{ quantite($stock->quantite) }} {{ $stock->produit->unite_base_libelle_complet }}
                                 @if ($sousSeuil)
                                     <i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="Sous le seuil d'alerte"></i>
                                 @endif
@@ -124,7 +124,7 @@
                                     <span class="small fst-italic text-secondary">
                                         dont
                                         @if ($repartition['reste'] > 0)
-                                            {{ $repartition['reste'] }} {{ $stock->produit->unite_base_libelle_complet }} et
+                                            {{ quantite($repartition['reste']) }} {{ $stock->produit->unite_base_libelle_complet }} et
                                         @endif
                                         {{ $repartition['nombre'] }} {{ $repartition['unite']->libelle }}
                                     </span>

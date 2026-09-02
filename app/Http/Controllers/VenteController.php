@@ -30,6 +30,7 @@ use App\Services\CompteClientService;
 use App\Services\DevisService;
 use App\Services\StockService;
 use App\Services\VenteService;
+use App\Support\Decimal;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -103,7 +104,7 @@ class VenteController extends Controller
         $produits = Produit::catalogueVente()
             ->map(fn (array $p) => [
                 ...$p,
-                'stock' => (int) ($stocksParProduit[$p['id']] ?? 0),
+                'stock' => (float) ($stocksParProduit[$p['id']] ?? 0),
             ])
             ->values();
 
@@ -126,7 +127,7 @@ class VenteController extends Controller
                     'produitLibelle' => $produit['libelle_affichage'] ?? '',
                     'uniteLibelle' => $unite['libelle'] ?? null,
                     'facteur' => $unite['facteur'] ?? 1,
-                    'quantite' => (int) $ligne['quantite'],
+                    'quantite' => (float) $ligne['quantite'],
                     'prixUnitaire' => $unite['prix'] ?? ($produit['prix_piece'] ?? 0),
                     'remise_type' => $ligne['remise_type'] ?? '',
                     'remise_valeur' => ($ligne['remise_valeur'] ?? '') !== '' ? (int) $ligne['remise_valeur'] : null,
@@ -151,7 +152,7 @@ class VenteController extends Controller
                 'produitLibelle' => $ligne->produit->libelle_affichage,
                 'uniteLibelle' => $ligne->uniteVente?->libelle,
                 'facteur' => $ligne->uniteVente?->facteur ?? 1,
-                'quantite' => $ligne->quantite,
+                'quantite' => (float) $ligne->quantite,
                 'prixUnitaire' => $ligne->uniteVente?->prix ?? $ligne->produit->prix_piece,
                 // Remise indicative du devis reprise comme point de départ,
                 // modifiable avant finalisation (jamais figée, règle 15).
@@ -166,7 +167,7 @@ class VenteController extends Controller
                     'produitLibelle' => $ligne->produit->libelle_affichage,
                     'uniteLibelle' => $ligne->uniteVente?->libelle,
                     'facteur' => $ligne->uniteVente?->facteur ?? 1,
-                    'quantite' => $ligne->quantite,
+                    'quantite' => (float) $ligne->quantite,
                     'prixUnitaire' => $ligne->uniteVente?->prix ?? $ligne->produit->prix_piece,
                     'remise_type' => '',
                     'remise_valeur' => null,
@@ -235,7 +236,7 @@ class VenteController extends Controller
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
             'lignes.*.taxe_id' => ['nullable', 'exists:taxes,id'],
             'lignes.*.magasin_source_id' => ['required', 'exists:magasins,id'],
-            'lignes.*.quantite' => ['required', 'integer', 'min:1'],
+            'lignes.*.quantite' => ['required', 'numeric', 'min:0.001'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
             'lignes.*.prix_personnalise' => ['nullable', 'boolean'],
@@ -289,7 +290,7 @@ class VenteController extends Controller
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
             'lignes.*.taxe_id' => ['nullable', 'exists:taxes,id'],
             'lignes.*.magasin_source_id' => ['required', 'exists:magasins,id'],
-            'lignes.*.quantite' => ['required', 'integer', 'min:1'],
+            'lignes.*.quantite' => ['required', 'numeric', 'min:0.001'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
             'lignes.*.prix_personnalise' => ['nullable', 'boolean'],
@@ -659,6 +660,7 @@ class VenteController extends Controller
             $ligne['magasin_source_id'] = ($ligne['magasin_source_id'] ?? null) ?: null;
             $ligne['remise_type'] = ($ligne['remise_type'] ?? null) ?: null;
             $ligne['remise_valeur'] = ($ligne['remise_valeur'] ?? null) ?: null;
+            $ligne['quantite'] = Decimal::normaliser($ligne['quantite'] ?? null);
 
             return $ligne;
         })->all();

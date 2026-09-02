@@ -151,7 +151,7 @@
                     <td>{{ $ligne->produit->libelle_affichage }}</td>
                     <td>{{ $ligne->uniteVente->unite->nom_avec_abbreviation ?? $ligne->produit->unite_base_libelle }}</td>
                     <td>{{ $ligne->magasinDestination->nom }}</td>
-                    <td class="text-end">{{ $ligne->quantite }}</td>
+                    <td class="text-end">{{ quantite($ligne->quantite) }}</td>
                     <td class="text-end">{{ montant($ligne->prix_achat) }}</td>
                     <td>{{ $ligne->taxe->nom ?? '—' }}</td>
                     <td class="text-end">{{ montant($ligne->montantHt()) }}</td>

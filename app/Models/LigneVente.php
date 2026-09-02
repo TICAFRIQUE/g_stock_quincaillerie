@@ -23,8 +23,8 @@ class LigneVente extends Model
     protected function casts(): array
     {
         return [
-            'quantite' => 'integer',
-            'quantite_pieces' => 'integer',
+            'quantite' => 'decimal:3',
+            'quantite_pieces' => 'decimal:3',
             'prix_unitaire_applique' => 'integer',
             'cout_applique' => 'integer',
             'sous_total_ligne' => 'integer',
@@ -44,11 +44,11 @@ class LigneVente extends Model
      */
     public function prixUnitaireEffectif(): int
     {
-        if (! $this->prix_personnalise || $this->quantite === 0) {
+        if (! $this->prix_personnalise || (float) $this->quantite === 0.0) {
             return $this->prix_unitaire_applique;
         }
 
-        return $this->prix_unitaire_applique - intdiv($this->remise_ligne_montant, $this->quantite);
+        return $this->prix_unitaire_applique - Arrondi::entier($this->remise_ligne_montant / (float) $this->quantite);
     }
 
     public function vente(): BelongsTo

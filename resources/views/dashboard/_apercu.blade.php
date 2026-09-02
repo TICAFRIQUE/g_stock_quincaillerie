@@ -192,7 +192,7 @@
                                 <tr>
                                     <td>{{ $stock->produit->libelle_affichage }}</td>
                                     <td>{{ $stock->magasin->nom }}</td>
-                                    <td class="text-danger fw-medium">{{ $stock->quantite }}</td>
+                                    <td class="text-danger fw-medium">{{ quantite($stock->quantite) }}</td>
                                     <td>{{ $stock->produit->seuil_alerte }}</td>
                                 </tr>
                             @endforeach

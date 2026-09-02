@@ -13,6 +13,7 @@ use App\Models\Produit;
 use App\Models\Taxe;
 use App\Models\UniteVente;
 use App\Services\AchatService;
+use App\Support\Decimal;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -123,7 +124,7 @@ class CommandeAchatController extends Controller
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
             'lignes.*.taxe_id' => ['nullable', 'exists:taxes,id'],
             'lignes.*.magasin_destination_id' => ['required', 'exists:magasins,id'],
-            'lignes.*.quantite' => ['required', 'integer', 'min:1'],
+            'lignes.*.quantite' => ['required', 'numeric', 'min:0.001'],
             'lignes.*.prix_achat' => ['required', 'integer', 'min:0'],
         ])['lignes'];
 
@@ -249,7 +250,7 @@ class CommandeAchatController extends Controller
             $feuille->setCellValue("A{$ligne}", $ligneAchat->produit->libelle_affichage);
             $feuille->setCellValue("B{$ligne}", $ligneAchat->uniteVente->unite->nom_avec_abbreviation ?? $ligneAchat->produit->unite_base_libelle);
             $feuille->setCellValue("C{$ligne}", $ligneAchat->magasinDestination->nom);
-            $feuille->setCellValue("D{$ligne}", $ligneAchat->quantite);
+            $feuille->setCellValue("D{$ligne}", (float) $ligneAchat->quantite);
             $feuille->setCellValue("E{$ligne}", $ligneAchat->prix_achat);
             $feuille->setCellValue("F{$ligne}", $ligneAchat->taxe->nom ?? '—');
             $feuille->setCellValue("G{$ligne}", $ligneAchat->montantHt());
@@ -384,6 +385,7 @@ class CommandeAchatController extends Controller
         $lignes = collect($request->input('lignes', []))->map(function (array $ligne) {
             $ligne['unite_vente_id'] = ($ligne['unite_vente_id'] ?? null) ?: null;
             $ligne['taxe_id'] = ($ligne['taxe_id'] ?? null) ?: null;
+            $ligne['quantite'] = Decimal::normaliser($ligne['quantite'] ?? null);
 
             return $ligne;
         })->all();

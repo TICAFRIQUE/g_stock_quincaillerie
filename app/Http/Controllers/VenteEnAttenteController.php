@@ -12,6 +12,7 @@ use App\Models\Client;
 use App\Models\SessionCaisse;
 use App\Models\VenteEnAttente;
 use App\Services\VenteEnAttenteService;
+use App\Support\Decimal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -51,7 +52,7 @@ class VenteEnAttenteController extends Controller
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
             'lignes.*.magasin_source_id' => ['nullable', 'exists:magasins,id'],
-            'lignes.*.quantite' => ['required', 'integer', 'min:1'],
+            'lignes.*.quantite' => ['required', 'numeric', 'min:0.001'],
             'libelle' => ['nullable', 'string', 'max:255'],
             'client_id' => ['nullable', 'exists:clients,id'],
         ]);
@@ -89,7 +90,7 @@ class VenteEnAttenteController extends Controller
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
             'lignes.*.magasin_source_id' => ['nullable', 'exists:magasins,id'],
-            'lignes.*.quantite' => ['required', 'integer', 'min:1'],
+            'lignes.*.quantite' => ['required', 'numeric', 'min:0.001'],
             'libelle' => ['nullable', 'string', 'max:255'],
             'client_id' => ['nullable', 'exists:clients,id'],
         ]);
@@ -130,7 +131,7 @@ class VenteEnAttenteController extends Controller
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
             'lignes.*.taxe_id' => ['nullable', 'exists:taxes,id'],
             'lignes.*.magasin_source_id' => ['required', 'exists:magasins,id'],
-            'lignes.*.quantite' => ['required', 'integer', 'min:1'],
+            'lignes.*.quantite' => ['required', 'numeric', 'min:0.001'],
             'lignes.*.remise_type' => ['nullable', 'in:montant,pourcentage'],
             'lignes.*.remise_valeur' => ['nullable', 'integer', 'min:0', $this->remisePourcentageMax()],
             'lignes.*.prix_personnalise' => ['nullable', 'boolean'],
@@ -183,6 +184,7 @@ class VenteEnAttenteController extends Controller
             $ligne['magasin_source_id'] = ($ligne['magasin_source_id'] ?? null) ?: null;
             $ligne['remise_type'] = ($ligne['remise_type'] ?? null) ?: null;
             $ligne['remise_valeur'] = ($ligne['remise_valeur'] ?? null) ?: null;
+            $ligne['quantite'] = Decimal::normaliser($ligne['quantite'] ?? null);
 
             return $ligne;
         })->all();

@@ -191,7 +191,7 @@
                                 {{ $ligne->produit->libelle_affichage }}
                                 <span class="text-secondary small">({{ $ligne->uniteVente?->libelle ?? $ligne->produit->unite_base_libelle }})</span>
                             </td>
-                            <td>{{ $ligne->quantite }}</td>
+                            <td>{{ quantite($ligne->quantite) }}</td>
                             <td class="text-end">{{ montant($ligne->prixUnitaireEffectif()) }}</td>
                             <td class="text-end text-danger">{{ (! $ligne->prix_personnalise && $ligne->remise_ligne_montant > 0) ? '− '.montant($ligne->remise_ligne_montant) : '—' }}</td>
                             @if ($venteTotalTaxes > 0)
@@ -200,8 +200,8 @@
                             <td class="text-end fw-medium">{{ montant($ligne->total_ligne) }}</td>
                             @php $ligneDejaLivre = $dejaLivreParLigne[$ligne->id] ?? 0; @endphp
                             <td>
-                                <span class="{{ $ligneDejaLivre >= $ligne->quantite_pieces ? 'text-success' : ($ligneDejaLivre > 0 ? 'text-warning-emphasis' : 'text-secondary') }}">
-                                    {{ $ligneDejaLivre }}/{{ $ligne->quantite_pieces }}
+                                <span class="{{ (float) $ligneDejaLivre >= (float) $ligne->quantite_pieces ? 'text-success' : ($ligneDejaLivre > 0 ? 'text-warning-emphasis' : 'text-secondary') }}">
+                                    {{ quantite($ligneDejaLivre) }}/{{ quantite($ligne->quantite_pieces) }}
                                 </span>
                             </td>
                         </tr>
@@ -288,7 +288,7 @@
                         @endif
                         @foreach ($retour->lignes as $ligneRetour)
                             <div class="d-flex justify-content-between text-secondary ps-4">
-                                <span>{{ $ligneRetour->produit->libelle_affichage }} × {{ $ligneRetour->quantite_pieces }}</span>
+                                <span>{{ $ligneRetour->produit->libelle_affichage }} × {{ quantite($ligneRetour->quantite_pieces) }}</span>
                                 <span>{{ montant($ligneRetour->montant) }}</span>
                             </div>
                         @endforeach
@@ -324,7 +324,7 @@
                                 <td>
                                     @foreach ($bonLivraison->lignes as $ligneBonLivraison)
                                         <div class="small {{ $loop->last ? '' : 'mb-1' }}">
-                                            {{ $ligneBonLivraison->produit->libelle_affichage }} × {{ $ligneBonLivraison->quantite_pieces }}
+                                            {{ $ligneBonLivraison->produit->libelle_affichage }} × {{ quantite($ligneBonLivraison->quantite_pieces) }}
                                             <span class="text-secondary">({{ $ligneBonLivraison->magasin->nom }})</span>
                                         </div>
                                     @endforeach
@@ -414,7 +414,7 @@
                                 {{ $ligne->produit->libelle_affichage }}
                                 <span class="text-secondary small">({{ $ligne->uniteVente?->libelle ?? $ligne->produit->unite_base_libelle }})</span>
                                 <br>
-                                <span class="text-secondary small">{{ $ligne->quantite }} × {{ montant($ligne->prixUnitaireEffectif()) }}</span>
+                                <span class="text-secondary small">{{ quantite($ligne->quantite) }} × {{ montant($ligne->prixUnitaireEffectif()) }}</span>
                                 @if (! $ligne->prix_personnalise && $ligne->remise_ligne_montant > 0)
                                     <br><span class="text-danger small">Remise : − {{ montant($ligne->remise_ligne_montant) }}</span>
                                 @endif
@@ -561,7 +561,7 @@
                     <tr>
                         <td>{{ $ligne->produit->libelle_affichage }}</td>
                         <td>{{ $ligne->uniteVente->libelle ?? $ligne->produit->unite_base_libelle }}</td>
-                        <td class="text-end">{{ $ligne->quantite }}</td>
+                        <td class="text-end">{{ quantite($ligne->quantite) }}</td>
                         <td class="text-end">{{ montant($ligne->prix_unitaire_applique) }}</td>
                         <td class="text-end">{{ $ligne->remise_ligne_montant > 0 ? '− '.montant($ligne->remise_ligne_montant) : '—' }}</td>
                         <td class="text-end">{{ montant($ligne->total_ligne) }}</td>
@@ -764,12 +764,12 @@
                                                     {{ $ligne->produit->libelle_affichage }}
                                                     <input type="hidden" name="lignes[{{ $ligne->id }}][ligne_vente_id]" value="{{ $ligne->id }}">
                                                 </td>
-                                                <td class="text-end">{{ $ligne->quantite_pieces }}</td>
-                                                <td class="text-end">{{ $dejaRetourne }}</td>
+                                                <td class="text-end">{{ quantite($ligne->quantite_pieces) }}</td>
+                                                <td class="text-end">{{ quantite($dejaRetourne) }}</td>
                                                 <td>
                                                     <input type="number" name="lignes[{{ $ligne->id }}][quantite_pieces]"
                                                            x-model.number="lignes[{{ $ligne->id }}]"
-                                                           min="0" max="{{ $ligne->quantite_pieces - $dejaRetourne }}"
+                                                           min="0" step="0.001" max="{{ (float) $ligne->quantite_pieces - $dejaRetourne }}"
                                                            class="form-control form-control-sm text-end">
                                                 </td>
                                             </tr>
@@ -831,13 +831,13 @@
                                                     {{ $ligne->produit->libelle_affichage }}
                                                     <input type="hidden" name="lignes[{{ $ligne->id }}][ligne_vente_id]" value="{{ $ligne->id }}">
                                                 </td>
-                                                <td class="text-end">{{ $ligne->quantite_pieces }}</td>
-                                                <td class="text-end">{{ $dejaLivre }}</td>
-                                                <td class="text-end">{{ $ligne->quantite_pieces - $dejaLivre }}</td>
+                                                <td class="text-end">{{ quantite($ligne->quantite_pieces) }}</td>
+                                                <td class="text-end">{{ quantite($dejaLivre) }}</td>
+                                                <td class="text-end">{{ quantite((float) $ligne->quantite_pieces - $dejaLivre) }}</td>
                                                 <td>
                                                     <input type="number" name="lignes[{{ $ligne->id }}][quantite_pieces]"
                                                            x-model.number="lignes[{{ $ligne->id }}]"
-                                                           min="0" max="{{ $ligne->quantite_pieces - $dejaLivre }}"
+                                                           min="0" step="0.001" max="{{ (float) $ligne->quantite_pieces - $dejaLivre }}"
                                                            class="form-control form-control-sm text-end">
                                                 </td>
                                             </tr>

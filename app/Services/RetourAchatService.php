@@ -25,7 +25,7 @@ class RetourAchatService
     ) {}
 
     /**
-     * @param  array<int, array{ligne_commande_achat_id:int, quantite_pieces:int}>  $lignes
+     * @param  array<int, array{ligne_commande_achat_id:int, quantite_pieces:int|float}>  $lignes
      */
     public function retourner(CommandeAchat $commandeAchat, array $lignes, User $auteur, ?string $motif = null): RetourAchat
     {
@@ -71,9 +71,9 @@ class RetourAchatService
                     throw new InvalidArgumentException("Ligne de commande introuvable sur ce bon d'achat.");
                 }
 
-                $quantiteAvant = (int) ($dejaRetourne[$ligne->id] ?? 0);
-                $quantiteRestante = $ligne->quantite_pieces - $quantiteAvant;
-                $quantiteRetour = (int) $demande['quantite_pieces'];
+                $quantiteAvant = (float) ($dejaRetourne[$ligne->id] ?? 0);
+                $quantiteRestante = (float) $ligne->quantite_pieces - $quantiteAvant;
+                $quantiteRetour = (float) $demande['quantite_pieces'];
 
                 if ($quantiteRetour > $quantiteRestante) {
                     throw new QuantiteRetourInvalideException($ligne, $quantiteRetour, $quantiteRestante);
@@ -115,7 +115,7 @@ class RetourAchatService
         });
     }
 
-    private function montantTelescope(int $totalLigne, int $quantitePiecesTotal, int $quantiteAvant, int $quantiteRetour): int
+    private function montantTelescope(int $totalLigne, int|float $quantitePiecesTotal, int|float $quantiteAvant, int|float $quantiteRetour): int
     {
         if ($quantitePiecesTotal <= 0) {
             return 0;

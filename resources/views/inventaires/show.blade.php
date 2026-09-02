@@ -49,15 +49,15 @@
                     @forelse ($inventaire->lignes as $ligne)
                         <tr>
                             <td>{{ $ligne->produit->libelle_affichage }} <code class="small">{{ $ligne->produit->sku }}</code></td>
-                            <td>{{ $ligne->quantite_theorique }}</td>
-                            <td>{{ $ligne->quantite_comptee }}</td>
+                            <td>{{ quantite($ligne->quantite_theorique) }}</td>
+                            <td>{{ quantite($ligne->quantite_comptee) }}</td>
                             <td>
-                                @if ($ligne->ecart === 0)
+                                @if ((float) $ligne->ecart === 0.0)
                                     <span class="text-secondary">0</span>
                                 @elseif ($ligne->ecart > 0)
-                                    <span class="text-success fw-medium">+{{ $ligne->ecart }}</span>
+                                    <span class="text-success fw-medium">+{{ quantite($ligne->ecart) }}</span>
                                 @else
-                                    <span class="text-danger fw-medium">{{ $ligne->ecart }}</span>
+                                    <span class="text-danger fw-medium">{{ quantite($ligne->ecart) }}</span>
                                 @endif
                             </td>
                         </tr>
@@ -91,7 +91,7 @@
                     </div>
                     <div class="col-3">
                         <label class="form-label small">Qté comptée<span class="required-marker">*</span></label>
-                        <input type="number" name="quantite_comptee" class="form-control form-control-sm" min="0" required>
+                        <input type="number" name="quantite_comptee" class="form-control form-control-sm" min="0" step="0.001" required>
                     </div>
                     <div class="col-2">
                         <button type="submit" class="btn btn-sm btn-primary w-100">

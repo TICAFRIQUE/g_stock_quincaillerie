@@ -28,7 +28,7 @@ class BonLivraisonController extends Controller
             'motif' => ['nullable', 'string', 'max:500'],
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.ligne_vente_id' => ['required', Rule::exists('ligne_ventes', 'id')->where('vente_id', $vente->id)],
-            'lignes.*.quantite_pieces' => ['required', 'integer', 'min:0'],
+            'lignes.*.quantite_pieces' => ['required', 'numeric', 'min:0'],
         ]);
 
         try {

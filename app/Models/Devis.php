@@ -110,7 +110,7 @@ class Devis extends Model
 
         foreach ($this->lignes as $ligne) {
             $prixUnitaire = $ligne->uniteVente?->prix ?? $ligne->produit->prix_piece;
-            $sousTotalLigne = $prixUnitaire * $ligne->quantite;
+            $sousTotalLigne = Arrondi::entier($prixUnitaire * (float) $ligne->quantite);
             $remiseLigne = Remise::resoudre($ligne->remise_type, $ligne->remise_valeur, $sousTotalLigne);
             $totalLigne = $sousTotalLigne - $remiseLigne;
             $sousTotal += $totalLigne;
@@ -127,7 +127,7 @@ class Devis extends Model
      * est insuffisant partout, plutôt que de laisser échouer la vente après
      * coup — suppose lignes.produit et lignes.uniteVente chargées.
      *
-     * @return Collection<int, array{ligne: LigneDevis, demande: int, disponible: int}>
+     * @return Collection<int, array{ligne: LigneDevis, demande: float, disponible: float}>
      */
     public function lignesEnRuptureDeStock(): Collection
     {
@@ -139,8 +139,8 @@ class Devis extends Model
 
         return $this->lignes
             ->map(function (LigneDevis $ligne) use ($stocksParProduit) {
-                $demande = $ligne->quantite * ($ligne->uniteVente->facteur ?? 1);
-                $disponible = (int) ($stocksParProduit[$ligne->produit_id] ?? 0);
+                $demande = Arrondi::quantite((float) $ligne->quantite * ($ligne->uniteVente->facteur ?? 1));
+                $disponible = (float) ($stocksParProduit[$ligne->produit_id] ?? 0);
 
                 return ['ligne' => $ligne, 'demande' => $demande, 'disponible' => $disponible];
             })

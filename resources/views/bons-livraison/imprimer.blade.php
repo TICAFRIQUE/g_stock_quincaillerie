@@ -139,7 +139,7 @@
             @foreach ($bonLivraison->lignes as $ligne)
                 <tr>
                     <td>{{ $ligne->produit->libelle_affichage }}</td>
-                    <td class="text-end">{{ $ligne->quantite_pieces }}</td>
+                    <td class="text-end">{{ quantite($ligne->quantite_pieces) }}</td>
                     <td>{{ $ligne->magasin->nom }}</td>
                 </tr>
             @endforeach

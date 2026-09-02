@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\MetEnFormePhrase;
+use App\Support\Arrondi;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -75,7 +76,7 @@ class Produit extends Model implements HasMedia
     protected function libelleAvecPrix(): Attribute
     {
         return Attribute::make(
-            get: fn () => "{$this->libelle_affichage} — ".number_format($this->prix_piece, 0, ',', ' ').' F',
+            get: fn () => "{$this->libelle_affichage} — ".montant($this->prix_piece),
         );
     }
 
@@ -116,10 +117,12 @@ class Produit extends Model implements HasMedia
      * inférieure au facteur de la plus petite d'entre elles (rien d'utile à
      * afficher). Suppose la relation uniteVentes déjà chargée.
      *
-     * @return array{unite: UniteVente, nombre: int, reste: int}|null
+     * @return array{unite: UniteVente, nombre: int, reste: float}|null
      */
-    public function repartirQuantite(int $quantitePieces): ?array
+    public function repartirQuantite(int|float $quantitePieces): ?array
     {
+        $quantitePieces = (float) $quantitePieces;
+
         $uniteDominante = $this->uniteVentes
             ->where('actif', true)
             ->sortByDesc('facteur')
@@ -131,8 +134,8 @@ class Produit extends Model implements HasMedia
 
         return [
             'unite' => $uniteDominante,
-            'nombre' => intdiv($quantitePieces, $uniteDominante->facteur),
-            'reste' => $quantitePieces % $uniteDominante->facteur,
+            'nombre' => (int) floor($quantitePieces / $uniteDominante->facteur),
+            'reste' => Arrondi::quantite(fmod($quantitePieces, $uniteDominante->facteur)),
         ];
     }
 

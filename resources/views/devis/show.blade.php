@@ -152,12 +152,12 @@
                                 <div class="d-flex flex-column">
                                     @foreach ($stocksParProduit[$ligne->produit_id] ?? [] as $source)
                                         <span class="small">
-                                            <span class="text-secondary">{{ $source['nom'] }}{{ $source['type'] === 'depot' ? ' (dépôt)' : '' }} : </span><span class="{{ $source['quantite'] === 0 ? 'text-danger' : 'text-secondary' }}">{{ $source['quantite'] }}</span>
+                                            <span class="text-secondary">{{ $source['nom'] }}{{ $source['type'] === 'depot' ? ' (dépôt)' : '' }} : </span><span class="{{ (float) $source['quantite'] === 0.0 ? 'text-danger' : 'text-secondary' }}">{{ quantite($source['quantite']) }}</span>
                                         </span>
                                     @endforeach
                                 </div>
                             </td>
-                            <td>{{ $ligne->quantite }}</td>
+                            <td>{{ quantite($ligne->quantite) }}</td>
                             <td class="text-end">{{ montant($prixUnitaire) }}</td>
                             <td class="text-end text-danger">{{ $remiseLigne > 0 ? '− '.montant($remiseLigne) : '—' }}</td>
                             @if ($montants['total_taxes'] > 0)
@@ -242,7 +242,7 @@
                     <tr>
                         <td>{{ $ligne->produit->libelle_affichage }}</td>
                         <td>{{ $ligne->uniteVente->libelle ?? $ligne->produit->unite_base_libelle }}</td>
-                        <td class="text-end">{{ $ligne->quantite }}</td>
+                        <td class="text-end">{{ quantite($ligne->quantite) }}</td>
                         <td class="text-end">{{ montant($prixUnitaire) }}</td>
                         <td class="text-end">{{ $remiseLigne > 0 ? '− '.montant($remiseLigne) : '—' }}</td>
                         <td class="text-end">{{ montant($sousTotalLigne - $remiseLigne) }}</td>

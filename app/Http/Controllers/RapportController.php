@@ -17,6 +17,7 @@ use App\Models\SessionCaisse;
 use App\Models\Stock;
 use App\Models\User;
 use App\Models\Vente;
+use App\Support\Arrondi;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -128,8 +129,8 @@ class RapportController extends Controller
                 $v->magasin->nom,
                 $v->sessionCaisse->caisse->nom,
                 $v->caissier->name,
-                number_format($v->total_net, 0, ',', ' ').' F',
-                $v->avoir_applique > 0 ? number_format($v->avoir_applique, 0, ',', ' ').' F' : '—',
+                montant($v->total_net),
+                $v->avoir_applique > 0 ? montant($v->avoir_applique) : '—',
                 $this->statutLivraisonLibelle($v),
             ]),
             'rapport-ventes.pdf',
@@ -175,7 +176,7 @@ class RapportController extends Controller
 
         return $vente->entierementLivree()
             ? 'Entièrement livrée'
-            : $vente->quantiteLivreePieces().'/'.$vente->lignes->sum('quantite_pieces').' pièce(s)';
+            : quantite($vente->quantiteLivreePieces()).'/'.quantite($vente->lignes->sum('quantite_pieces')).' pièce(s)';
     }
 
     private function requeteVentesFiltree(Request $request, Carbon $debut, Carbon $fin, ?int $magasinId): \Illuminate\Database\Eloquent\Builder
@@ -209,10 +210,10 @@ class RapportController extends Controller
 
         return [
             'Nombre de ventes' => (string) (clone $requeteTotaux)->count(),
-            'Total net' => number_format((int) (clone $requeteTotaux)->sum('total_net'), 0, ',', ' ').' F',
-            'Total dû (crédit)' => number_format($totalDu, 0, ',', ' ').' F',
-            'Avoirs appliqués' => number_format((int) (clone $requeteTotaux)->sum('avoir_applique'), 0, ',', ' ').' F',
-            'Total en caisse (espèces)' => number_format($this->totalEspecesFiltre($request, $debut, $fin, $magasinId), 0, ',', ' ').' F',
+            'Total net' => montant((int) (clone $requeteTotaux)->sum('total_net')),
+            'Total dû (crédit)' => montant($totalDu),
+            'Avoirs appliqués' => montant((int) (clone $requeteTotaux)->sum('avoir_applique')),
+            'Total en caisse (espèces)' => montant($this->totalEspecesFiltre($request, $debut, $fin, $magasinId)),
         ];
     }
 
@@ -244,9 +245,9 @@ class RapportController extends Controller
             ['Produit', 'SKU', 'Pièces vendues', 'Ventes', 'Coût', 'Marge'],
             $this->ligneMargeFiltree($request, $debut, $fin, $magasinId)->map(fn ($l) => [
                 $l->nom, $l->sku, $l->pieces,
-                number_format($l->ventes_total, 0, ',', ' ').' F',
-                number_format($l->cout_total, 0, ',', ' ').' F',
-                number_format($l->marge, 0, ',', ' ').' F',
+                montant($l->ventes_total),
+                montant($l->cout_total),
+                montant($l->marge),
             ]),
             'rapport-marge.pdf',
             'Du '.$debut->format('d/m/Y').' au '.$fin->format('d/m/Y'),
@@ -296,7 +297,7 @@ class RapportController extends Controller
 
         return view('rapports.stock', [
             'parMagasin' => $parMagasin,
-            'valeurGlobale' => (int) $parMagasin->sum('valeur_totale'),
+            'valeurGlobale' => Arrondi::entier((float) $parMagasin->sum('valeur_totale')),
         ]);
     }
 
@@ -306,7 +307,7 @@ class RapportController extends Controller
             'Valeur du stock',
             ['Destination', 'Quantité (pièces)', 'Valeur (CMP)'],
             $this->parMagasinFiltre($request)->map(fn ($l) => [
-                $l->magasin_nom, $l->quantite_totale, number_format($l->valeur_totale, 0, ',', ' ').' F',
+                $l->magasin_nom, quantite($l->quantite_totale), montant($l->valeur_totale),
             ]),
             'rapport-stock.pdf',
         );
@@ -318,7 +319,7 @@ class RapportController extends Controller
             'Valeur du stock',
             ['Destination', 'Quantité (pièces)', 'Valeur (CMP)'],
             $this->parMagasinFiltre($request)->map(fn ($l) => [
-                $l->magasin_nom, $l->quantite_totale, $l->valeur_totale,
+                $l->magasin_nom, (float) $l->quantite_totale, (float) $l->valeur_totale,
             ]),
             'rapport-stock.xlsx',
         );
@@ -371,7 +372,7 @@ class RapportController extends Controller
                 $s->caisse->magasin->nom,
                 $s->caissier->name,
                 $s->date_cloture->format('d/m/Y H:i'),
-                number_format($s->ecart ?? 0, 0, ',', ' ').' F',
+                montant($s->ecart ?? 0),
             ]),
             'rapport-ecarts-caisse.pdf',
             'Du '.$debut->format('d/m/Y').' au '.$fin->format('d/m/Y'),
@@ -461,7 +462,7 @@ class RapportController extends Controller
                 $l->magasin_nom,
                 $this->decorerLigneJournal($l)->type_libelle,
                 $l->motif,
-                ($l->type === 'sortie' ? '− ' : '+ ').number_format($l->montant, 0, ',', ' ').' F',
+                ($l->type === 'sortie' ? '− ' : '+ ').montant($l->montant),
                 $l->auteur_nom ?? 'Utilisateur supprimé',
             ]),
             'rapport-mouvements-caisse.pdf',
@@ -520,9 +521,9 @@ class RapportController extends Controller
         )->get();
 
         return [
-            'Ventes en espèces' => number_format((int) $toutesLesLignes->where('type', 'vente')->sum('montant'), 0, ',', ' ').' F',
-            'Total entrées' => number_format((int) $toutesLesLignes->where('type', 'entree')->sum('montant'), 0, ',', ' ').' F',
-            'Total sorties' => number_format((int) $toutesLesLignes->where('type', 'sortie')->sum('montant'), 0, ',', ' ').' F',
+            'Ventes en espèces' => montant((int) $toutesLesLignes->where('type', 'vente')->sum('montant')),
+            'Total entrées' => montant((int) $toutesLesLignes->where('type', 'entree')->sum('montant')),
+            'Total sorties' => montant((int) $toutesLesLignes->where('type', 'sortie')->sum('montant')),
         ];
     }
 
@@ -572,7 +573,7 @@ class RapportController extends Controller
                 $e->compteTresorerie->nom,
                 $e->type->libelle(),
                 $e->motif ?? '—',
-                ($e->montant >= 0 ? '+ ' : '− ').number_format(abs($e->montant), 0, ',', ' ').' F',
+                ($e->montant >= 0 ? '+ ' : '− ').montant(abs($e->montant)),
                 $e->auteur?->name ?? 'Utilisateur supprimé',
             ]),
             'rapport-tresorerie.pdf',
@@ -614,9 +615,9 @@ class RapportController extends Controller
         $totalSorties = (int) (clone $requeteTotaux)->where('montant', '<', 0)->sum('montant');
 
         return [
-            'Total entrées' => number_format($totalEntrees, 0, ',', ' ').' F',
-            'Total sorties' => number_format(abs($totalSorties), 0, ',', ' ').' F',
-            'Solde net' => number_format($totalEntrees + $totalSorties, 0, ',', ' ').' F',
+            'Total entrées' => montant($totalEntrees),
+            'Total sorties' => montant(abs($totalSorties)),
+            'Solde net' => montant($totalEntrees + $totalSorties),
         ];
     }
 

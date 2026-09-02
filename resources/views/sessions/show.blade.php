@@ -291,7 +291,7 @@
                                         <span class="badge text-bg-success-subtle text-success-emphasis">Entièrement livrée</span>
                                     @else
                                         <span class="badge text-bg-warning-subtle text-warning-emphasis">
-                                            {{ $vente->quantiteLivreePieces() }}/{{ $vente->lignes->sum('quantite_pieces') }} pièce(s)
+                                            {{ quantite($vente->quantiteLivreePieces()) }}/{{ quantite($vente->lignes->sum('quantite_pieces')) }} pièce(s)
                                         </span>
                                     @endif
                                 @else

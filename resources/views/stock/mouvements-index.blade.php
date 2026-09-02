@@ -66,7 +66,7 @@
                             <td>{{ $mouvement->produit->libelle_affichage }} <code class="small">{{ $mouvement->produit->sku }}</code></td>
                             <td>{{ $mouvement->magasin->nom }}</td>
                             <td class="{{ $mouvement->quantite >= 0 ? 'text-success' : 'text-danger' }} fw-medium">
-                                {{ $mouvement->quantite >= 0 ? '+' : '' }}{{ $mouvement->quantite }}
+                                {{ $mouvement->quantite >= 0 ? '+' : '' }}{{ quantite($mouvement->quantite) }}
                             </td>
                             <td>{{ $mouvement->auteur->name }}</td>
                             <td>{{ $mouvement->motif ?? '—' }}</td>

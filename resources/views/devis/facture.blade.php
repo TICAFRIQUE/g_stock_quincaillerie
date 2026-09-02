@@ -146,7 +146,7 @@
                 <tr>
                     <td>{{ $ligne->produit->libelle_affichage }}</td>
                     <td>{{ $ligne->uniteVente->libelle ?? $ligne->produit->unite_base_libelle }}</td>
-                    <td class="text-end">{{ $ligne->quantite }}</td>
+                    <td class="text-end">{{ quantite($ligne->quantite) }}</td>
                     <td class="text-end">{{ montant($prixUnitaire) }}</td>
                     <td class="text-end">{{ $remiseLigne > 0 ? '− '.montant($remiseLigne) : '—' }}</td>
                     @if ($montants['total_taxes'] > 0)

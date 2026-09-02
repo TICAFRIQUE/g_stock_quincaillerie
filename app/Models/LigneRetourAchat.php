@@ -17,7 +17,7 @@ class LigneRetourAchat extends Model
     protected function casts(): array
     {
         return [
-            'quantite_pieces' => 'integer',
+            'quantite_pieces' => 'decimal:3',
             'montant' => 'integer',
         ];
     }

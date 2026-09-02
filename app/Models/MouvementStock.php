@@ -25,7 +25,7 @@ class MouvementStock extends Model
     {
         return [
             'type' => MouvementStockType::class,
-            'quantite' => 'integer',
+            'quantite' => 'decimal:3',
         ];
     }
 

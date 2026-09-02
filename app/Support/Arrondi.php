@@ -12,4 +12,17 @@ class Arrondi
     {
         return (int) floor($valeur + 0.5);
     }
+
+    /**
+     * Arrondi une quantité à 3 décimales (précision des colonnes
+     * decimal(12,3), voir migration ..._convertir_quantites_en_decimal) —
+     * évite qu'une imprécision flottante intermédiaire (ex. quantite ×
+     * facteur) ne fausse une comparaison de stock disponible avant que la
+     * valeur n'atteigne la colonne DECIMAL, qui arrondirait de toute façon
+     * mais seulement à l'insertion.
+     */
+    public static function quantite(float $valeur): float
+    {
+        return round($valeur, 3);
+    }
 }

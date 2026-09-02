@@ -44,6 +44,14 @@ function matcherCommencePar(params, data) {
     return correspond ? data : null;
 }
 
+// Arrondi à 3 décimales (précision des colonnes decimal(12,3), voir
+// App\Support\Arrondi::quantite() côté serveur) — évite qu'une imprécision
+// flottante JS (ex. 0.1 + 0.2) ne s'affiche ou ne se compare de travers
+// avant que le serveur ne revalide de toute façon.
+function arrondirQuantite(valeur) {
+    return Math.round(valeur * 1000) / 1000;
+}
+
 // Sélecteur recherchable (produits, etc.) — thème Bootstrap 5 cohérent avec le
 // reste de l'app. Un seul point d'appel pour ne pas répéter les options.
 window.initSelect2 = function (selector, options = {}) {
@@ -421,8 +429,8 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
         // explicite (bouton corbeille, retirerLigne()), jamais une
         // conséquence accidentelle d'un clic de trop sur "−".
         changerQuantite(ligne, delta) {
-            const nouvelle = ligne.quantite + delta;
-            if (nouvelle < 1) return;
+            const nouvelle = arrondirQuantite(ligne.quantite + delta);
+            if (nouvelle < 0.001) return;
             const dispo = this.stockDisponible(ligne);
             if (dispo !== null) {
                 const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * (ligne.facteur || 0);
@@ -432,7 +440,7 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
         },
 
         atteintMin(ligne) {
-            return ligne.quantite <= 1;
+            return ligne.quantite <= 0.001;
         },
 
         // Saisie manuelle (en plus des boutons −/+), déclenchée à chaque
@@ -441,8 +449,10 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
         // résolu directement en quantité maximale plutôt que testée un
         // incrément à la fois (sinon taper une grande quantité, ex. 50,
         // obligerait à cliquer "+" 50 fois). Un champ vide/en cours de
-        // frappe (parseInt non fini) ne force rien : on laisse taper plutôt
-        // que de faire sauter le champ à "1" à chaque touche effacée.
+        // frappe (parseFloat non fini) ne force rien : on laisse taper
+        // plutôt que de faire sauter le champ à une valeur à chaque touche
+        // effacée. Un point OU une virgule sont acceptés (habitude locale
+        // variable), toujours ramenés au point avant parseFloat.
         // `input` (l'élément DOM, passé par @input) est mis à jour
         // explicitement : si la quantité tapée (ex. "0") retombe sur la
         // MÊME valeur déjà en mémoire (ex. déjà 1), Alpine ne redéclenche
@@ -450,15 +460,15 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
         // le champ resterait visuellement sur "0" tapé alors que la
         // quantité réelle est bien 1 — d'où ce forçage manuel.
         definirQuantite(ligne, valeur, input = null) {
-            const nombre = parseInt(valeur, 10);
+            const nombre = parseFloat(String(valeur).replace(',', '.'));
             if (!Number.isFinite(nombre)) return;
-            let nouvelle = Math.max(1, nombre);
+            let nouvelle = Math.max(0.001, arrondirQuantite(nombre));
 
             const dispo = this.stockDisponible(ligne);
             if (dispo !== null) {
                 const facteur = ligne.facteur || 1;
                 const autresPieces = this.piecesReservees(ligne.produit_id, ligne.magasin_source_id) - ligne.quantite * facteur;
-                const maxQuantite = Math.max(1, Math.floor((dispo - autresPieces) / facteur));
+                const maxQuantite = Math.max(0.001, arrondirQuantite((dispo - autresPieces) / facteur));
                 nouvelle = Math.min(nouvelle, maxQuantite);
             }
 
@@ -471,7 +481,7 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
         // indéfinie — definirQuantite() n'y touche pas tant qu'on tape.
         // Même forçage explicite du DOM que definirQuantite() ci-dessus.
         validerQuantite(ligne, valeur, input = null) {
-            if (!Number.isFinite(parseInt(valeur, 10))) {
+            if (!Number.isFinite(parseFloat(String(valeur).replace(',', '.')))) {
                 ligne.quantite = 1;
                 if (input) input.value = 1;
             }
@@ -733,27 +743,29 @@ window.devisApp = function (produits, panierInitial = [], taxes = []) {
         // À 1, "−" ne fait plus rien (voir atteintMin) : retirer une ligne
         // reste un geste séparé et explicite (bouton corbeille).
         changerQuantite(ligne, delta) {
-            const nouvelle = ligne.quantite + delta;
-            if (nouvelle < 1) return;
+            const nouvelle = arrondirQuantite(ligne.quantite + delta);
+            if (nouvelle < 0.001) return;
             ligne.quantite = nouvelle;
         },
 
         atteintMin(ligne) {
-            return ligne.quantite <= 1;
+            return ligne.quantite <= 0.001;
         },
 
         // Saisie manuelle (en plus des boutons −/+), déclenchée à chaque
         // frappe (@input) pour agir immédiatement — un devis ne vérifie
         // jamais le stock (montants indicatifs, hors caisse — voir
-        // CLAUDE.md), donc juste un plancher à 1, pas de plafond. Un champ
-        // vide/en cours de frappe ne force rien (voir validerQuantite()).
-        // `input` forcé explicitement : si la valeur clampée (ex. "0" → 1)
-        // égale la quantité déjà en mémoire, Alpine ne redéclenche pas la
-        // liaison :value et le champ resterait visuellement sur "0" tapé.
+        // CLAUDE.md), donc juste un plancher, pas de plafond. Un point OU
+        // une virgule sont acceptés, toujours ramenés au point avant
+        // parseFloat. Un champ vide/en cours de frappe ne force rien (voir
+        // validerQuantite()). `input` forcé explicitement : si la valeur
+        // clampée (ex. "0" → 1) égale la quantité déjà en mémoire, Alpine ne
+        // redéclenche pas la liaison :value et le champ resterait
+        // visuellement sur "0" tapé.
         definirQuantite(ligne, valeur, input = null) {
-            const nombre = parseInt(valeur, 10);
+            const nombre = parseFloat(String(valeur).replace(',', '.'));
             if (!Number.isFinite(nombre)) return;
-            ligne.quantite = Math.max(1, nombre);
+            ligne.quantite = Math.max(0.001, arrondirQuantite(nombre));
             if (input) input.value = ligne.quantite;
         },
 
@@ -761,7 +773,7 @@ window.devisApp = function (produits, panierInitial = [], taxes = []) {
         // retombe sur 1, jamais une quantité indéfinie. Même forçage du DOM
         // que definirQuantite() ci-dessus.
         validerQuantite(ligne, valeur, input = null) {
-            if (!Number.isFinite(parseInt(valeur, 10))) {
+            if (!Number.isFinite(parseFloat(String(valeur).replace(',', '.')))) {
                 ligne.quantite = 1;
                 if (input) input.value = 1;
             }

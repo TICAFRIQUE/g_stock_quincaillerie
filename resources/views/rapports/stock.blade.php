@@ -37,7 +37,7 @@
                     @forelse ($parMagasin as $ligne)
                         <tr>
                             <td>{{ $ligne->magasin_nom }}</td>
-                            <td>{{ $ligne->quantite_totale }}</td>
+                            <td>{{ quantite($ligne->quantite_totale) }}</td>
                             <td>{{ montant($ligne->valeur_totale) }}</td>
                         </tr>
                     @empty

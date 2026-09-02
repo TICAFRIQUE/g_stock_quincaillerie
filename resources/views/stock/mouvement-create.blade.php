@@ -62,7 +62,7 @@
                                     <option value="">{{ $magasinId ? '— Choisir —' : '— Choisir le magasin d\'abord —' }}</option>
                                     @foreach ($produits as $produit)
                                         <option value="{{ $produit->id }}" @selected(old('produit_id') == $produit->id)>
-                                            {{ $produit->sku }} — {{ $produit->libelle_affichage }}{{ $magasinId ? ' (Stock : '.($produit->stock_magasin ?? 0).')' : '' }}
+                                            {{ $produit->sku }} — {{ $produit->libelle_affichage }}{{ $magasinId ? ' (Stock : '.quantite($produit->stock_magasin ?? 0).')' : '' }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -72,7 +72,7 @@
                             <div class="col-4 mb-3">
                                 <label for="quantite" class="form-label">Quantité (pièces)<span class="required-marker">*</span></label>
                                 <input type="number" name="quantite" id="quantite" class="form-control @error('quantite') is-invalid @enderror"
-                                       value="{{ old('quantite') }}" min="1" required>
+                                       value="{{ old('quantite') }}" min="0.001" step="0.001" required>
                                 @error('quantite') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             </div>
                         </div>

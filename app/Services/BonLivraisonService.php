@@ -21,7 +21,7 @@ use InvalidArgumentException;
 class BonLivraisonService
 {
     /**
-     * @param  array<int, array{ligne_vente_id:int, quantite_pieces:int}>  $lignes
+     * @param  array<int, array{ligne_vente_id:int, quantite_pieces:int|float}>  $lignes
      */
     public function livrer(Vente $vente, array $lignes, User $auteur, ?string $motif = null): BonLivraison
     {
@@ -62,9 +62,9 @@ class BonLivraisonService
                     throw new InvalidArgumentException('Ligne de vente introuvable sur cette facture.');
                 }
 
-                $quantiteAvant = (int) ($dejaLivre[$ligneVente->id] ?? 0);
-                $quantiteRestante = $ligneVente->quantite_pieces - $quantiteAvant;
-                $quantiteLivree = (int) $demande['quantite_pieces'];
+                $quantiteAvant = (float) ($dejaLivre[$ligneVente->id] ?? 0);
+                $quantiteRestante = (float) $ligneVente->quantite_pieces - $quantiteAvant;
+                $quantiteLivree = (float) $demande['quantite_pieces'];
 
                 if ($quantiteLivree > $quantiteRestante) {
                     throw new QuantiteLivraisonInvalideException($ligneVente, $quantiteLivree, $quantiteRestante);

@@ -34,7 +34,7 @@
                     <i class="bi bi-box-seam me-1"></i>{{ $stock->produit->libelle_affichage }}
                 </div>
                 <div class="small text-secondary">
-                    {{ $stock->magasin->nom }} — {{ $stock->quantite }} / seuil {{ $stock->produit->seuil_alerte }}
+                    {{ $stock->magasin->nom }} — {{ quantite($stock->quantite) }} / seuil {{ $stock->produit->seuil_alerte }}
                 </div>
                 <div class="small text-secondary"><code>{{ $stock->produit->sku }}</code></div>
             </a>

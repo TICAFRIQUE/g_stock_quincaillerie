@@ -8,6 +8,7 @@ use App\Models\Inventaire;
 use App\Models\Magasin;
 use App\Models\Produit;
 use App\Services\InventaireService;
+use App\Support\Decimal;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -128,16 +129,18 @@ class InventaireController extends Controller
     {
         abort_unless($request->user()->can('inventaire.realiser'), 403);
 
+        $request->merge(['quantite_comptee' => Decimal::normaliser($request->input('quantite_comptee'))]);
+
         $donnees = $request->validate([
             'produit_id' => ['required', 'exists:produits,id'],
-            'quantite_comptee' => ['required', 'integer', 'min:0'],
+            'quantite_comptee' => ['required', 'numeric', 'min:0'],
         ]);
 
         try {
             $inventaireService->saisirComptage(
                 $inventaire,
                 Produit::findOrFail($donnees['produit_id']),
-                $donnees['quantite_comptee'],
+                (float) $donnees['quantite_comptee'],
             );
         } catch (RuntimeException $e) {
             return redirect()->route('inventaires.show', $inventaire)->with('erreur', $e->getMessage());

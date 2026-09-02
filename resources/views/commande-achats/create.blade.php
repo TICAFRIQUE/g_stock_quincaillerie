@@ -219,7 +219,7 @@
                                     <div class="row g-2 align-items-end mb-2">
                                         <div class="col-4">
                                             <label class="form-label small" x-text="'Quantité (' + uniteChoisie(ligne).libelle + ') *'"></label>
-                                            <input type="number" :name="'lignes['+index+'][quantite]'" x-model="ligne.quantite" class="form-control form-control-sm" min="1" step="1" required>
+                                            <input type="number" :name="'lignes['+index+'][quantite]'" x-model="ligne.quantite" class="form-control form-control-sm" min="0.001" step="0.001" required>
                                         </div>
                                         <div class="col-4">
                                             <label class="form-label small" x-text="'Prix d\'achat HT (' + uniteChoisie(ligne).libelle + ', F) *'"></label>

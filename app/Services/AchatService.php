@@ -38,7 +38,7 @@ class AchatService
                 $this->stockService->enregistrerMouvement(
                     produit: $ligne->produit,
                     magasin: $ligne->magasinDestination,
-                    quantite: $ligne->quantite_pieces,
+                    quantite: (float) $ligne->quantite_pieces,
                     type: MouvementStockType::Reception,
                     auteur: $auteur,
                     reference: $commandeAchat,
@@ -107,7 +107,7 @@ class AchatService
                 $this->stockService->enregistrerMouvement(
                     produit: $ligne->produit,
                     magasin: $ligne->magasinDestination,
-                    quantite: -$ligne->quantite_pieces,
+                    quantite: -(float) $ligne->quantite_pieces,
                     type: MouvementStockType::Annulation,
                     auteur: $auteur,
                     reference: $commandeAchat,

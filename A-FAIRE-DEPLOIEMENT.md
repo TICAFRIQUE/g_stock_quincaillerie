@@ -91,6 +91,43 @@ pas supprimer les entrées cochées (historique).
     de fin dépassée (peut se tester en activant une formule très courte),
     et que Superadmin garde un accès complet malgré l'expiration.
 
+- [ ] **Nouveau : quantités décimales (ex. 1.5 mètre de câble)** — dernière et
+  plus large des trois étapes d'ouverture hors zone FCFA (après devise et
+  TVA). Toutes les colonnes de quantité transactionnelle (stock, mouvements
+  de stock, lignes de vente/achat/devis/vente-en-attente, retours,
+  inventaire, transferts, bons de livraison) passent de entier à
+  `decimal(12,3)`. **`unite_ventes.facteur` reste volontairement entier**
+  (multiplicateur d'un lot, ex. carton de 12 — pas une quantité). Aucune
+  bascule dans Paramètres : la saisie décimale est **toujours autorisée**,
+  décision prise avec l'utilisateur (une quantité entière saisie aujourd'hui
+  se comporte à l'identique — 5 reste "5" à l'affichage, jamais "5.000").
+  Déploiement standard, plus :
+  ```
+  php artisan migrate --force
+  npm run build
+  ```
+  La migration modifie le type de 15 colonnes en SQL brut (`ALTER TABLE
+  MODIFY COLUMN`, pas de `->change()` — doctrine/dbal n'est pas installé sur
+  ce projet, voir le commentaire de la migration) ; **aucune donnée
+  existante perdue ou tronquée** (testé migration + rollback + remigration
+  sur les données réelles avant ce déploiement). `npm run build` est
+  **indispensable** cette fois : la saisie décimale (virgule ou point
+  acceptés, normalisés côté serveur) dépend de `resources/js/app.js`
+  recompilé — sans ce rebuild, les écrans de vente/devis continueraient de
+  tronquer toute quantité décimale tapée (comportement JS inchangé tant que
+  le bundle n'est pas reconstruit).
+  - [ ] **Tester après déploiement** : sur l'écran de vente, ajouter une
+    ligne et taper une quantité avec virgule (ex. "1,5") → doit s'afficher
+    "1.5" dans le panier et le total se recalculer correctement (ex. 1.5 ×
+    280 F = 420 F) ; finaliser la vente et vérifier le ticket ("1.5" propre,
+    pas "1.500") ; vérifier qu'une vente à quantité entière (ex. "3") reste
+    identique à avant (affichage "3", pas "3.0"). Même test côté devis,
+    achat (bon d'achat), transfert de stock, mouvement de stock manuel
+    (casse/ajustement), et comptage d'inventaire.
+  - [ ] Vérifier qu'un retour (client ou fournisseur) sur une ligne à
+    quantité décimale plafonne bien au reste retournable (ex. vendu 1.5,
+    déjà retourné 0.5 → max retournable 1.0 sur le formulaire).
+
 - [ ] **Nouveau : TVA optionnelle sur la vente et le devis** — deuxième étape
   de l'ouverture hors zone FCFA (après la devise), même principe que côté
   achat : `taxe_id` optionnel par ligne (référentiel `Taxe` déjà existant,

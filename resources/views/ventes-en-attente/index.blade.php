@@ -30,7 +30,7 @@
                         <ul class="list-unstyled small mb-3">
                             @foreach ($venteEnAttente->lignes as $ligne)
                                 <li>
-                                    {{ $ligne->quantite }} × {{ $ligne->produit->libelle_affichage }}
+                                    {{ quantite($ligne->quantite) }} × {{ $ligne->produit->libelle_affichage }}
                                     @if ($ligne->uniteVente) ({{ $ligne->uniteVente->libelle }}) @endif
                                 </li>
                             @endforeach

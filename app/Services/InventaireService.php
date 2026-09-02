@@ -7,6 +7,7 @@ use App\Models\Inventaire;
 use App\Models\LigneInventaire;
 use App\Models\Produit;
 use App\Models\User;
+use App\Support\Arrondi;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -18,12 +19,13 @@ class InventaireService
      * Snapshot du théorique au moment du comptage : l'écart ne se recalcule
      * jamais en live, pour que la fiche reste reproductible dans le temps.
      */
-    public function saisirComptage(Inventaire $inventaire, Produit $produit, int $quantiteComptee): LigneInventaire
+    public function saisirComptage(Inventaire $inventaire, Produit $produit, int|float $quantiteComptee): LigneInventaire
     {
         if ($inventaire->statut !== 'brouillon') {
             throw new RuntimeException("L'inventaire du {$inventaire->date->toDateString()} n'est plus modifiable.");
         }
 
+        $quantiteComptee = Arrondi::quantite((float) $quantiteComptee);
         $quantiteTheorique = $this->stockService->quantiteDisponible($produit, $inventaire->magasin);
 
         return LigneInventaire::updateOrCreate(
@@ -31,7 +33,7 @@ class InventaireService
             [
                 'quantite_theorique' => $quantiteTheorique,
                 'quantite_comptee' => $quantiteComptee,
-                'ecart' => $quantiteComptee - $quantiteTheorique,
+                'ecart' => Arrondi::quantite($quantiteComptee - $quantiteTheorique),
             ],
         );
     }
@@ -46,14 +48,14 @@ class InventaireService
             $inventaire->loadMissing('lignes.produit');
 
             foreach ($inventaire->lignes as $ligne) {
-                if ($ligne->ecart === 0) {
+                if ((float) $ligne->ecart === 0.0) {
                     continue;
                 }
 
                 $this->stockService->enregistrerMouvement(
                     produit: $ligne->produit,
                     magasin: $inventaire->magasin,
-                    quantite: $ligne->ecart,
+                    quantite: (float) $ligne->ecart,
                     type: MouvementStockType::Ajustement,
                     auteur: $auteur,
                     reference: $ligne,

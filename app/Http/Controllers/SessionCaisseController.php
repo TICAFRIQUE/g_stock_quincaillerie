@@ -297,7 +297,7 @@ class SessionCaisseController extends Controller
             $session->ventes()->orderBy('created_at')->get()->map(fn (Vente $v) => [
                 $v->numero,
                 $v->created_at->format('d/m/Y H:i'),
-                number_format($v->total_net, 0, ',', ' ').' F',
+                montant($v->total_net),
             ]),
             'rapport-caisse.pdf',
             'Caissier : '.$session->caissier->name.' — Ouverte le '.$session->date_ouverture->format('d/m/Y à H:i'),
@@ -332,13 +332,13 @@ class SessionCaisseController extends Controller
     private function bilanRapportSession(SessionCaisse $session): array
     {
         $bilan = [
-            'Fond de caisse' => number_format($session->fond_de_caisse, 0, ',', ' ').' F',
+            'Fond de caisse' => montant($session->fond_de_caisse),
             'Nombre de ventes' => (string) $session->ventes()->count(),
-            'Total net' => number_format((int) $session->ventes()->sum('total_net'), 0, ',', ' ').' F',
+            'Total net' => montant((int) $session->ventes()->sum('total_net')),
         ];
 
         foreach ($this->paiementsParMoyen($session) as $paiement) {
-            $bilan[$paiement->moyenPaiement->nom] = number_format($paiement->total, 0, ',', ' ').' F';
+            $bilan[$paiement->moyenPaiement->nom] = montant($paiement->total);
         }
 
         if ($session->date_cloture) {
@@ -346,18 +346,18 @@ class SessionCaisseController extends Controller
                 + $session->total_entrees_especes - $session->total_sorties_especes;
 
             $bilan += [
-                'Théorique' => number_format($theorique, 0, ',', ' ').' F',
+                'Théorique' => montant($theorique),
             ];
 
             if ($session->total_reglements_especes > 0) {
-                $bilan['Règlements clients (espèces)'] = number_format($session->total_reglements_especes, 0, ',', ' ').' F';
+                $bilan['Règlements clients (espèces)'] = montant($session->total_reglements_especes);
             }
 
             $bilan += [
-                'Entrées de caisse' => number_format($session->total_entrees_especes, 0, ',', ' ').' F',
-                'Sorties de caisse' => number_format($session->total_sorties_especes, 0, ',', ' ').' F',
-                'Compté' => number_format($session->montant_compte, 0, ',', ' ').' F',
-                'Écart' => ($session->ecart > 0 ? '+' : '').number_format($session->ecart, 0, ',', ' ').' F',
+                'Entrées de caisse' => montant($session->total_entrees_especes),
+                'Sorties de caisse' => montant($session->total_sorties_especes),
+                'Compté' => montant($session->montant_compte),
+                'Écart' => ($session->ecart > 0 ? '+' : '').montant($session->ecart),
             ];
         }
 

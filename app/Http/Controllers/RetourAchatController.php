@@ -23,7 +23,7 @@ class RetourAchatController extends Controller
             'motif' => ['nullable', 'string', 'max:500'],
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.ligne_commande_achat_id' => ['required', Rule::exists('ligne_commande_achats', 'id')->where('commande_achat_id', $commandeAchat->id)],
-            'lignes.*.quantite_pieces' => ['required', 'integer', 'min:0'],
+            'lignes.*.quantite_pieces' => ['required', 'numeric', 'min:0'],
         ]);
 
         try {

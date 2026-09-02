@@ -76,7 +76,7 @@ class StockController extends Controller
             $feuille->setCellValue("A{$ligne}", $stock->produit->libelle_affichage);
             $feuille->setCellValue("B{$ligne}", $stock->produit->sku);
             $feuille->setCellValue("C{$ligne}", $stock->magasin->nom);
-            $feuille->setCellValue("D{$ligne}", $stock->quantite);
+            $feuille->setCellValue("D{$ligne}", (float) $stock->quantite);
             $feuille->setCellValue("E{$ligne}", $stock->produit->seuil_alerte);
             $feuille->setCellValue("F{$ligne}", $stock->produit->prix_piece);
             $feuille->setCellValue("G{$ligne}", $stock->cout_moyen_pondere);

@@ -21,8 +21,8 @@ class LigneCommandeAchat extends Model
     protected function casts(): array
     {
         return [
-            'quantite' => 'integer',
-            'quantite_pieces' => 'integer',
+            'quantite' => 'decimal:3',
+            'quantite_pieces' => 'decimal:3',
             'prix_achat' => 'integer',
         ];
     }
@@ -107,7 +107,7 @@ class LigneCommandeAchat extends Model
      */
     public function montantHt(): int
     {
-        return $this->prix_achat * $this->quantite;
+        return Arrondi::entier($this->prix_achat * (float) $this->quantite);
     }
 
     public function montantTtc(): int

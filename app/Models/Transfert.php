@@ -22,7 +22,7 @@ class Transfert extends Model
     protected function casts(): array
     {
         return [
-            'quantite' => 'integer',
+            'quantite' => 'decimal:3',
         ];
     }
 
