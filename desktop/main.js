@@ -237,6 +237,33 @@ async function openMainWindow(config) {
     );
   });
 
+  // Le contenu chargé dans cette fenêtre hérite du pont privilégié
+  // window.gstock (preload.js) — sans restriction, une page usurpée (lien
+  // externe, MITM réseau local) pourrait l'utiliser pour repointer
+  // durablement l'app (saveConfig) ou déclencher une impression arbitraire.
+  // On n'autorise jamais de navigation hors de l'origine du serveur
+  // configuré, ni l'ouverture de nouvelles fenêtres depuis le contenu web.
+  const origineAutorisee = (() => {
+    try {
+      return new URL(targetUrl).origin;
+    } catch {
+      return null;
+    }
+  })();
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith('data:')) return; // nos propres écrans d'erreur/message
+    try {
+      if (!origineAutorisee || new URL(url).origin !== origineAutorisee) {
+        event.preventDefault();
+      }
+    } catch {
+      event.preventDefault();
+    }
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
   mainWindow.webContents.once('did-finish-load', () => {
     setTimeout(() => checkForUpdates(), 5000);
   });
@@ -285,6 +312,20 @@ ipcMain.handle('gstock:print-pdf-url', (_event, url) => {
   // ciblait pas correctement le cadre du PDF (l'impression retombait sur la
   // page visible derrière au lieu du PDF réel).
   if (!url) return { success: false, reason: 'no-url' };
+
+  // Ne jamais ouvrir une URL hors de l'origine du serveur configuré (ex.
+  // file:// arbitraire) — le renderer fournit cette URL, elle ne doit pas
+  // être une confiance aveugle même si le contenu vient normalement de
+  // notre propre app.
+  try {
+    const origineServeur = currentConfig?.url ? new URL(currentConfig.url).origin : null;
+    if (!origineServeur || new URL(url).origin !== origineServeur) {
+      return { success: false, reason: 'origine-non-autorisee' };
+    }
+  } catch {
+    return { success: false, reason: 'url-invalide' };
+  }
+
   openPdfPreview(url, mainWindow ? mainWindow.getTitle() : undefined);
   return { success: true };
 });
