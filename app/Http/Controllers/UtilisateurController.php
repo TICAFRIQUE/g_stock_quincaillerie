@@ -19,6 +19,15 @@ class UtilisateurController extends Controller
     {
         $query = User::query()
             ->with(['magasin', 'roles'])
+            // Un Superadmin/développeur voit tout ; les autres (ex. un Gérant
+            // habilité utilisateur.gerer) ne voient jamais les comptes
+            // Superadmin ni le compte développeur — pas juste "non gérables
+            // depuis cet écran" (déjà le cas via edit()/update()), carrément
+            // invisibles dans la liste.
+            ->when(! $request->user()->estGestionnaireAbonnement(), function ($q) {
+                $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'Superadmin'))
+                    ->when(config('abonnement.developpeur_username'), fn ($q2, $developpeur) => $q2->where('username', '!=', $developpeur));
+            })
             ->when($request->filled('recherche'), function ($q) use ($request) {
                 $recherche = $request->string('recherche');
                 $q->where(function ($sub) use ($recherche) {
@@ -52,6 +61,7 @@ class UtilisateurController extends Controller
             'name' => $donnees['name'],
             'username' => $donnees['username'],
             'email' => $donnees['email'] ?? null,
+            'telephone' => $donnees['telephone'] ?? null,
             'password' => $code,
             'magasin_id' => $donnees['magasin_id'] ?? null,
             'actif' => $donnees['actif'],
@@ -90,6 +100,7 @@ class UtilisateurController extends Controller
             'name' => $donnees['name'],
             'username' => $donnees['username'],
             'email' => $donnees['email'] ?? null,
+            'telephone' => $donnees['telephone'] ?? null,
             // Un superadmin qui modifie son propre compte garde son magasin/
             // statut actif tels quels : le formulaire ne les expose pas dans
             // ce cas (voir _form.blade.php), pas de risque de se désactiver
@@ -146,6 +157,7 @@ class UtilisateurController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:50', 'unique:users,username,'.($utilisateur?->id)],
             'email' => ['nullable', 'email', 'max:255', 'unique:users,email,'.($utilisateur?->id)],
+            'telephone' => ['nullable', 'string', 'max:30'],
             'magasin_id' => ['nullable', 'exists:magasins,id'],
             'role' => [$ignorerRoleEtStatut ? 'sometimes' : 'required', 'nullable', 'exists:roles,name', 'not_in:Superadmin'],
             'actif' => ['boolean'],

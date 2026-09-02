@@ -21,6 +21,13 @@
     <div class="form-text">Non utilisé pour la connexion — sert uniquement de coordonnée de contact.</div>
 </div>
 
+<div class="mb-3">
+    <label for="telephone" class="form-label">Téléphone (optionnel)</label>
+    <input type="text" name="telephone" id="telephone" class="form-control @error('telephone') is-invalid @enderror"
+           value="{{ old('telephone', $utilisateur->telephone ?? '') }}" maxlength="30">
+    @error('telephone') <div class="invalid-feedback">{{ $message }}</div> @enderror
+</div>
+
 @unless (isset($utilisateur))
     <div class="alert alert-info small">
         <i class="bi bi-info-circle me-1"></i>Un code à 4 chiffres sera généré automatiquement et affiché à l'écran une seule fois — aucun envoi par e-mail.

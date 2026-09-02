@@ -7,6 +7,8 @@
         <h2 class="h4">Bonjour, {{ $utilisateur->name }} 👋</h2>
     </div>
 
+    <x-alerte-abonnement-expire />
+
     @if (! $session)
         <div class="card">
             <div class="card-body text-center py-5">

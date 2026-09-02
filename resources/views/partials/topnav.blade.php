@@ -157,20 +157,13 @@
         </li>
     @endcan
 
-    {{-- Jamais un @can : réservé au Superadmin/développeur en dur, voir
-         User::estGestionnaireAbonnement() — ni délégable ni visible pour un
-         Gérant, même habilité par ailleurs sur le menu Administration. --}}
-    @if (auth()->user()->estGestionnaireAbonnement())
-        <li class="nav-item">
-            <a href="{{ route('abonnement.gestion') }}"
-                class="nav-link {{ request()->routeIs('abonnement.gestion') ? 'active' : '' }}">
-                <i class="bi bi-calendar-check me-1"></i>Abonnement
-            </a>
-        </li>
-    @endif
-
-    @canany(['administration.gerer', 'taxe.gerer', 'typeclient.gerer', 'motif.gerer', 'parametre.gerer',
-        'utilisateur.gerer', 'role.gerer'])
+    {{-- L'entrée "Abonnement" du sous-menu (voir plus bas) est réservée en dur
+         au Superadmin/développeur (User::estGestionnaireAbonnement()), jamais
+         via une permission Spatie — donc ce menu doit s'afficher pour ce
+         compte même s'il n'a par ailleurs aucune permission d'administration
+         (cas du compte développeur sans autre rôle). --}}
+    @if (auth()->user()->canAny(['administration.gerer', 'taxe.gerer', 'typeclient.gerer', 'motif.gerer',
+        'parametre.gerer', 'utilisateur.gerer', 'role.gerer']) || auth()->user()->estGestionnaireAbonnement())
         <li class="nav-item dropdown">
             <a href="#"
                 class="nav-link dropdown-toggle {{ request()->routeIs('magasins.*', 'caisses.*', 'moyens-paiement.*', 'unites.*', 'taxes.*', 'type-clients.*', 'motifs-mouvement.*', 'parametres.*', 'utilisateurs.*', 'roles.*') ? 'active' : '' }}"
@@ -258,7 +251,20 @@
                         </a>
                     </li>
                 @endcan
+
+                {{-- Jamais un @can : réservé au Superadmin/développeur en dur,
+                     voir User::estGestionnaireAbonnement() — ni délégable ni
+                     visible pour un Gérant, même habilité par ailleurs sur ce
+                     menu Administration. Toujours en dernier. --}}
+                @if (auth()->user()->estGestionnaireAbonnement())
+                    <li>
+                        <a href="{{ route('abonnement.gestion') }}"
+                            class="dropdown-item {{ request()->routeIs('abonnement.gestion') ? 'active' : '' }}">
+                            <i class="bi bi-calendar-check me-2"></i>Abonnement
+                        </a>
+                    </li>
+                @endif
             </ul>
         </li>
-    @endcanany
+    @endif
 </ul>
