@@ -33,6 +33,11 @@
                 <i class="bi bi-question-circle me-1"></i>Guide d'utilisation
             </a>
         </li>
+        <li>
+            <a class="dropdown-item" href="{{ route('abonnement.mon') }}">
+                <i class="bi bi-calendar-check me-1"></i>Mon abonnement
+            </a>
+        </li>
         <li><hr class="dropdown-divider"></li>
         <li>
             <form method="POST" action="{{ route('logout') }}">

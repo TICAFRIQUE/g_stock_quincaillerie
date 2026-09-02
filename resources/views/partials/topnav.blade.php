@@ -157,6 +157,18 @@
         </li>
     @endcan
 
+    {{-- Jamais un @can : réservé au Superadmin/développeur en dur, voir
+         User::estGestionnaireAbonnement() — ni délégable ni visible pour un
+         Gérant, même habilité par ailleurs sur le menu Administration. --}}
+    @if (auth()->user()->estGestionnaireAbonnement())
+        <li class="nav-item">
+            <a href="{{ route('abonnement.gestion') }}"
+                class="nav-link {{ request()->routeIs('abonnement.gestion') ? 'active' : '' }}">
+                <i class="bi bi-calendar-check me-1"></i>Abonnement
+            </a>
+        </li>
+    @endif
+
     @canany(['administration.gerer', 'taxe.gerer', 'typeclient.gerer', 'motif.gerer', 'parametre.gerer',
         'utilisateur.gerer', 'role.gerer'])
         <li class="nav-item dropdown">

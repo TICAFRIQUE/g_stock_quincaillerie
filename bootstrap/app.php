@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\AssureAbonnementActif;
+use App\Http\Middleware\AssureGestionnaireAbonnement;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +18,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // et resources/js/app.js) : doit rester lisible/comparable tel quel côté
         // client (document.cookie === '1'), donc exclu du chiffrement automatique.
         $middleware->encryptCookies(except: ['telechargement_pret']);
+
+        $middleware->alias([
+            'abonnement.actif' => AssureAbonnementActif::class,
+            'abonnement.gestion' => AssureGestionnaireAbonnement::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

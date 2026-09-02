@@ -10,6 +10,37 @@ pas supprimer les entrées cochées (historique).
 
 ---
 
+## 2026-09-02
+
+- [ ] **Nouveau : Système d'abonnement** — passé une date d'expiration, tout
+  compte autre que Superadmin/développeur est redirigé vers "Mon abonnement"
+  (lien dans le menu utilisateur, après "Guide d'utilisation") sur **toutes**
+  les routes. Déploiement standard, plus :
+  ```
+  php artisan migrate --force
+  ```
+  Trois nouvelles tables (`formule_abonnements`, `abonnement_activations`,
+  `configuration_abonnements`), aucune donnée existante touchée. **Aucune
+  permission à seeder** — l'accès à Gestion abonnement est en dur sur le
+  rôle Superadmin (+ compte développeur), jamais délégable via `/roles`.
+  - [ ] Définir `ABONNEMENT_DEVELOPPEUR_USERNAME` dans le `.env` du poste
+    serveur (voir `.env.example`) **si** un compte support côté éditeur doit
+    pouvoir agir sans passer par le Superadmin du client — sinon laisser
+    vide, rien ne change.
+  - [ ] **Tant qu'aucune activation n'est enregistrée, rien n'est bloqué**
+    (comportement volontaire, voir le plan) — l'écran Gestion abonnement
+    (menu horizontal, visible uniquement en Superadmin) sert à créer les
+    premières formules et à activer l'abonnement du client quand c'est
+    voulu commercialement. Ne pas oublier de le faire, sinon l'app reste en
+    accès libre indéfiniment.
+  - [ ] **Tester après déploiement** : en Superadmin, créer une formule (ex.
+    "30 jours"), l'activer, vérifier que jours restants/historique
+    s'affichent sur Gestion abonnement **et** sur Mon abonnement (compte
+    Caissier). Renseigner les coordonnées de contact. Vérifier qu'un compte
+    Caissier/Gérant est bien redirigé vers Mon abonnement une fois la date
+    de fin dépassée (peut se tester en activant une formule très courte),
+    et que Superadmin garde un accès complet malgré l'expiration.
+
 ## 2026-09-01
 
 - [ ] **Nouveau : Prix personnalisé à la vente** — le caissier peut taper un

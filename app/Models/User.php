@@ -65,6 +65,20 @@ class User extends Authenticatable
     }
 
     /**
+     * Superadmin du client, ou compte « développeur » (éditeur) fixé côté
+     * .env — jamais un rôle Spatie : ce serait auto-attribuable par le
+     * Superadmin lui-même via l'écran Rôles, ce qui viderait le
+     * verrouillage de l'abonnement de son sens (voir
+     * AssureAbonnementActif/AssureGestionnaireAbonnement).
+     */
+    public function estGestionnaireAbonnement(): bool
+    {
+        return $this->hasRole('Superadmin')
+            || (config('abonnement.developpeur_username') !== null
+                && $this->username === config('abonnement.developpeur_username'));
+    }
+
+    /**
      * Destinataires des alertes caisse (écart, session restée ouverte…) :
      * les gérants du magasin concerné, plus tous les superadmins.
      *

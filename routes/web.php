@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AbonnementController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\BonLivraisonController;
 use App\Http\Controllers\CaisseController;
@@ -46,10 +47,20 @@ Route::middleware('guest')->group(function () {
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
 });
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'abonnement.actif'])->group(function () {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::view('guide', 'guide.index')->name('guide');
+
+    Route::get('abonnement', [AbonnementController::class, 'mon'])->name('abonnement.mon');
+
+    Route::middleware('abonnement.gestion')->group(function () {
+        Route::get('abonnement/gestion', [AbonnementController::class, 'gestion'])->name('abonnement.gestion');
+        Route::post('abonnement/activer', [AbonnementController::class, 'activer'])->name('abonnement.activer');
+        Route::post('abonnement/formules', [AbonnementController::class, 'storeFormule'])->name('abonnement.formules.store');
+        Route::patch('abonnement/formules/{formuleAbonnement}/basculer', [AbonnementController::class, 'toggleFormule'])->name('abonnement.formules.basculer');
+        Route::post('abonnement/configuration', [AbonnementController::class, 'updateConfiguration'])->name('abonnement.configuration.update');
+    });
 
     Route::post('notifications/marquer-lues', [NotificationController::class, 'marquerLues'])->name('notifications.marquer-lues');
     Route::get('notifications/{notification}/ouvrir', [NotificationController::class, 'ouvrir'])->name('notifications.ouvrir');
