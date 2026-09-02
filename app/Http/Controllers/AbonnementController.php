@@ -48,21 +48,24 @@ class AbonnementController extends Controller
 
     public function activer(Request $request): RedirectResponse
     {
+        // Une case décochée n'envoie aucun champ "illimite" du tout (comportement
+        // HTML standard) — jamais valider sa présence, toujours lire via boolean().
+        $illimite = $request->boolean('illimite');
+
         $donnees = $request->validate([
-            'formule_id' => ['nullable', 'exists:formules_abonnement,id'],
-            'illimite' => ['required', 'boolean'],
-            'jours' => ['required_if:illimite,false', 'nullable', 'integer', 'min:1'],
+            'formule_id' => ['nullable', 'exists:formule_abonnements,id'],
+            'jours' => [$illimite ? 'nullable' : 'required', 'nullable', 'integer', 'min:1'],
             'montant' => ['required', 'integer', 'min:0'],
             'note' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $formule = $donnees['formule_id'] ? FormuleAbonnement::findOrFail($donnees['formule_id']) : null;
+        $formule = ! empty($donnees['formule_id']) ? FormuleAbonnement::findOrFail($donnees['formule_id']) : null;
 
         Abonnement::activer(
             formule: $formule,
             montant: $donnees['montant'],
-            jours: $donnees['illimite'] ? null : (int) $donnees['jours'],
-            illimite: $donnees['illimite'],
+            jours: $illimite ? null : (int) $donnees['jours'],
+            illimite: $illimite,
             note: $donnees['note'] ?? null,
             auteur: $request->user(),
         );
@@ -72,17 +75,18 @@ class AbonnementController extends Controller
 
     public function storeFormule(Request $request): RedirectResponse
     {
+        $illimite = $request->boolean('illimite');
+
         $donnees = $request->validate([
             'nom' => ['required', 'string', 'max:255'],
-            'illimite' => ['required', 'boolean'],
-            'jours' => ['required_if:illimite,false', 'nullable', 'integer', 'min:1'],
+            'jours' => [$illimite ? 'nullable' : 'required', 'nullable', 'integer', 'min:1'],
             'prix' => ['required', 'integer', 'min:0'],
         ]);
 
         FormuleAbonnement::create([
             'nom' => $donnees['nom'],
-            'illimite' => $donnees['illimite'],
-            'jours' => $donnees['illimite'] ? null : $donnees['jours'],
+            'illimite' => $illimite,
+            'jours' => $illimite ? null : $donnees['jours'],
             'prix' => $donnees['prix'],
             'actif' => true,
         ]);

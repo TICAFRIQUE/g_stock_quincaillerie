@@ -18,21 +18,25 @@ pas supprimer les entrées cochées (historique).
   les routes. Déploiement standard, plus :
   ```
   php artisan migrate --force
+  php artisan db:seed --class=FormuleAbonnementSeeder --force
   ```
   Trois nouvelles tables (`formule_abonnements`, `abonnement_activations`,
   `configuration_abonnements`), aucune donnée existante touchée. **Aucune
   permission à seeder** — l'accès à Gestion abonnement est en dur sur le
   rôle Superadmin (+ compte développeur), jamais délégable via `/roles`.
+  - [ ] `FormuleAbonnementSeeder` crée 3 formules de départ (Essai/Mensuelle/
+    Illimité, prix indicatifs à ajuster) — **modifiables** ensuite depuis
+    Gestion abonnement (pas de bouton suppression pour l'instant, seulement
+    activer/désactiver et en ajouter).
   - [ ] Définir `ABONNEMENT_DEVELOPPEUR_USERNAME` dans le `.env` du poste
     serveur (voir `.env.example`) **si** un compte support côté éditeur doit
     pouvoir agir sans passer par le Superadmin du client — sinon laisser
     vide, rien ne change.
   - [ ] **Tant qu'aucune activation n'est enregistrée, rien n'est bloqué**
     (comportement volontaire, voir le plan) — l'écran Gestion abonnement
-    (menu horizontal, visible uniquement en Superadmin) sert à créer les
-    premières formules et à activer l'abonnement du client quand c'est
-    voulu commercialement. Ne pas oublier de le faire, sinon l'app reste en
-    accès libre indéfiniment.
+    (menu horizontal, visible uniquement en Superadmin) sert à activer
+    l'abonnement du client quand c'est voulu commercialement. Ne pas
+    oublier de le faire, sinon l'app reste en accès libre indéfiniment.
   - [ ] **Tester après déploiement** : en Superadmin, créer une formule (ex.
     "30 jours"), l'activer, vérifier que jours restants/historique
     s'affichent sur Gestion abonnement **et** sur Mon abonnement (compte
