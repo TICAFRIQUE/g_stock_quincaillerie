@@ -44,7 +44,10 @@ Route::redirect('/', '/dashboard');
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
-    Route::post('login', [AuthenticatedSessionController::class, 'store']);
+    // Verrou par (identifiant + IP) déjà dans le contrôleur (5 tentatives/min) ;
+    // ce throttle générique par IP protège en plus contre l'énumération de
+    // plusieurs identifiants depuis la même source.
+    Route::post('login', [AuthenticatedSessionController::class, 'store'])->middleware('throttle:20,1');
 });
 
 Route::middleware(['auth', 'abonnement.actif'])->group(function () {

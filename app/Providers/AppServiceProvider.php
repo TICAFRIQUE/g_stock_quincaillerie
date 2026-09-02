@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Listeners\LogAuthentication;
 use App\Models\Parametre;
 use App\Models\User;
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Pagination\Paginator;
@@ -37,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(Login::class, [LogAuthentication::class, 'handleLogin']);
         Event::listen(Logout::class, [LogAuthentication::class, 'handleLogout']);
+        Event::listen(Failed::class, [LogAuthentication::class, 'handleFailed']);
 
         // Logo, nom, slogan… configurables (voir ParametreController) : partagés
         // avec les layouts qui affichent la marque, plutôt que de repasser
