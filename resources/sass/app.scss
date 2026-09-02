@@ -159,11 +159,21 @@ input[type='number'] {
         }
     }
 
+    // Sans ces trois lignes, le sous-menu (Catalogue, Stock, Vente,
+    // Administration…) garde le positionnement Popper.js par défaut de
+    // Bootstrap (absolute + transform en style inline) : il flotte par-
+    // dessus les liens suivants de la sidebar au lieu de s'insérer dans le
+    // flux normal, qui se chevauchent visuellement à l'ouverture. !important
+    // nécessaire : Popper pose ces valeurs directement en style inline,
+    // priorité plus forte qu'une règle de feuille de style classique.
     .navbar-nav .dropdown-menu {
         background-color: transparent;
         border: none;
         padding-left: 1rem;
         min-width: auto;
+        position: static !important;
+        inset: auto !important;
+        transform: none !important;
     }
 
     hr {
