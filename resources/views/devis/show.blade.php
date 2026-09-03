@@ -5,20 +5,25 @@
 @section('content')
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3 d-print-none">
         <div>
-            <h2 class="h4 mb-1">Devis <code>{{ $devis->numero }}</code></h2>
+            <div class="d-flex align-items-center gap-2">
+                <x-bouton-retour :route="route('devis.index')" />
+                <h2 class="h4 mb-0">Devis <code>{{ $devis->numero }}</code></h2>
+            </div>
             <span class="badge {{ $devis->statutEffectif()->classeBadge() }}">{{ $devis->statutEffectif()->libelle() }}</span>
         </div>
 
         <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-outline-secondary" onclick="imprimerDevis()">
-                <i class="bi bi-printer me-1"></i>Imprimer
-            </button>
-            <a href="{{ route('devis.pdf', $devis) }}" class="btn btn-outline-secondary">
-                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
-            </a>
-            <a href="{{ route('devis.excel', $devis) }}" class="btn btn-outline-secondary">
-                <i class="bi bi-file-earmark-excel me-1"></i>Excel
-            </a>
+            <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="imprimerDevis()">
+                    <i class="bi bi-printer me-1"></i>Imprimer
+                </button>
+                <a href="{{ route('devis.pdf', $devis) }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+                </a>
+                <a href="{{ route('devis.excel', $devis) }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                </a>
+            </div>
 
             @can('devis.gerer')
                 @if ($devis->peutEtreModifie())
@@ -46,10 +51,6 @@
                     @endif
                 @endif
             @endcan
-
-            <a href="{{ route('devis.index') }}" class="btn btn-link">
-                <i class="bi bi-arrow-left me-1"></i>Retour à la liste
-            </a>
         </div>
     </div>
 

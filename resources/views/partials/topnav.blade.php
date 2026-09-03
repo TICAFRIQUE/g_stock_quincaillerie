@@ -54,7 +54,7 @@
                     <li>
                         <a href="{{ route('commande-achats.index') }}"
                             class="dropdown-item {{ request()->routeIs('commande-achats.*') ? 'active' : '' }}">
-                            <i class="bi bi-truck me-2"></i>Bons d'achat
+                            <i class="bi bi-truck me-2"></i>Bons de commande
                         </a>
                     </li>
                 @endcan

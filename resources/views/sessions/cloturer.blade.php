@@ -3,7 +3,10 @@
 @section('title', 'Clôturer la session')
 
 @section('content')
-    <h2 class="h4 mb-3">Clôturer la session — {{ $session->caisse->nom }}</h2>
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <x-bouton-retour :route="route('sessions.show', $session)" />
+        <h2 class="h4 mb-0">Clôturer la session — {{ $session->caisse->nom }}</h2>
+    </div>
 
     <div class="row g-3 mb-3" style="max-width: 720px;">
         <div class="col-6 col-md-3">

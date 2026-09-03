@@ -4,11 +4,9 @@
 
 @section('content')
     <div x-data="devisApp({{ \Illuminate\Support\Js::from($produits) }}, {{ \Illuminate\Support\Js::from($panierInitial) }}, {{ \Illuminate\Support\Js::from($taxes->map(fn ($t) => ['id' => $t->id, 'libelle' => $t->nom, 'taux' => $t->taux])) }})">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <x-bouton-retour :route="route('devis.index')" />
             <h2 class="h4 mb-0">Nouveau devis</h2>
-            <a href="{{ route('devis.index') }}" class="btn btn-link">
-                <i class="bi bi-arrow-left me-1"></i>Retour à la liste
-            </a>
         </div>
 
         <div class="row g-3 align-items-start">

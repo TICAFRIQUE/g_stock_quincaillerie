@@ -6,13 +6,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="h4 mb-0">Valeur du stock</h2>
         <div class="d-flex gap-2 flex-wrap">
-            <x-bouton-imprimer :pdf-route="route('rapports.stock.pdf', request()->query())" />
-            <a href="{{ route('rapports.stock.pdf', request()->query()) }}" class="btn btn-outline-secondary d-print-none">
-                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
-            </a>
-            <a href="{{ route('rapports.stock.excel', request()->query()) }}" class="btn btn-outline-secondary d-print-none">
-                <i class="bi bi-file-earmark-excel me-1"></i>Excel
-            </a>
+            <x-export-buttons :pdf-route="route('rapports.stock.pdf', request()->query())" :excel-route="route('rapports.stock.excel', request()->query())" />
         </div>
     </div>
 

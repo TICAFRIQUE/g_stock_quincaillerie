@@ -6,7 +6,6 @@
     <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
         <h2 class="h4 mb-0">Fournisseurs</h2>
         <div class="d-flex gap-2 flex-wrap">
-            <x-export-buttons :pdf-route="route('fournisseurs.pdf', request()->query())" :excel-route="route('fournisseurs.excel', request()->query())" :tout="true" />
             @can('fournisseur.gerer')
                 <a href="{{ route('fournisseurs.create') }}" class="btn btn-primary">Nouveau fournisseur</a>
             @endcan
@@ -16,7 +15,11 @@
     <h2 class="h4 mb-3 d-none d-print-block">Fournisseurs</h2>
 
     <div class="d-print-none">
-        <x-recherche-form :action="route('fournisseurs.index')" placeholder="Nom, téléphone ou e-mail…" />
+        <x-recherche-form :action="route('fournisseurs.index')" placeholder="Nom, téléphone ou e-mail…">
+            <x-slot:export>
+                <x-export-buttons :pdf-route="route('fournisseurs.pdf', request()->query())" :excel-route="route('fournisseurs.excel', request()->query())" :tout="true" />
+            </x-slot:export>
+        </x-recherche-form>
     </div>
 
     <div class="card">
@@ -28,7 +31,7 @@
                         <x-th-tri champ="nom" label="Nom" />
                         <th>Téléphone</th>
                         <th>E-mail</th>
-                        <th>Solde dû</th>
+                        <th>Solde</th>
                         <x-th-tri champ="actif" label="Statut" />
                         <th class="text-end d-print-none">Actions</th>
                     </tr>
@@ -41,7 +44,9 @@
                             <td><a href="{{ route('fournisseurs.show', $fournisseur) }}">{{ $fournisseur->nom }}</a></td>
                             <td>{{ $fournisseur->telephone ?? '—' }}</td>
                             <td>{{ $fournisseur->email ?? '—' }}</td>
-                            <td class="{{ $solde > 0 ? 'text-danger fw-medium' : '' }}">{{ montant($solde) }}</td>
+                            <td class="{{ $solde > 0 ? 'text-danger fw-medium' : ($solde < 0 ? 'text-success fw-medium' : '') }}">
+                                {{ montant($solde) }}{{ $solde < 0 ? ' (avoir)' : '' }}
+                            </td>
                             <td>
                                 @if ($fournisseur->actif)
                                     <span class="badge text-bg-success">Actif</span>
@@ -50,6 +55,7 @@
                                 @endif
                             </td>
                             <td class="text-end d-print-none">
+                                <x-detail-button :href="route('fournisseurs.show', $fournisseur)" />
                                 @can('fournisseur.gerer')
                                     <x-edit-button :href="route('fournisseurs.edit', $fournisseur)" />
                                     <x-delete-button :action="route('fournisseurs.destroy', $fournisseur)" :label="'le fournisseur « '.$fournisseur->nom.' »'" />

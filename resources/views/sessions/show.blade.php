@@ -5,8 +5,11 @@
 @section('content')
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
         <div>
-            <h2 class="h4 mb-1">{{ $session->caisse->nom }} — {{ $session->caisse->magasin->nom }}</h2>
-            <p class="text-secondary small mb-0">
+            <div class="d-flex align-items-center gap-2">
+                <x-bouton-retour :route="route('sessions.index')" />
+                <h2 class="h4 mb-0">{{ $session->caisse->nom }} — {{ $session->caisse->magasin->nom }}</h2>
+            </div>
+            <p class="text-secondary small mb-0 ms-5 ps-1">
                 Ouverte par {{ $session->caissier->name }} le {{ $session->date_ouverture->format('d/m/Y à H:i') }}
                 @if ($session->date_cloture)
                     <span class="badge text-bg-secondary ms-2">Clôturée</span>
@@ -16,7 +19,7 @@
             </p>
             @can('rapport.voir')
                 @if ($sessionsAujourdhui > 0)
-                    <p class="small mb-0">
+                    <p class="small mb-0 ms-5 ps-1">
                         <a href="{{ route('rapports.ventes', ['caisse_id' => $session->caisse_id, 'debut' => $session->date_ouverture->toDateString(), 'fin' => $session->date_ouverture->toDateString()]) }}">
                             <i class="bi bi-clock-history me-1"></i>Voir les autres sessions de cette caisse aujourd'hui ({{ $sessionsAujourdhui }})
                         </a>

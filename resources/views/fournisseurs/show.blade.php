@@ -5,8 +5,11 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
-            <h2 class="h4 mb-1">{{ $fournisseur->nom }} <code class="fs-6 text-secondary">{{ $fournisseur->code }}</code></h2>
-            <p class="text-secondary small mb-0">
+            <div class="d-flex align-items-center gap-2">
+                <x-bouton-retour :route="route('fournisseurs.index')" />
+                <h2 class="h4 mb-0">{{ $fournisseur->nom }} <code class="fs-6 text-secondary">{{ $fournisseur->code }}</code></h2>
+            </div>
+            <p class="text-secondary small mb-0 ms-5 ps-1">
                 {{ $fournisseur->telephone ?? 'Aucun téléphone' }}
                 @if ($fournisseur->email) — {{ $fournisseur->email }} @endif
                 @if ($fournisseur->adresse) — {{ $fournisseur->adresse }} @endif
@@ -15,7 +18,7 @@
         <div class="d-flex gap-2">
             @can('fournisseur.reglement')
                 {{-- Règlement global (solde total) volontairement masqué pour
-                     l'instant : on règle d'abord par bon d'achat précis (bouton
+                     l'instant : on règle d'abord par bon de commande précis (bouton
                      dédié dans le tableau ci-dessous, voir resterFournisseurModal
                      en mode ciblé) — reglerIntegralite() reste fonctionnel côté
                      serveur, seule cette entrée est retirée de l'écran. --}}
@@ -43,7 +46,7 @@
                 :value="montant($totalAchats)" />
         </div>
         <div class="col-6 col-md-3">
-            <x-kpi-card label="Bons d'achat" icon="bi-truck" color="primary"
+            <x-kpi-card label="Bons de commande" icon="bi-truck" color="primary"
                 :value="$fournisseur->commande_achats_count" />
         </div>
         <div class="col-6 col-md-3">
@@ -53,8 +56,19 @@
     </div>
 
     <div class="card mb-3">
-        <div class="card-body">
-            <h3 class="h6 mb-0">Bons d'achat</h3>
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h3 class="h6 mb-0">Bons de commande</h3>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <form method="GET" action="{{ route('fournisseurs.show', $fournisseur) }}" class="d-flex align-items-center gap-1">
+                    <div class="form-check mb-0">
+                        <input type="checkbox" name="reception_incomplete" value="1" id="reception-incomplete"
+                               class="form-check-input" @checked($receptionIncomplete) onchange="this.form.submit()">
+                        <label class="form-check-label small" for="reception-incomplete">Pas encore reçus à 100 %</label>
+                    </div>
+                </form>
+                <x-export-buttons :pdf-route="route('fournisseurs.commandes.pdf', [$fournisseur] + request()->query())"
+                    :excel-route="route('fournisseurs.commandes.excel', [$fournisseur] + request()->query())" />
+            </div>
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
@@ -64,6 +78,7 @@
                         <th>Date</th>
                         <th>Destination(s)</th>
                         <th>Statut</th>
+                        <th>Réception</th>
                         <th class="text-end">Total TTC</th>
                         <th class="text-end">Réglé</th>
                         <th class="text-end">Reste dû</th>
@@ -85,7 +100,16 @@
                                     <span class="badge text-bg-secondary">Brouillon</span>
                                 @endif
                             </td>
-                            <td class="text-end">{{ montant($commande->totalTtc()) }}</td>
+                            <td>
+                                @if ($commande->statut === 'validee')
+                                    <span class="small {{ $commande->tauxCompletion() >= 100 ? 'text-success' : ($commande->tauxCompletion() > 0 ? 'text-warning-emphasis' : 'text-secondary') }}">
+                                        {{ quantite($commande->quantiteRecuePieces()) }}/{{ quantite($commande->quantiteCommandeePieces()) }} · {{ $commande->tauxCompletion() }} %
+                                    </span>
+                                @else
+                                    <span class="text-secondary">—</span>
+                                @endif
+                            </td>
+                            <td class="text-end">{{ montant($commande->totalTtcReel()) }}</td>
                             @if ($commande->statut === 'validee')
                                 <td class="text-end text-success">{{ montant($commande->montantRegle()) }}</td>
                                 <td class="text-end {{ $commande->resteDu() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ montant($commande->resteDu()) }}</td>
@@ -94,7 +118,7 @@
                                 <td class="text-end text-secondary">—</td>
                             @endif
                             <td class="text-end">
-                                <a href="{{ route('commande-achats.show', $commande) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Détail du bon d'achat">
+                                <a href="{{ route('commande-achats.show', $commande) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Détail du bon de commande">
                                     <i class="bi bi-eye"></i>
                                     <span class="visually-hidden">Détail</span>
                                 </a>
@@ -102,7 +126,7 @@
                                     @if ($commande->statut === 'validee' && ! $commande->trashed() && $commande->resteDu() > 0)
                                         <button type="button" class="btn btn-sm btn-icon btn-outline-reglement" title="Régler cette dette"
                                                 data-bs-toggle="modal" data-bs-target="#reglerFournisseurModal"
-                                                data-montant="{{ min($commande->resteDu(), $solde) }}"
+                                                data-montant="{{ $commande->resteDu() }}"
                                                 data-commande="{{ $commande->id }}"
                                                 data-numero="{{ $commande->numero }}">
                                             <i class="bi bi-cash-coin"></i>
@@ -114,7 +138,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-secondary py-4">Aucune commande pour ce fournisseur.</td>
+                            <td colspan="9" class="text-center text-secondary py-4">Aucune commande pour ce fournisseur.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -171,7 +195,7 @@
                             </td>
                             <td class="text-end">
                                 @if ($commandeLiee)
-                                    <a href="{{ route('commande-achats.show', $commandeLiee) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Voir le détail du bon d'achat">
+                                    <a href="{{ route('commande-achats.show', $commandeLiee) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Voir le détail du bon de commande">
                                         <i class="bi bi-eye"></i>
                                         <span class="visually-hidden">Détail</span>
                                     </a>
@@ -191,10 +215,6 @@
                 {{ $ecritures->onEachSide(1)->links() }}
             </div>
         @endif
-    </div>
-
-    <div class="mt-3">
-        <a href="{{ route('fournisseurs.index') }}" class="btn btn-link ps-0">Retour à la liste</a>
     </div>
 
     @can('fournisseur.reglement')
@@ -217,6 +237,35 @@
                      get montantValide() { return this.commandeAchatId ? this.totalPaiements <= this.detteAffichee : this.totalPaiements === this.detteAffichee; },
                      ajouterPaiement() { this.paiements.push({ moyen_paiement_id: '', montant: null }); },
                      retirerPaiement(index) { if (this.paiements.length > 1) this.paiements.splice(index, 1); },
+                     // Uniquement en mode ciblé (un bon de commande précis) :
+                     // un règlement global doit, lui, pouvoir dépasser
+                     // temporairement le solde pendant la saisie pour que le
+                     // message d'erreur (!montantValide) reste visible tant
+                     // que le compte n'est pas exact — voir montantValide.
+                     // Volontairement PAS combiné à x-model sur le même champ :
+                     // les deux écouteraient tous les deux l'évènement 'input'
+                     // et, selon l'ordre d'application des directives Alpine,
+                     // x-model peut réécrire la valeur clampée avec la valeur
+                     // brute juste après — un seul gestionnaire (@input
+                     // ci-dessous, qui pilote :value) élimine cette course.
+                     // Le gestionnaire @input force AUSSI directement
+                     // $event.target.value (pas seulement paiement.montant) :
+                     // si la valeur tapée dépasse déjà le plafond dès le
+                     // champ pré-rempli au maximum, clamperMontant() renvoie
+                     // la MÊME valeur qu'avant — Alpine ne détecte alors
+                     // aucun changement réactif et ne réécrit jamais le DOM,
+                     // laissant affiché (et surtout SOUMIS, voir FormData)
+                     // le chiffre brut tapé malgré un paiement.montant
+                     // interne correctement plafonné. Un vrai bug vécu, pas
+                     // une précaution théorique.
+                     clamperMontant(index, valeurBrute) {
+                         if (valeurBrute === '') return null;
+                         const valeur = Number(valeurBrute) || 0;
+                         if (!this.commandeAchatId) return valeur;
+                         const autres = this.paiements.reduce((total, p, i) => i === index ? total : total + (Number(p.montant) || 0), 0);
+                         const maxPourCetteLigne = Math.max(0, this.detteAffichee - autres);
+                         return Math.min(valeur, maxPourCetteLigne);
+                     },
                      onModalShow(event) {
                          this.commandeAchatId = event.relatedTarget?.dataset.commande || null;
                          this.commandeNumero = event.relatedTarget?.dataset.numero || null;
@@ -245,13 +294,13 @@
                             <div class="modal-body">
                                 <p class="small text-secondary">
                                     <template x-if="commandeNumero">
-                                        <span>Reste dû sur le bon d'achat <strong x-text="commandeNumero"></strong> : <strong x-text="detteAffichee.toLocaleString('fr-FR') + ' ' + window.DEVISE_ABREVIATION"></strong></span>
+                                        <span>Reste dû sur le bon de commande <strong x-text="commandeNumero"></strong> : <strong x-text="detteAffichee.toLocaleString('fr-FR') + ' ' + window.DEVISE_ABREVIATION"></strong></span>
                                     </template>
                                     <template x-if="!commandeNumero">
                                         <span>
                                             Dette totale du fournisseur : <strong>{{ montant($solde) }}</strong> — ce règlement
-                                            soldera l'intégralité de la dette, répartie automatiquement sur chaque bon d'achat encore dû
-                                            (le plus ancien d'abord). Pour un paiement partiel, réglez un bon d'achat précis depuis la liste ci-dessous.
+                                            soldera l'intégralité de la dette, répartie automatiquement sur chaque bon de commande encore dû
+                                            (le plus ancien d'abord). Pour un paiement partiel, réglez un bon de commande précis depuis la liste ci-dessous.
                                         </span>
                                     </template>
                                 </p>
@@ -268,7 +317,10 @@
                                             </select>
                                         </div>
                                         <div class="col-4">
-                                            <input type="number" :name="'paiements['+index+'][montant]'" x-model.number="paiement.montant" min="1" class="form-control form-control-sm" placeholder="Montant" required>
+                                            <input type="number" :name="'paiements['+index+'][montant]'" :value="paiement.montant"
+                                                   @input="paiement.montant = clamperMontant(index, $event.target.value); $event.target.value = paiement.montant ?? ''"
+                                                   min="1" :max="commandeAchatId ? detteAffichee : null"
+                                                   class="form-control form-control-sm" placeholder="Montant" required>
                                         </div>
                                         <div class="col-2">
                                             <button type="button" class="btn btn-sm btn-icon btn-outline-danger" @click="retirerPaiement(index)" x-show="paiements.length > 1">
@@ -277,7 +329,8 @@
                                         </div>
                                     </div>
                                 </template>
-                                <button type="button" class="btn btn-sm btn-outline-reglement" @click="ajouterPaiement()">
+                                <button type="button" class="btn btn-sm btn-outline-reglement" @click="ajouterPaiement()"
+                                        :disabled="commandeAchatId && totalPaiements >= detteAffichee">
                                     <i class="bi bi-plus-lg"></i> Ajouter un moyen de paiement
                                 </button>
 

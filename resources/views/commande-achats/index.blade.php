@@ -1,17 +1,17 @@
 @extends('layouts.app')
 
-@section('title', "Bons d'achat")
+@section('title', "Bons de commande")
 
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="h4 mb-0">Bons d'achat</h2>
+        <h2 class="h4 mb-0">Bons de commande</h2>
         @can('achat.creer')
-            <a href="{{ route('commande-achats.create') }}" class="btn btn-primary">Nouveau bon d'achat</a>
+            <a href="{{ route('commande-achats.create') }}" class="btn btn-primary">Nouveau bon de commande</a>
         @endcan
     </div>
 
     <x-recherche-form :action="route('commande-achats.index')" placeholder="Numéro de commande…"
-        :autres-params="['date_debut', 'date_fin', 'statut']">
+        :autres-params="['date_debut', 'date_fin', 'statut', 'reception_incomplete']">
         <div>
             <label for="date_debut" class="form-label small mb-1">Du</label>
             <input type="date" name="date_debut" id="date_debut" class="form-control" value="{{ $dateDebut }}" onchange="this.form.submit()">
@@ -28,6 +28,11 @@
                 <option value="validee" @selected(request('statut') === 'validee')>Validée</option>
             </select>
         </div>
+        <div class="form-check mb-2">
+            <input type="checkbox" name="reception_incomplete" value="1" id="reception-incomplete"
+                   class="form-check-input" @checked($receptionIncomplete) onchange="this.form.submit()">
+            <label class="form-check-label small" for="reception-incomplete">Pas encore reçus à 100 %</label>
+        </div>
     </x-recherche-form>
 
     <div class="card">
@@ -39,6 +44,7 @@
                         <th>Fournisseur</th>
                         <x-th-tri champ="date_commande" label="Date" />
                         <x-th-tri champ="statut" label="Statut" />
+                        <th>Réception</th>
                         <th class="text-end">Montant dû</th>
                         <th class="text-end">Déjà réglé</th>
                         <th class="text-end">Reste à régler</th>
@@ -58,8 +64,17 @@
                                     <span class="badge text-bg-secondary">Brouillon</span>
                                 @endif
                             </td>
+                            <td>
+                                @if ($commande->statut === 'validee')
+                                    <span class="small {{ $commande->tauxCompletion() >= 100 ? 'text-success' : ($commande->tauxCompletion() > 0 ? 'text-warning-emphasis' : 'text-secondary') }}">
+                                        {{ quantite($commande->quantiteRecuePieces()) }}/{{ quantite($commande->quantiteCommandeePieces()) }} · {{ $commande->tauxCompletion() }} %
+                                    </span>
+                                @else
+                                    <span class="text-secondary">—</span>
+                                @endif
+                            </td>
                             @if ($commande->statut === 'validee')
-                                <td class="text-end">{{ montant($commande->totalTtc()) }}</td>
+                                <td class="text-end">{{ montant($commande->totalTtcReel()) }}</td>
                                 <td class="text-end text-success">{{ montant($commande->montantRegle()) }}</td>
                                 <td class="text-end {{ $commande->resteDu() > 0 ? 'text-danger fw-medium' : 'text-secondary' }}">{{ montant($commande->resteDu()) }}</td>
                             @else
@@ -76,7 +91,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-secondary py-4">Aucun bon d'achat pour l'instant.</td>
+                            <td colspan="9" class="text-center text-secondary py-4">Aucun bon de commande pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>

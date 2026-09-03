@@ -1,15 +1,18 @@
 @extends('layouts.app')
 
-@section('title', "Bon d'achat {$commande->numero}")
+@section('title', "Bon de commande {$commande->numero}")
 
 @section('content')
     <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
-            <h2 class="h4 mb-1">Bon d'achat <code>{{ $commande->numero }}</code></h2>
-            <div class="text-secondary small">
+            <div class="d-flex align-items-center gap-2">
+                <x-bouton-retour :route="route('commande-achats.index')" />
+                <h2 class="h4 mb-0">Bon de commande <code>{{ $commande->numero }}</code></h2>
+            </div>
+            <div class="text-secondary small ms-5 ps-1">
                 Fournisseur : <a href="{{ route('fournisseurs.show', $commande->fournisseur) }}">{{ $commande->fournisseur->nom }}</a>
             </div>
-            <div class="text-secondary small">
+            <div class="text-secondary small ms-5 ps-1">
                 @if ($commande->trashed())
                     <span class="text-danger">Annulée</span>
                 @elseif ($commande->statut === 'validee')
@@ -20,10 +23,7 @@
             </div>
         </div>
         <div class="d-flex gap-2">
-            <x-bouton-imprimer :pdf-route="route('commande-achats.pdf', $commande)" />
-            <a href="{{ route('commande-achats.pdf', $commande) }}" class="btn btn-outline-secondary">
-                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
-            </a>
+            <x-export-buttons :pdf-route="route('commande-achats.pdf', $commande)" :excel-route="route('commande-achats.excel', $commande)" />
             @if (! $commande->trashed() && $commande->statut === 'brouillon' && $peutAnnuler)
                 <x-delete-button :action="route('commande-achats.destroy', $commande)" :label="'la commande « '.$commande->numero.' »'" />
             @endif
@@ -44,16 +44,67 @@
         $afficheRegler = ! $commande->trashed() && $commande->statut === 'validee' && $peutRegler && $commande->resteDu() > 0;
         $afficheAnnuler = ! $commande->trashed() && $commande->statut === 'validee' && $peutAnnuler;
         $afficheRetourner = ! $commande->trashed() && $commande->statut === 'validee' && $peutRetourner;
-        $lignesRetournables = $commande->lignes->filter(
-            fn ($ligne) => $ligne->quantite_pieces - ($dejaRetourneParLigne[$ligne->id] ?? 0) > 0
+        $afficheReceptionner = ! $commande->trashed() && $commande->statut === 'validee' && $peutReceptionner;
+        $lignesAReceptionner = $commande->lignes->filter(
+            fn ($ligne) => (float) $ligne->quantite_pieces - ($dejaRecuParLigne[$ligne->id] ?? 0) > 0
         );
     @endphp
 
-    @if ($afficheValider || $afficheRegler || $afficheRetourner || $afficheAnnuler)
+    @if ($commande->statut === 'validee' && ! $commande->trashed())
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0 border-start border-4 border-info">
+                    <div class="card-body">
+                        <div class="text-secondary small">Réception</div>
+                        <div class="fs-4 fw-bold">{{ quantite($commande->quantiteRecuePieces()) }} / {{ quantite($commande->quantiteCommandeePieces()) }} pièce(s)</div>
+                        <div class="small text-secondary">
+                            Reste à recevoir : <span class="{{ $commande->quantiteResteARecevoirPieces() > 0 ? 'text-warning-emphasis fw-medium' : '' }}">{{ quantite($commande->quantiteResteARecevoirPieces()) }}</span>
+                            · {{ $commande->tauxCompletion() }} %
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0 border-start border-4 border-primary">
+                    <div class="card-body">
+                        <div class="text-secondary small">Montant</div>
+                        <div class="fs-4 fw-bold">{{ number_format($commande->totalTtcReel(), 0, ',', ' ') }} F</div>
+                        <div class="small text-secondary">
+                            Indicatif : {{ number_format($commande->totalTtc(), 0, ',', ' ') }} F
+                            @if ($commande->ecartMontant() !== 0)
+                                · Écart : <span class="{{ $commande->ecartMontant() > 0 ? 'text-danger' : 'text-success' }}">{{ $commande->ecartMontant() > 0 ? '+' : '' }}{{ number_format($commande->ecartMontant(), 0, ',', ' ') }} F</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0 border-start border-4 border-secondary">
+                    <div class="card-body">
+                        <div class="text-secondary small">Réceptions</div>
+                        <div class="fs-4 fw-bold">{{ $commande->receptions->count() }}</div>
+                        <div class="small text-secondary">
+                            Reste dû : {{ number_format($commande->resteDu(), 0, ',', ' ') }} F
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($afficheValider || $afficheReceptionner || $afficheRegler || $afficheRetourner || $afficheAnnuler)
         <div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
             @if ($afficheValider)
                 <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#validerAchatModal">
                     <i class="bi bi-check-circle me-1"></i>Valider
+                </button>
+            @endif
+
+            @if ($afficheReceptionner)
+                <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#receptionnerAchatModal"
+                        @disabled($lignesAReceptionner->isEmpty())
+                        title="{{ $lignesAReceptionner->isEmpty() ? 'Tout a déjà été reçu' : '' }}">
+                    <i class="bi bi-box-seam me-1"></i>Réceptionner
                 </button>
             @endif
 
@@ -66,13 +117,15 @@
             @if ($afficheRetourner)
                 <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#retourAchatModal"
                         @disabled($lignesRetournables->isEmpty())
-                        title="{{ $lignesRetournables->isEmpty() ? 'Tout a déjà été retourné' : '' }}">
+                        title="{{ $lignesRetournables->isEmpty() ? 'Rien à retourner (pas encore reçu, ou tout a déjà été retourné)' : '' }}">
                     <i class="bi bi-arrow-return-left me-1"></i>Retourner
                 </button>
             @endif
 
             @if ($afficheAnnuler)
-                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#annulerAchatModal">
+                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#annulerAchatModal"
+                        @disabled($commande->receptions->isNotEmpty())
+                        title="{{ $commande->receptions->isNotEmpty() ? 'Déjà réceptionnée : corrigez via un retour fournisseur' : '' }}">
                     <i class="bi bi-x-circle me-1"></i>Annuler
                 </button>
             @endif
@@ -93,6 +146,9 @@
                         <th>Taxe</th>
                         <th>Total HT</th>
                         <th>Total TTC</th>
+                        @if ($commande->statut === 'validee')
+                            <th>Reçu</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody>
@@ -119,6 +175,14 @@
                             <td>{{ $ligne->taxe->nom ?? '—' }}</td>
                             <td>{{ montant($ligne->montantHt()) }}</td>
                             <td>{{ montant($ligne->montantTtc()) }}</td>
+                            @if ($commande->statut === 'validee')
+                                @php $ligneDejaRecu = (float) ($dejaRecuParLigne[$ligne->id] ?? 0); @endphp
+                                <td>
+                                    <span class="{{ $ligneDejaRecu >= (float) $ligne->quantite_pieces ? 'text-success' : ($ligneDejaRecu > 0 ? 'text-warning-emphasis' : 'text-secondary') }}">
+                                        {{ quantite($ligneDejaRecu) }}/{{ quantite($ligne->quantite_pieces) }}
+                                    </span>
+                                </td>
+                            @endif
                         </tr>
                     @endforeach
                 </tbody>
@@ -128,6 +192,9 @@
                         <th>{{ montant($commande->totalTaxes()) }}</th>
                         <th>{{ montant($commande->totalHt()) }}</th>
                         <th>{{ montant($commande->totalTtc()) }}</th>
+                        @if ($commande->statut === 'validee')
+                            <th></th>
+                        @endif
                     </tr>
                 </tfoot>
             </table>
@@ -148,7 +215,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="2" class="text-secondary small">Aucun paiement encaissé à la validation.</td>
+                            <td colspan="2" class="text-secondary small">Aucun paiement pour l'instant.</td>
                         </tr>
                     @endforelse
                     @foreach ($commande->reglementsFournisseur as $reglement)
@@ -167,6 +234,49 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+    @endif
+
+    @if ($commande->receptions->isNotEmpty())
+        <div class="card mt-3">
+            <div class="card-body">
+                <h3 class="h6">Bons d'achat (réceptions)</h3>
+                @foreach ($commande->receptions as $reception)
+                    <div class="small border-bottom py-1 text-info-emphasis">
+                        <div class="d-flex justify-content-between">
+                            <span>
+                                <i class="bi bi-box-seam me-1"></i>Bon d'achat <code>{{ $reception->numero }}</code>
+                                du {{ $reception->created_at->format('d/m/Y') }}
+                                par {{ $reception->auteur?->name ?? 'utilisateur supprimé' }}
+                                @if ($reception->numero_bon_livraison_fournisseur)
+                                    · BL n° <strong>{{ $reception->numero_bon_livraison_fournisseur }}</strong>
+                                @endif
+                                @if ($reception->numero_facture_fournisseur)
+                                    · Facture n° <strong>{{ $reception->numero_facture_fournisseur }}</strong>
+                                @endif
+                            </span>
+                            <span class="fw-medium">{{ montant($reception->totalTtc()) }}</span>
+                        </div>
+                        @if ($reception->motif)
+                            <div class="text-secondary ps-4 fst-italic">{{ $reception->motif }}</div>
+                        @endif
+                        @foreach ($reception->lignes as $ligneReception)
+                            <div class="d-flex justify-content-between text-secondary ps-4">
+                                <span>{{ $ligneReception->produit->libelle_affichage }} × {{ quantite($ligneReception->quantite_pieces) }} — {{ $ligneReception->magasin->nom }}</span>
+                                <span>{{ montant($ligneReception->prix_achat_reel) }} / pièce</span>
+                            </div>
+                        @endforeach
+                        @forelse ($reception->paiements as $paiementReception)
+                            <div class="d-flex justify-content-between text-success ps-4">
+                                <span>Payé — {{ $paiementReception->moyenPaiement->nom }}</span>
+                                <span>{{ montant($paiementReception->montant) }}</span>
+                            </div>
+                        @empty
+                            <div class="text-secondary ps-4 fst-italic">Rien payé à la réception — dette fournisseur intégrale pour ce lot.</div>
+                        @endforelse
+                    </div>
+                @endforeach
+            </div>
         </div>
     @endif
 
@@ -199,29 +309,186 @@
         </div>
     @endif
 
-    <div class="mt-3">
-        <a href="{{ route('commande-achats.index') }}" class="btn btn-link ps-0">Retour à la liste</a>
-    </div>
-
     @if ($afficheValider)
         <div class="modal fade" id="validerAchatModal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog">
-                <div class="modal-content" x-data="{ paiements: [{ moyen_paiement_id: '', montant: '' }],
-                        get totalPaiements() { return this.paiements.reduce((total, p) => total + (Number(p.montant) || 0), 0); },
-                        get resteDu() { return Math.max({{ $commande->totalTtc() }} - this.totalPaiements, 0); },
-                        ajouterPaiement() { this.paiements.push({ moyen_paiement_id: '', montant: '' }); },
-                        retirerPaiement(index) { this.paiements.splice(index, 1); } }">
+                <div class="modal-content">
                     <form id="formValiderAchat" method="POST" action="{{ route('commande-achats.valider', $commande) }}">
                         @csrf
                         <div class="modal-header">
-                            <h5 class="modal-title"><i class="bi bi-check-circle me-1"></i>Valider le bon d'achat</h5>
+                            <h5 class="modal-title"><i class="bi bi-check-circle me-1"></i>Valider le bon de commande</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="small text-secondary mb-0">
+                                Confirme la commande (envoyée au fournisseur, prête à être réceptionnée) — total
+                                indicatif : <strong>{{ montant($commande->totalTtc()) }}</strong>. Le stock et le
+                                paiement se font plus tard, à chaque réception.
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-link" data-bs-dismiss="modal">Fermer</button>
+                            <button type="submit" class="btn btn-success">Valider le bon de commande</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($afficheRegler)
+        <div class="modal fade" id="reglerFournisseurModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content" x-data="{ paiements: [{ moyen_paiement_id: '', montant: {{ $commande->resteDu() }} }],
+                        especeIds: @json($moyensPaiement->where('est_espece', true)->pluck('id')->values()),
+                        detteAffichee: {{ $commande->resteDu() }},
+                        get totalPaiements() { return this.paiements.reduce((total, p) => total + (Number(p.montant) || 0), 0); },
+                        get contientEspeces() { return this.paiements.some(p => this.especeIds.includes(Number(p.moyen_paiement_id))); },
+                        ajouterPaiement() { this.paiements.push({ moyen_paiement_id: '', montant: null }); },
+                        retirerPaiement(index) { this.paiements.splice(index, 1); },
+                        clamperMontant(index, valeurBrute) {
+                            if (valeurBrute === '') return null;
+                            const valeur = Number(valeurBrute) || 0;
+                            const autres = this.paiements.reduce((total, p, i) => i === index ? total : total + (Number(p.montant) || 0), 0);
+                            const maxPourCetteLigne = Math.max(0, this.detteAffichee - autres);
+                            return Math.min(valeur, maxPourCetteLigne);
+                        } }">
+                    <form id="formReglerFournisseur" method="POST" action="{{ route('reglements-fournisseur.store', $commande->fournisseur) }}">
+                        @csrf
+                        <input type="hidden" name="commande_achat_id" value="{{ $commande->id }}">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i>Règlement fournisseur</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
                         </div>
                         <div class="modal-body">
                             <p class="small text-secondary mb-2">
-                                Total TTC à régler : <strong>{{ montant($commande->totalTtc()) }}</strong><br>
-                                Laissez vide pour ne rien encaisser maintenant (dette fournisseur intégrale).
+                                Reste dû sur ce bon de commande : <strong>{{ montant($commande->resteDu()) }}</strong><br>
+                                Solde total du fournisseur (toutes commandes confondues) : {{ montant($commande->fournisseur->solde()) }}
                             </p>
+                            <template x-for="(paiement, index) in paiements" :key="index">
+                                <div class="row g-1 align-items-center mb-2">
+                                    <div class="col-6 col-md-5">
+                                        <select :name="'paiements['+index+'][moyen_paiement_id]'" x-model="paiement.moyen_paiement_id" class="form-select form-select-sm" required>
+                                            <option value="">Moyen…</option>
+                                            @foreach ($moyensPaiement as $moyen)
+                                                <option value="{{ $moyen->id }}">{{ $moyen->nom }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-4">
+                                        <input type="number" :name="'paiements['+index+'][montant]'" :value="paiement.montant"
+                                               @input="paiement.montant = clamperMontant(index, $event.target.value); $event.target.value = paiement.montant ?? ''"
+                                               min="1" :max="detteAffichee" class="form-control form-control-sm" placeholder="Montant" required>
+                                    </div>
+                                    <div class="col-2">
+                                        <button type="button" class="btn btn-sm btn-icon btn-outline-danger" @click="retirerPaiement(index)" x-show="paiements.length > 1">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                            <button type="button" class="btn btn-sm btn-outline-reglement" @click="ajouterPaiement()" :disabled="totalPaiements >= detteAffichee">
+                                <i class="bi bi-plus-lg"></i> Ajouter un paiement
+                            </button>
+                            <div class="mt-2 small text-secondary" x-show="contientEspeces" x-cloak>
+                                <i class="bi bi-safe me-1"></i>Paiement en espèces : sort de la Caisse Générale.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-link" data-bs-dismiss="modal">Fermer</button>
+                            <button type="submit" class="btn btn-reglement" :disabled="totalPaiements <= 0 || totalPaiements > detteAffichee">Enregistrer le règlement</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($afficheReceptionner && $lignesAReceptionner->isNotEmpty())
+        <div class="modal fade" id="receptionnerAchatModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content"
+                     x-data="{
+                        lignes: {{ $lignesAReceptionner->mapWithKeys(fn ($l) => [$l->id => 0])->toJson() }},
+                        paiements: [],
+                        get total() { return Object.values(this.lignes).reduce((s, q) => s + (Number(q) || 0), 0); },
+                        get totalPaiements() { return this.paiements.reduce((total, p) => total + (Number(p.montant) || 0), 0); },
+                        ajouterPaiement() { this.paiements.push({ moyen_paiement_id: '', montant: '' }); },
+                        retirerPaiement(index) { this.paiements.splice(index, 1); },
+                     }">
+                    <form method="POST" action="{{ route('commande-achats.receptions.store', $commande) }}">
+                        @csrf
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-box-seam me-1"></i>Enregistrer une réception</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="small text-secondary">
+                                Quantité physiquement arrivée par article (unité de base — pièce), au prix
+                                réellement facturé par le fournisseur pour ce lot (peut différer de l'indicatif) et
+                                à la destination réelle (pré-remplie avec le plan de la commande, modifiable).
+                            </p>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-6">
+                                    <label for="reception-achat-numero-bl" class="form-label small">N° de bon de livraison (optionnel)</label>
+                                    <input type="text" name="numero_bon_livraison_fournisseur" id="reception-achat-numero-bl" class="form-control form-control-sm"
+                                           placeholder="Numéro écrit sur le bon de livraison">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="reception-achat-numero-facture" class="form-label small">N° de facture fournisseur (optionnel)</label>
+                                    <input type="text" name="numero_facture_fournisseur" id="reception-achat-numero-facture" class="form-control form-control-sm"
+                                           placeholder="Numéro écrit sur la facture, si déjà remise">
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Produit</th>
+                                            <th class="text-end">Commandé</th>
+                                            <th class="text-end">Reste à recevoir</th>
+                                            <th style="min-width: 160px;">Destination</th>
+                                            <th style="width: 130px;">Prix réel HT / pièce</th>
+                                            <th class="text-end" style="width: 130px;">Reçu</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($lignesAReceptionner as $ligne)
+                                            @php $ligneDejaRecu = (float) ($dejaRecuParLigne[$ligne->id] ?? 0); @endphp
+                                            <tr>
+                                                <td>
+                                                    {{ $ligne->produit->libelle_affichage }}
+                                                    <input type="hidden" name="lignes[{{ $ligne->id }}][ligne_commande_achat_id]" value="{{ $ligne->id }}">
+                                                </td>
+                                                <td class="text-end">{{ quantite($ligne->quantite_pieces) }}</td>
+                                                <td class="text-end">{{ quantite((float) $ligne->quantite_pieces - $ligneDejaRecu) }}</td>
+                                                <td>
+                                                    <select name="lignes[{{ $ligne->id }}][magasin_id]" class="form-select form-select-sm">
+                                                        @foreach ($magasins as $magasinOption)
+                                                            <option value="{{ $magasinOption->id }}" @selected($magasinOption->id === $ligne->magasin_destination_id)>{{ $magasinOption->nom }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <input type="number" name="lignes[{{ $ligne->id }}][prix_achat_reel]"
+                                                           value="{{ $ligne->prixAchatParPiece() }}" min="0" step="1"
+                                                           class="form-control form-control-sm text-end">
+                                                </td>
+                                                <td>
+                                                    <input type="number" name="lignes[{{ $ligne->id }}][quantite_pieces]"
+                                                           x-model.number="lignes[{{ $ligne->id }}]"
+                                                           min="0" step="0.001" max="{{ (float) $ligne->quantite_pieces - $ligneDejaRecu }}"
+                                                           class="form-control form-control-sm text-end">
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <label class="form-label small">Paiement (optionnel)</label>
                             <template x-for="(paiement, index) in paiements" :key="index">
                                 <div class="row g-1 align-items-center mb-2">
                                     <div class="col-6 col-md-5">
@@ -242,74 +509,22 @@
                                     </div>
                                 </div>
                             </template>
-                            <button type="button" class="btn btn-sm btn-outline-success" @click="ajouterPaiement()">
+                            <button type="button" class="btn btn-sm btn-outline-info" @click="ajouterPaiement()">
                                 <i class="bi bi-plus-lg"></i> Ajouter un paiement
                             </button>
-                            <div class="mt-2 small text-secondary">
-                                Reste dû après validation : <span class="fw-semibold" x-text="resteDu.toLocaleString('fr-FR') + ' ' + window.DEVISE_ABREVIATION"></span>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-link" data-bs-dismiss="modal">Fermer</button>
-                            <button type="submit" class="btn btn-success">Valider le bon d'achat</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    @if ($afficheRegler)
-        <div class="modal fade" id="reglerFournisseurModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog">
-                <div class="modal-content" x-data="{ paiements: [{ moyen_paiement_id: '', montant: {{ $commande->resteDu() }} }],
-                        especeIds: @json($moyensPaiement->where('est_espece', true)->pluck('id')->values()),
-                        get totalPaiements() { return this.paiements.reduce((total, p) => total + (Number(p.montant) || 0), 0); },
-                        get contientEspeces() { return this.paiements.some(p => this.especeIds.includes(Number(p.moyen_paiement_id))); },
-                        ajouterPaiement() { this.paiements.push({ moyen_paiement_id: '', montant: '' }); },
-                        retirerPaiement(index) { this.paiements.splice(index, 1); } }">
-                    <form id="formReglerFournisseur" method="POST" action="{{ route('reglements-fournisseur.store', $commande->fournisseur) }}">
-                        @csrf
-                        <input type="hidden" name="commande_achat_id" value="{{ $commande->id }}">
-                        <div class="modal-header">
-                            <h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i>Règlement fournisseur</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-                        </div>
-                        <div class="modal-body">
-                            <p class="small text-secondary mb-2">
-                                Reste dû sur ce bon d'achat : <strong>{{ montant($commande->resteDu()) }}</strong><br>
-                                Solde total du fournisseur (toutes commandes confondues) : {{ montant($commande->fournisseur->solde()) }}
+                            <p class="small text-secondary mt-2 mb-0">
+                                Laissez vide pour ne rien encaisser maintenant (dette fournisseur intégrale pour ce
+                                lot).
                             </p>
-                            <template x-for="(paiement, index) in paiements" :key="index">
-                                <div class="row g-1 align-items-center mb-2">
-                                    <div class="col-6 col-md-5">
-                                        <select :name="'paiements['+index+'][moyen_paiement_id]'" x-model="paiement.moyen_paiement_id" class="form-select form-select-sm" required>
-                                            <option value="">Moyen…</option>
-                                            @foreach ($moyensPaiement as $moyen)
-                                                <option value="{{ $moyen->id }}">{{ $moyen->nom }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="col-4">
-                                        <input type="number" :name="'paiements['+index+'][montant]'" x-model.number="paiement.montant" min="1" class="form-control form-control-sm" placeholder="Montant" required>
-                                    </div>
-                                    <div class="col-2">
-                                        <button type="button" class="btn btn-sm btn-icon btn-outline-danger" @click="retirerPaiement(index)" x-show="paiements.length > 1">
-                                            <i class="bi bi-x-lg"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </template>
-                            <button type="button" class="btn btn-sm btn-outline-reglement" @click="ajouterPaiement()">
-                                <i class="bi bi-plus-lg"></i> Ajouter un paiement
-                            </button>
-                            <div class="mt-2 small text-secondary" x-show="contientEspeces" x-cloak>
-                                <i class="bi bi-safe me-1"></i>Paiement en espèces : sort de la Caisse Générale.
+
+                            <div class="mb-2 mt-3">
+                                <label for="reception-achat-motif" class="form-label small">Motif (optionnel)</label>
+                                <textarea name="motif" id="reception-achat-motif" class="form-control form-control-sm" rows="2"></textarea>
                             </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-link" data-bs-dismiss="modal">Fermer</button>
-                            <button type="submit" class="btn btn-reglement" :disabled="totalPaiements <= 0">Enregistrer le règlement</button>
+                            <button type="submit" class="btn btn-info" :disabled="total <= 0">Enregistrer la réception</button>
                         </div>
                     </form>
                 </div>
@@ -324,13 +539,14 @@
                     <form id="formAnnulerAchat" method="POST" action="{{ route('commande-achats.annuler', $commande) }}">
                         @csrf
                         <div class="modal-header">
-                            <h5 class="modal-title text-danger"><i class="bi bi-x-circle me-1"></i>Annuler le bon d'achat</h5>
+                            <h5 class="modal-title text-danger"><i class="bi bi-x-circle me-1"></i>Annuler le bon de commande</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
                         </div>
                         <div class="modal-body">
                             <p class="small text-secondary">
-                                Le stock sera décrémenté en conséquence (échoue si une partie a déjà été vendue ou
-                                transférée ailleurs). Cette action est irréversible.
+                                Si le stock a déjà été mouvementé pour cette commande, il sera décrémenté en
+                                conséquence (échoue si une partie a déjà été vendue ou transférée ailleurs). Cette
+                                action est irréversible.
                             </p>
                             <label for="motif-annulation-achat" class="form-label small">Motif de l'annulation (obligatoire)</label>
                             <textarea name="motif" id="motif-annulation-achat" class="form-control form-control-sm" rows="2" required></textarea>
@@ -350,7 +566,7 @@
             <div class="modal-dialog modal-lg">
                 <div class="modal-content"
                      x-data="{
-                        lignes: {{ $lignesRetournables->mapWithKeys(fn ($l) => [$l->id => 0])->toJson() }},
+                        lignes: {{ $lignesRetournables->mapWithKeys(fn ($item, $index) => [$index => 0])->toJson() }},
                         get total() { return Object.values(this.lignes).reduce((s, q) => s + (Number(q) || 0), 0); },
                      }">
                     <form method="POST" action="{{ route('commande-achats.retours.store', $commande) }}">
@@ -362,32 +578,34 @@
                         <div class="modal-body">
                             <p class="small text-secondary">
                                 Quantité à rendre au fournisseur par article (unité de base — pièce). Le stock est
-                                repris et un avoir est crédité au compte du fournisseur.
+                                repris à l'endroit où il a été reçu, et un avoir est crédité au compte du fournisseur.
                             </p>
                             <div class="table-responsive">
                                 <table class="table table-sm align-middle">
                                     <thead>
                                         <tr>
                                             <th>Produit</th>
+                                            <th>Destination</th>
                                             <th class="text-end">Reçu</th>
                                             <th class="text-end">Déjà retourné</th>
                                             <th class="text-end" style="width: 140px;">À retourner</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach ($lignesRetournables as $ligne)
-                                            @php $dejaRetourne = $dejaRetourneParLigne[$ligne->id] ?? 0; @endphp
+                                        @foreach ($lignesRetournables as $index => $item)
                                             <tr>
                                                 <td>
-                                                    {{ $ligne->produit->libelle_affichage }}
-                                                    <input type="hidden" name="lignes[{{ $ligne->id }}][ligne_commande_achat_id]" value="{{ $ligne->id }}">
+                                                    {{ $item->ligne->produit->libelle_affichage }}
+                                                    <input type="hidden" name="lignes[{{ $index }}][ligne_commande_achat_id]" value="{{ $item->ligne->id }}">
+                                                    <input type="hidden" name="lignes[{{ $index }}][magasin_id]" value="{{ $item->magasin->id }}">
                                                 </td>
-                                                <td class="text-end">{{ quantite($ligne->quantite_pieces) }}</td>
-                                                <td class="text-end">{{ quantite($dejaRetourne) }}</td>
+                                                <td>{{ $item->magasin->nom }}</td>
+                                                <td class="text-end">{{ quantite($item->quantiteRecue) }}</td>
+                                                <td class="text-end">{{ quantite($item->dejaRetourne) }}</td>
                                                 <td>
-                                                    <input type="number" name="lignes[{{ $ligne->id }}][quantite_pieces]"
-                                                           x-model.number="lignes[{{ $ligne->id }}]"
-                                                           min="0" step="0.001" max="{{ (float) $ligne->quantite_pieces - $dejaRetourne }}"
+                                                    <input type="number" name="lignes[{{ $index }}][quantite_pieces]"
+                                                           x-model.number="lignes[{{ $index }}]"
+                                                           min="0" step="0.001" max="{{ $item->reste }}"
                                                            class="form-control form-control-sm text-end">
                                                 </td>
                                             </tr>

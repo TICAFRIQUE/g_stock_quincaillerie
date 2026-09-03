@@ -12,9 +12,17 @@
         </div>
         {{ $slot }}
         @if (request()->hasAny(array_merge([$nom, 'tri', 'direction'], $autresParams)))
-            <a href="{{ $action }}" class="btn btn-outline-danger" title="Réinitialiser la recherche">
-                <i class="bi bi-x-circle"></i>
-            </a>
+            <x-bouton-reinitialiser :route="$action" />
         @endif
+        {{-- Boutons d'impression/export : optionnels, passés via <x-slot:export>.
+             ms-auto (pas de sous-groupe + justify-content-between, qui forçait
+             les deux groupes à se rétrécir l'un l'autre et cassait le retour à
+             la ligne naturel des filtres) : chaque champ garde sa largeur
+             normale, seul ce bloc est poussé à droite s'il reste de la place. --}}
+        @isset($export)
+            <div class="d-flex gap-2 flex-wrap d-print-none ms-auto">
+                {{ $export }}
+            </div>
+        @endisset
     </div>
 </form>

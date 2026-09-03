@@ -3,7 +3,10 @@
 @section('title', 'Modifier le produit')
 
 @section('content')
-    <h2 class="h4 mb-3">Modifier « {{ $produit->libelle_affichage }} »</h2>
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <x-bouton-retour :route="route('produits.index')" />
+        <h2 class="h4 mb-0">Modifier « {{ $produit->libelle_affichage }} »</h2>
+    </div>
 
     <div class="row g-4">
         <div class="col-12 col-lg-7">

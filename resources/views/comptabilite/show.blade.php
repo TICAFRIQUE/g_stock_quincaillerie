@@ -5,8 +5,11 @@
 @section('content')
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
         <div>
-            <h2 class="h4 mb-1">{{ $compte->nom }}</h2>
-            <p class="text-secondary small mb-0">
+            <div class="d-flex align-items-center gap-2">
+                <x-bouton-retour :route="route('comptabilite.caisses.index')" />
+                <h2 class="h4 mb-0">{{ $compte->nom }}</h2>
+            </div>
+            <p class="text-secondary small mb-0 ms-5 ps-1">
                 @if ($compte->type === 'caisse_generale')
                     <span class="badge text-bg-primary">Caisse Générale</span>
                 @elseif ($compte->type === 'banque')
@@ -24,16 +27,8 @@
                     </button>
                 @endif
             @endcan
-            <x-bouton-imprimer :pdf-route="route('comptabilite.caisses.show.pdf', array_merge(request()->query(), ['compte' => $compte->id]))" />
-            <a href="{{ route('comptabilite.caisses.show.pdf', array_merge(request()->query(), ['compte' => $compte->id])) }}" class="btn btn-outline-secondary d-print-none">
-                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
-            </a>
-            <a href="{{ route('comptabilite.caisses.show.excel', array_merge(request()->query(), ['compte' => $compte->id])) }}" class="btn btn-outline-secondary d-print-none">
-                <i class="bi bi-file-earmark-excel me-1"></i>Excel
-            </a>
-            <a href="{{ route('comptabilite.caisses.index') }}" class="btn btn-link d-print-none">
-                <i class="bi bi-arrow-left me-1"></i>Retour
-            </a>
+            <x-export-buttons :pdf-route="route('comptabilite.caisses.show.pdf', array_merge(request()->query(), ['compte' => $compte->id]))"
+                :excel-route="route('comptabilite.caisses.show.excel', array_merge(request()->query(), ['compte' => $compte->id]))" />
         </div>
     </div>
 
@@ -225,9 +220,7 @@
         </div>
         @if (request()->hasAny(['debut', 'fin', 'type']))
             <div class="col-auto">
-                <a href="{{ route('comptabilite.caisses.show', $compte) }}" class="btn btn-sm btn-outline-danger" title="Réinitialiser les filtres">
-                    <i class="bi bi-x-circle me-1"></i>Réinitialiser
-                </a>
+                <x-bouton-reinitialiser :route="route('comptabilite.caisses.show', $compte)" />
             </div>
         @endif
     </form>

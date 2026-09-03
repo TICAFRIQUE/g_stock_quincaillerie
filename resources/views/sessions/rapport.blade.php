@@ -4,18 +4,12 @@
 
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
-        <h2 class="h4 mb-0">Rapport de caisse</h2>
+        <div class="d-flex align-items-center gap-2">
+            <x-bouton-retour :route="route('sessions.show', $session)" />
+            <h2 class="h4 mb-0">Rapport de caisse</h2>
+        </div>
         <div class="d-flex gap-2">
-            <a href="{{ route('sessions.show', $session) }}" class="btn btn-link">
-                <i class="bi bi-arrow-left me-1"></i>Retour à la session
-            </a>
-            <x-bouton-imprimer :pdf-route="route('sessions.rapport.pdf', $session)" />
-            <a href="{{ route('sessions.rapport.pdf', $session) }}" class="btn btn-outline-secondary">
-                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
-            </a>
-            <a href="{{ route('sessions.rapport.excel', $session) }}" class="btn btn-outline-secondary">
-                <i class="bi bi-file-earmark-excel me-1"></i>Excel
-            </a>
+            <x-export-buttons :pdf-route="route('sessions.rapport.pdf', $session)" :excel-route="route('sessions.rapport.excel', $session)" />
         </div>
     </div>
 

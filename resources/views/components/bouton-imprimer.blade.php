@@ -5,7 +5,7 @@
          ExporteListe::pdfDepuisListe(), ?imprimer=1 → stream() au lieu de
          download()) — jamais un window.print() du HTML de la page (qui
          rendait différemment : cards, formulaires…). --}}
-    <button type="button" class="btn btn-outline-secondary d-print-none"
+    <button type="button" class="btn btn-sm btn-outline-secondary d-print-none"
         onclick="window.__imprimerPdf(this.dataset.pdfUrl)"
         data-pdf-url="{{ $pdfRoute . (str_contains($pdfRoute, '?') ? '&' : '?') . 'imprimer=1' }}">
         <i class="bi bi-printer me-1"></i>Imprimer
@@ -41,7 +41,7 @@
         };
     </script>
 @elseif ($tout)
-    <button type="button" class="btn btn-outline-secondary d-print-none" onclick="window.__imprimerRapportComplet()">
+    <button type="button" class="btn btn-sm btn-outline-secondary d-print-none" onclick="window.__imprimerRapportComplet()">
         <i class="bi bi-printer me-1"></i>Imprimer
     </button>
     <script>
@@ -57,7 +57,7 @@
         @endif
     </script>
 @else
-    <button type="button" class="btn btn-outline-secondary d-print-none"
+    <button type="button" class="btn btn-sm btn-outline-secondary d-print-none"
         onclick="(window.gstock && window.gstock.print) ? window.gstock.print() : window.print()">
         <i class="bi bi-printer me-1"></i>Imprimer
     </button>

@@ -5,26 +5,28 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
         <div>
-            <h2 class="h4 mb-0">Détail de la facture</h2>
-            <div class="text-secondary small"><code>{{ $vente->numero }}</code></div>
+            <div class="d-flex align-items-center gap-2">
+                <x-bouton-retour :route="route('sessions.show', $vente->sessionCaisse)" />
+                <h2 class="h4 mb-0">Détail de la facture</h2>
+            </div>
+            <div class="text-secondary small ms-5 ps-1"><code>{{ $vente->numero }}</code></div>
         </div>
         <div class="d-flex gap-2">
-            <a href="{{ route('sessions.show', $vente->sessionCaisse) }}" class="btn btn-link">
-                <i class="bi bi-arrow-left me-1"></i>Retour à la session
-            </a>
-            <button type="button" class="btn btn-outline-secondary"
-                onclick="(window.gstock && window.gstock.print) ? window.gstock.print() : window.print()">
-                <i class="bi bi-printer me-1"></i>Ticket caisse
-            </button>
-            <button type="button" class="btn btn-outline-secondary" onclick="imprimerFacture()">
-                <i class="bi bi-receipt me-1"></i>Facture
-            </button>
-            <a href="{{ route('ventes.pdf', $vente) }}" class="btn btn-outline-secondary">
-                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
-            </a>
-            <a href="{{ route('ventes.excel', $vente) }}" class="btn btn-outline-secondary">
-                <i class="bi bi-file-earmark-excel me-1"></i>Excel
-            </a>
+            <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                    onclick="(window.gstock && window.gstock.print) ? window.gstock.print() : window.print()">
+                    <i class="bi bi-printer me-1"></i>Ticket caisse
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="imprimerFacture()">
+                    <i class="bi bi-receipt me-1"></i>Facture
+                </button>
+                <a href="{{ route('ventes.pdf', $vente) }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+                </a>
+                <a href="{{ route('ventes.excel', $vente) }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                </a>
+            </div>
             <a href="{{ route('ventes.create', $vente->sessionCaisse) }}" class="btn btn-primary">
                 <i class="bi bi-cart-plus me-1"></i>Nouvelle facture
             </a>

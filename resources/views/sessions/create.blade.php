@@ -3,7 +3,10 @@
 @section('title', "Ouvrir une session")
 
 @section('content')
-    <h2 class="h4 mb-3">Ouvrir une session — {{ $caisse->nom }}</h2>
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <x-bouton-retour :route="route('sessions.index')" />
+        <h2 class="h4 mb-0">Ouvrir une session — {{ $caisse->nom }}</h2>
+    </div>
 
     <div class="card mx-auto" style="max-width: 480px;">
         <div class="card-body">

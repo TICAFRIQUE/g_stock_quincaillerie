@@ -334,37 +334,57 @@
             <div id="gAchats" class="accordion-collapse collapse" data-bs-parent="#accordionGuide">
                 <div class="accordion-body">
                     @can('achat.creer')
-                        <h6>Passer une commande d'achat</h6>
+                        <h6>Passer un bon de commande</h6>
                         <ol>
-                            <li>Menu <strong>Stock → Bons d'achat → Nouvelle commande</strong>, choisir le
-                                fournisseur et le magasin gestionnaire.</li>
-                            <li>Ajouter les lignes : produit, quantité, prix d'achat (HT), et la
-                                destination du stock (un magasin ou un dépôt — une commande peut
-                                livrer plusieurs sites différents, ligne par ligne).</li>
-                            <li>À la <strong>validation</strong>, le stock est immédiatement mis à jour
-                                (pas d'étape de réception séparée) et le coût moyen du produit
-                                recalculé.</li>
-                            <li>Un ou plusieurs paiements peuvent être saisis à la validation ; ce
-                                qui n'est pas payé devient une dette sur le compte du
-                                fournisseur.</li>
+                            <li>Menu <strong>Stock → Bons de commande → Nouveau bon de commande</strong>,
+                                choisir le fournisseur.</li>
+                            <li>Ajouter les lignes : produit, quantité, prix d'achat (HT) indicatif, et
+                                la destination du stock (un magasin ou un dépôt — un bon de commande
+                                peut livrer plusieurs sites différents, ligne par ligne).</li>
+                            <li><strong>Enregistrer en brouillon</strong> : rien n'est encore engagé, le
+                                bon reste modifiable/supprimable. Il devra ensuite être <em>validé</em>
+                                (bouton dédié sur sa fiche) puis <em>réceptionné</em> — en une ou
+                                plusieurs fois, avec le prix et la destination réellement constatés à
+                                chaque livraison — pour que le stock, le coût moyen et la dette
+                                fournisseur bougent réellement. C'est le chemin pour une vraie commande
+                                envoyée au fournisseur, en attente de livraison.</li>
+                            <li><strong>Enregistrer et réceptionner immédiatement</strong> : pour un achat
+                                déjà effectué (achat comptant chez le fournisseur) — une seule action
+                                qui crée le bon, le valide, et enregistre la réception complète en une
+                                fois (stock, coût moyen et dette fournisseur mis à jour tout de suite).
+                                Un paiement peut y être saisi ; ce qui n'est pas payé devient une dette
+                                sur le compte du fournisseur.</li>
                         </ol>
+                    @endcan
+                    @can('achat.receptionner')
+                        <h6>Réceptionner un bon de commande</h6>
+                        <p class="mb-0">
+                            Depuis la fiche d'un bon de commande validé, bouton <em>Réceptionner</em> —
+                            saisir, par ligne, la quantité réellement arrivée (partielle ou totale), le
+                            prix réellement facturé par le fournisseur (peut différer de l'indicatif) et
+                            la destination réelle. Chaque réception crée un <strong>bon d'achat</strong>
+                            (numéroté, immuable) qui mouvemente le stock et pose la dette pour son reste
+                            dû ; on peut réceptionner un même bon de commande plusieurs fois jusqu'à
+                            réception complète.
+                        </p>
                     @endcan
                     @can('fournisseur.reglement')
                         <h6>Régler un fournisseur</h6>
                         <p>
-                            Depuis la fiche fournisseur : réglé soit sur un <strong>bon d'achat précis</strong>
+                            Depuis la fiche fournisseur : réglé soit sur un <strong>bon de commande précis</strong>
                             (partiel ou total, dans la limite de son reste dû), soit en
                             <strong>global</strong> (doit couvrir exactement le solde total du compte, réparti
-                            automatiquement sur les bons d'achat impayés). Contrairement à un
+                            automatiquement sur les bons de commande encore dus). Contrairement à un
                             règlement client, ceci <strong>ne nécessite aucune session de caisse</strong>.
                         </p>
                     @endcan
                     @can('achat.retour')
                         <h6>Retour fournisseur</h6>
                         <p class="mb-0">
-                            Depuis le détail d'un bon d'achat validé, bouton <em>Retour</em> —
-                            même principe que le retour client : crédite un avoir sur le compte
-                            fournisseur, remet la marchandise en stock.
+                            Depuis le détail d'un bon de commande ayant reçu de la marchandise, bouton
+                            <em>Retourner</em> — même principe que le retour client : crédite un avoir
+                            sur le compte fournisseur, remet la marchandise en stock, plafonné à ce qui a
+                            réellement été reçu.
                         </p>
                     @endcan
                 </div>

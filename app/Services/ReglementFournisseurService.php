@@ -67,7 +67,11 @@ class ReglementFournisseurService
 
             // Lève SoldeFournisseurInsuffisantException si le règlement
             // dépasse la dette actuelle, ce qui annule toute la transaction.
-            $this->compteFournisseurService->enregistrerReglement($fournisseur, $montant, $reglement, $auteur);
+            // Ciblé sur un bon de commande précis : plafonné à SON reste dû
+            // (déjà validé par le contrôleur), pas à la dette agrégée du
+            // fournisseur — qui peut être nette d'un avoir provenant d'un
+            // tout autre bon de commande et donc plus petite que ce bon-ci.
+            $this->compteFournisseurService->enregistrerReglement($fournisseur, $montant, $reglement, $auteur, plafond: $commandeAchat?->resteDu());
 
             if ($montantEspeces > 0) {
                 // Peut lever SoldeTresorerieInsuffisantException si la

@@ -3,7 +3,10 @@
 @section('title', 'Casse / ajustement de stock')
 
 @section('content')
-    <h2 class="h4 mb-3">Casse / ajustement de stock</h2>
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <x-bouton-retour :route="route('stock.mouvements.index')" />
+        <h2 class="h4 mb-0">Casse / ajustement de stock</h2>
+    </div>
 
     <div class="row g-4">
         <div class="col-12 col-lg-7">

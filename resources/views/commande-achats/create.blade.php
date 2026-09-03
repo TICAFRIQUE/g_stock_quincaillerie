@@ -1,9 +1,12 @@
 @extends('layouts.app')
 
-@section('title', "Nouveau bon d'achat")
+@section('title', "Nouveau bon de commande")
 
 @section('content')
-    <h2 class="h4 mb-3">Nouveau bon d'achat</h2>
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <x-bouton-retour :route="route('commande-achats.index')" />
+        <h2 class="h4 mb-0">Nouveau bon de commande</h2>
+    </div>
 
     <div class="row justify-content-center">
         <div class="col-12 col-xl-10">
@@ -122,14 +125,14 @@
                             retirerPaiement(index) {
                                 this.paiements.splice(index, 1);
                             },
-                            declencherValidation(event) {
+                            declencherReceptionImmediate(event) {
                                 const form = document.getElementById('formCommandeAchat');
                                 if (!form.checkValidity()) {
                                     form.classList.add('was-validated');
                                     form.reportValidity();
                                     return;
                                 }
-                                this.actionSoumission = 'valider';
+                                this.actionSoumission = 'recevoir';
                                 window.bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmActionModal')).show(event.currentTarget);
                             },
                         }">
@@ -196,10 +199,10 @@
                                             <label class="form-label small">Produit<span class="required-marker">*</span></label>
                                             <select :name="'lignes['+index+'][produit_id]'" x-model="ligne.produit_id" @change="ligne.unite_vente_id = ''"
                                                     class="form-select form-select-sm produit-ligne-select" :class="{ 'is-invalid': estDoublon(index) }"
-                                                    x-init="$nextTick(() => window.initSelect2($el, { width: '100%' }))" required>
+                                                    x-init="$nextTick(() => window.initSelect2($el, { width: '100%', templateResult: window.formaterOptionAvecStock }))" required>
                                                 <option value="">— Choisir —</option>
                                                 @foreach ($produits as $produit)
-                                                    <option value="{{ $produit->id }}">{{ $produit->sku }} — {{ $produit->libelle_affichage }}</option>
+                                                    <option value="{{ $produit->id }}" data-stock="{{ quantite($stocksParProduit[$produit->id] ?? 0) }}">{{ $produit->sku }} — {{ $produit->libelle_affichage }}</option>
                                                 @endforeach
                                             </select>
                                             <div class="text-danger small mt-1" x-show="estDoublon(index)" x-cloak>Ce produit, avec la même unité et la même destination, est déjà présent dans une autre ligne.</div>
@@ -286,12 +289,16 @@
                             </div>
                         </div>
 
-                        @if ($peutValider)
+                        @if ($peutValider && $peutReceptionner)
                             <div class="card mb-3 bg-white border">
                                 <div class="card-body">
-                                    <h3 class="h6">Règlement au fournisseur</h3>
+                                    <h3 class="h6">Achat direct — paiement (optionnel)</h3>
                                     <p class="text-secondary small">
-                                        Laissez vide pour ne rien encaisser maintenant : le total TTC devient une dette fournisseur.
+                                        Pour un achat déjà effectué (ex. achat comptant chez le fournisseur) : utilisez le
+                                        bouton « Enregistrer et réceptionner immédiatement » ci-dessous — le stock, le CMP
+                                        et la dette fournisseur seront mis à jour tout de suite avec ces lignes. Laissez le
+                                        paiement vide pour ne rien encaisser maintenant : le total TTC devient une dette
+                                        fournisseur.
                                     </p>
 
                                     <template x-for="(paiement, index) in paiements" :key="paiement._cle">
@@ -317,8 +324,20 @@
                                     <button type="button" class="btn btn-sm btn-outline-primary mb-2" @click="ajouterPaiement()">
                                         <i class="bi bi-plus-lg"></i> Ajouter un paiement
                                     </button>
-                                    <div class="mb-0 small text-secondary">
+                                    <div class="mb-2 small text-secondary">
                                         Reste dû au fournisseur après validation : <span class="fw-semibold" x-text="resteDu.toLocaleString('fr-FR') + ' ' + window.DEVISE_ABREVIATION"></span>
+                                    </div>
+                                    <div class="row g-2">
+                                        <div class="col-md-6">
+                                            <label for="numero-bl-fournisseur" class="form-label small">N° de bon de livraison (optionnel)</label>
+                                            <input type="text" name="numero_bon_livraison_fournisseur" id="numero-bl-fournisseur" class="form-control form-control-sm"
+                                                   placeholder="Numéro écrit sur le bon de livraison">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="numero-facture-fournisseur" class="form-label small">N° de facture fournisseur (optionnel)</label>
+                                            <input type="text" name="numero_facture_fournisseur" id="numero-facture-fournisseur" class="form-control form-control-sm"
+                                                   placeholder="Numéro écrit sur la facture, si déjà remise">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -326,18 +345,16 @@
 
                         <hr>
 
-                        @unless ($peutValider)
-                            <button type="submit" class="btn btn-outline-primary" @click="actionSoumission = 'brouillon'" :disabled="aUnDoublon">
-                                Enregistrer en brouillon
-                            </button>
-                        @endunless
-                        @if ($peutValider)
+                        <button type="submit" class="btn btn-outline-primary" @click="actionSoumission = 'brouillon'" :disabled="aUnDoublon">
+                            Enregistrer en brouillon
+                        </button>
+                        @if ($peutValider && $peutReceptionner)
                             <button type="button" class="btn btn-success" :disabled="aUnDoublon"
-                                    @click="declencherValidation($event)"
+                                    @click="declencherReceptionImmediate($event)"
                                     data-form-id="formCommandeAchat"
-                                    data-message="Valider ce bon d'achat maintenant ? Le stock sera mis à jour immédiatement et cette action est irréversible."
-                                    data-button-label="Valider le bon d'achat" data-button-class="btn-success">
-                                <i class="bi bi-check-circle me-1"></i>Valider le bon d'achat
+                                    data-message="Enregistrer et réceptionner cet achat maintenant ? Le stock, le CMP et la dette fournisseur seront mis à jour immédiatement. Cette action est irréversible."
+                                    data-button-label="Enregistrer et réceptionner" data-button-class="btn-success">
+                                <i class="bi bi-box-seam me-1"></i>Enregistrer et réceptionner immédiatement
                             </button>
                         @endif
                         <a href="{{ route('commande-achats.index') }}" class="btn btn-link">Annuler</a>

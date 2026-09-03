@@ -99,7 +99,53 @@ class FournisseurController extends Controller
         ]);
     }
 
-    public function show(Fournisseur $fournisseur): View
+    public function commandesPdf(Request $request, Fournisseur $fournisseur): Response
+    {
+        return $this->pdfDepuisListe(
+            "Bons de commande — {$fournisseur->nom}",
+            ['Numéro', 'Date', 'Destination(s)', 'Statut', 'Réception', 'Total TTC', 'Réglé', 'Reste dû'],
+            $this->lignesExportCommandes($request, $fournisseur),
+            "bons-de-commande-{$fournisseur->code}.pdf",
+        );
+    }
+
+    public function commandesExcel(Request $request, Fournisseur $fournisseur): StreamedResponse
+    {
+        return $this->excelDepuisListe(
+            "Bons de commande {$fournisseur->nom}",
+            ['Numéro', 'Date', 'Destination(s)', 'Statut', 'Réception', 'Total TTC', 'Réglé', 'Reste dû'],
+            $this->lignesExportCommandes($request, $fournisseur),
+            "bons-de-commande-{$fournisseur->code}.xlsx",
+        );
+    }
+
+    /**
+     * Mêmes lignes/colonnes que le tableau "Bons de commande" de la fiche
+     * fournisseur, y compris le filtre réception incomplète — jamais un
+     * calcul divergent entre l'écran et l'export (voir CLAUDE.md, rapports).
+     */
+    private function lignesExportCommandes(Request $request, Fournisseur $fournisseur): \Illuminate\Support\Collection
+    {
+        $commandes = $fournisseur->commandeAchats()
+            ->withTrashed()
+            ->when($request->boolean('reception_incomplete'), fn ($q) => $q->receptionIncomplete())
+            ->with(['lignes.taxe', 'lignes.magasinDestination', 'lignes.receptions.taxe', 'paiements', 'reglementsFournisseur', 'receptions.lignes.taxe'])
+            ->latest('created_at')
+            ->get();
+
+        return $commandes->map(fn (CommandeAchat $c) => [
+            $c->numero,
+            $c->created_at->format('d/m/Y H:i'),
+            $c->lignes->pluck('magasinDestination.nom')->unique()->implode(', '),
+            $c->trashed() ? 'Annulée' : ($c->statut === 'validee' ? 'Validée' : 'Brouillon'),
+            $c->statut === 'validee' ? quantite($c->quantiteRecuePieces()).'/'.quantite($c->quantiteCommandeePieces()).' ('.$c->tauxCompletion().' %)' : '—',
+            montant($c->totalTtcReel()),
+            $c->statut === 'validee' ? montant($c->montantRegle()) : '—',
+            $c->statut === 'validee' ? montant($c->resteDu()) : '—',
+        ]);
+    }
+
+    public function show(Request $request, Fournisseur $fournisseur): View
     {
         $fournisseur->loadCount('commandeAchats');
 
@@ -113,7 +159,7 @@ class FournisseurController extends Controller
                 $morphTo->morphWith([
                     CommandeAchat::class => ['lignes', 'paiements', 'reglementsFournisseur'],
                     ReglementFournisseur::class => ['commandeAchat'],
-                    RetourAchat::class => ['lignes.produit'],
+                    RetourAchat::class => ['lignes.produit', 'commandeAchat'],
                     RemboursementAvoirFournisseur::class => ['paiements'],
                 ]);
             }])
@@ -122,9 +168,11 @@ class FournisseurController extends Controller
 
         $commandes = $fournisseur->commandeAchats()
             ->withTrashed()
-            ->with(['lignes.taxe', 'lignes.magasinDestination', 'paiements', 'reglementsFournisseur'])
+            ->when($request->boolean('reception_incomplete'), fn ($q) => $q->receptionIncomplete())
+            ->with(['lignes.taxe', 'lignes.magasinDestination', 'lignes.receptions.taxe', 'paiements', 'reglementsFournisseur', 'receptions.lignes.taxe'])
             ->latest('created_at')
-            ->paginate(10, ['*'], 'commandes_page');
+            ->paginate(10, ['*'], 'commandes_page')
+            ->withQueryString();
 
         return view('fournisseurs.show', [
             'fournisseur' => $fournisseur,
@@ -133,6 +181,7 @@ class FournisseurController extends Controller
             'totalRegle' => $fournisseur->totalRegle(),
             'ecritures' => $ecritures,
             'commandes' => $commandes,
+            'receptionIncomplete' => $request->boolean('reception_incomplete'),
             'moyensPaiement' => MoyenPaiement::actifs(),
         ]);
     }

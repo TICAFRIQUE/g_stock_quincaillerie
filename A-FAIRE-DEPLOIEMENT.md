@@ -10,6 +10,103 @@ pas supprimer les entrées cochées (historique).
 
 ---
 
+## 2026-09-03 (suite)
+
+- [ ] **Nouveau : N° de bon de livraison et N° de facture fournisseur sur une
+  réception** — deux champs optionnels et indépendants ajoutés sur chaque
+  réception (« Réceptionner » depuis la fiche, ou « Enregistrer et réceptionner
+  immédiatement » à la création), pour noter séparément le numéro du bon de
+  livraison remis à la livraison et celui de la facture (parfois remise en
+  même temps, parfois séparément/plus tard selon le fournisseur) — affichés
+  dans l'historique des réceptions, la facture PDF et l'export Excel.
+  Déploiement standard, plus :
+  ```
+  php artisan migrate --force
+  ```
+  Deux migrations (`add_numero_facture_fournisseur_to_reception_achats_table`,
+  `add_numero_bon_livraison_fournisseur_to_reception_achats_table`), colonnes
+  nullables — aucune donnée existante touchée, aucune permission nouvelle.
+  - [ ] **Tester après déploiement** : réceptionner un bon de commande en
+    saisissant un numéro de bon de livraison et/ou un numéro de facture
+    fournisseur → vérifier qu'ils apparaissent dans l'historique des
+    réceptions de la fiche, sur la facture PDF et dans l'export Excel.
+    Vérifier qu'une réception sans ces numéros (champs laissés vides) reste
+    identique à avant.
+
+## 2026-09-03
+
+- [ ] **Nouveau : Réceptions échelonnées sur les bons de commande fournisseur**
+  — le **bon de commande** (`CommandeAchat`, prix indicatifs, aucun impact
+  stock/argent tant qu'il n'est pas reçu) peut désormais être **reçu en
+  plusieurs fois** ; chaque réception est un **bon d'achat** (`ReceptionAchat`,
+  immuable) qui capture la quantité réellement arrivée (partielle ou totale),
+  le prix réellement facturé (peut différer de l'indicatif, alimente le CMP)
+  et la destination réelle (éditable, pré-remplie avec le plan mais
+  modifiable) — avec KPI commandé/reçu/reste à recevoir et montant
+  indicatif/réel/écart sur `commande-achats/show`. Pour un **achat déjà
+  effectué** (achat comptant chez le fournisseur, sans document envoyé au
+  préalable), un raccourci « Enregistrer et réceptionner immédiatement » sur
+  l'écran de création fait tout en une seule action (création + validation +
+  réception complète, avec paiement). **Rétrocompatible sans migration de
+  données** : seules les commandes créées à partir de maintenant utilisent ce
+  nouveau système — une commande déjà validée avant ce déploiement continue
+  de se comporter exactement comme avant, aucune donnée/mouvement historique
+  touché. Déploiement standard, plus :
+  ```
+  php artisan migrate --force
+  php artisan db:seed --class=RolePermissionSeeder --force
+  npm run build
+  ```
+  Trois nouvelles migrations créent `reception_achats`/`ligne_reception_achats`
+  et ajoutent une colonne nullable `reception_achat_id` à `paiement_achats`
+  (aucune donnée existante touchée). Le seeder enregistre la nouvelle
+  permission `achat.receptionner` — comme pour toute nouvelle permission,
+  elle n'est **cochée pour aucun rôle existant** automatiquement : l'accorder
+  manuellement sur `/roles` au(x) rôle(s) qui doivent pouvoir réceptionner
+  (ex. Gérant). `npm run build` n'est utile ici que si le bundle JS/CSS n'a
+  pas déjà été reconstruit depuis une session de travail précédente sur ce
+  poste — aucun changement JS propre à cette fonctionnalité (tout est en
+  Blade/Alpine inline), mais garder le réflexe.
+  - [ ] **Vocabulaire à l'écran** : « Bon de commande » (le document,
+    brouillon/validée, prix indicatifs) et « Bon d'achat » (chaque réception,
+    l'événement réel) sont maintenant deux libellés distincts partout à
+    l'écran — même entité `CommandeAchat`/route `commande-achats.*` en
+    interne, aucun changement d'URL.
+  - [ ] **Changement de comportement à connaître** : "Valider" un bon de
+    commande ne mouvemente plus le stock ni la dette fournisseur — c'est
+    désormais la réception ("Réceptionner" depuis la fiche, ou "Enregistrer
+    et réceptionner immédiatement" depuis la création) qui le fait. Une
+    commande validée mais pas encore réceptionnée affiche un bouton "Annuler"
+    actif (rien à réconcilier) ; une fois au moins une réception enregistrée,
+    "Annuler" est bloqué (corriger via un retour fournisseur à la place). Sur
+    l'écran de création, le paiement ne se saisit plus qu'avec le raccourci
+    "Enregistrer et réceptionner immédiatement" (visible seulement avec les
+    permissions `achat.valider` **et** `achat.receptionner`) — un simple
+    "Enregistrer en brouillon" n'accepte plus de paiement.
+  - [ ] **Tester après déploiement** :
+    - Sur la fiche d'un bon de commande validé, cliquer "Réceptionner" **sans
+      rien saisir dans la section paiement** → doit réussir (c'était cassé
+      avant cette correction : erreur "paiements.0.moyen_paiement_id est
+      obligatoire"). Puis réceptionner avec un paiement partiel → dette
+      correcte.
+    - Créer un nouveau bon avec "Enregistrer et réceptionner immédiatement"
+      (avec et sans paiement) → stock/CMP/dette mis à jour immédiatement en
+      une seule action, aux destinations et prix saisis.
+    - Créer un bon de commande brouillon → valider séparément depuis la
+      fiche (vérifier qu'aucun stock ne bouge) → réceptionner une partie des
+      lignes avec un prix et une destination différents de l'indicatif →
+      stock augmenté au bon endroit, CMP recalculé au prix réel, dette
+      limitée au reste dû de cette réception. Réceptionner le complément
+      plus tard → KPI "reste à recevoir" à 0, taux 100 %.
+    - Vérifier qu'un retour fournisseur sur une ligne reçue à prix réel
+      différent de l'indicatif crédite l'avoir sur la base du prix
+      réellement facturé.
+    - Vérifier que la facture (écran, PDF, Excel) et la liste des bons de
+      commande affichent bien le montant réel et un récapitulatif des
+      réceptions pour un bon partiellement/totalement reçu.
+    - Vérifier qu'une commande déjà validée **avant** ce déploiement affiche
+      des montants et un bouton "Annuler" identiques à avant.
+
 ## 2026-09-02
 
 - [ ] **Sécurité (critique) : limitation des tentatives de connexion** —

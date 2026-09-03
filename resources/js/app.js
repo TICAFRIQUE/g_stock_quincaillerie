@@ -52,6 +52,29 @@ function arrondirQuantite(valeur) {
     return Math.round(valeur * 1000) / 1000;
 }
 
+// Rendu des options d'un select produit portant un attribut data-stock (ex.
+// bon de commande) : affiche le stock restant en retrait, italique, couleur
+// atténuée, sous le libellé normal du produit — jamais dans templateSelection
+// (select fermé), pour ne pas alourdir l'affichage une fois choisi.
+window.formaterOptionAvecStock = function (data) {
+    if (!data.id || ! data.element) {
+        return data.text;
+    }
+
+    const stock = data.element.dataset.stock;
+    if (stock === undefined) {
+        return data.text;
+    }
+
+    const $resultat = jQuery('<div></div>').text(data.text);
+    jQuery('<div></div>')
+        .addClass('small fst-italic text-secondary')
+        .text('Stock restant : ' + stock)
+        .appendTo($resultat);
+
+    return $resultat;
+};
+
 // Sélecteur recherchable (produits, etc.) — thème Bootstrap 5 cohérent avec le
 // reste de l'app. Un seul point d'appel pour ne pas répéter les options.
 window.initSelect2 = function (selector, options = {}) {

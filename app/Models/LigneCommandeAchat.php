@@ -81,6 +81,11 @@ class LigneCommandeAchat extends Model
         return $this->hasMany(LigneRetourAchat::class);
     }
 
+    public function receptions(): HasMany
+    {
+        return $this->hasMany(LigneReceptionAchat::class);
+    }
+
     /**
      * Nombre de pièces contenues dans l'unité d'achat choisie (1 si achetée
      * à la pièce/unité de base, le facteur de l'UniteVente sinon).

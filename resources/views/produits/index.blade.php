@@ -6,7 +6,6 @@
     <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
         <h2 class="h4 mb-0">Produits</h2>
         <div class="d-flex gap-2 flex-wrap">
-            <x-export-buttons :pdf-route="route('produits.pdf', request()->query())" :excel-route="route('produits.excel', request()->query())" :tout="true" />
             @can('produit.creer')
                 <a href="{{ route('produits.create') }}" class="btn btn-primary">Nouveau produit</a>
             @endcan
@@ -16,7 +15,11 @@
     <h2 class="h4 mb-3 d-none d-print-block">Produits</h2>
 
     <div class="d-print-none">
-        <x-recherche-form :action="route('produits.index')" placeholder="SKU, nom ou code-barres…" />
+        <x-recherche-form :action="route('produits.index')" placeholder="SKU, nom ou code-barres…">
+            <x-slot:export>
+                <x-export-buttons :pdf-route="route('produits.pdf', request()->query())" :excel-route="route('produits.excel', request()->query())" :tout="true" />
+            </x-slot:export>
+        </x-recherche-form>
     </div>
 
     <div class="card">

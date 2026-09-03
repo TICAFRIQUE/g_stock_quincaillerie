@@ -6,7 +6,6 @@
     <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
         <h2 class="h4 mb-0">Inventaires</h2>
         <div class="d-flex gap-2 flex-wrap">
-            <x-export-buttons :pdf-route="route('inventaires.pdf', request()->query())" :excel-route="route('inventaires.excel', request()->query())" :tout="true" />
             @can('inventaire.realiser')
                 <a href="{{ route('inventaires.create') }}" class="btn btn-primary">Nouvel inventaire</a>
             @endcan
@@ -43,11 +42,12 @@
         </div>
         @if (request()->hasAny(['date_debut', 'date_fin', 'statut', 'magasin_id']))
             <div class="col-auto">
-                <a href="{{ route('inventaires.index') }}" class="btn btn-outline-danger">
-                    <i class="bi bi-x-circle me-1"></i>Réinitialiser
-                </a>
+                <x-bouton-reinitialiser :route="route('inventaires.index')" />
             </div>
         @endif
+        <div class="col-auto ms-auto">
+            <x-export-buttons :pdf-route="route('inventaires.pdf', request()->query())" :excel-route="route('inventaires.excel', request()->query())" :tout="true" />
+        </div>
     </form>
 
     <div class="card">

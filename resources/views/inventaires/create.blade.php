@@ -3,7 +3,10 @@
 @section('title', 'Nouvel inventaire')
 
 @section('content')
-    <h2 class="h4 mb-3">Nouvel inventaire</h2>
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <x-bouton-retour :route="route('inventaires.index')" />
+        <h2 class="h4 mb-0">Nouvel inventaire</h2>
+    </div>
 
     <div class="card mx-auto" style="max-width: 480px;">
         <div class="card-body">

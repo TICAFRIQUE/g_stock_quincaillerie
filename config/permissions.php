@@ -26,6 +26,7 @@ return [
         'achat.voir',
         'achat.creer',
         'achat.valider',
+        'achat.receptionner',
         'achat.annuler',
         'achat.retour',
         'fournisseur.voir',

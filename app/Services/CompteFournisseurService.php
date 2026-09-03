@@ -44,17 +44,21 @@ class CompteFournisseurService
     }
 
     /**
-     * Enregistre un règlement (paiement total ou partiel d'une dette). Ne
-     * peut jamais dépasser la dette actuelle (pas de solde créditeur dans le
-     * MVP).
+     * Enregistre un règlement (paiement total ou partiel d'une dette). Plafonné
+     * par défaut à la dette agrégée du fournisseur (pas de solde créditeur dans
+     * le MVP) — sauf `$plafond` explicite, utilisé par un règlement ciblé sur
+     * un bon de commande précis (`ReglementFournisseurService::encaisser()`) :
+     * son plafond est le reste dû de CE bon (indépendant de la dette agrégée,
+     * qui peut être nette d'un avoir provenant d'un tout autre bon de commande
+     * — voir CLAUDE.md, règlement fournisseur ciblé).
      */
-    public function enregistrerReglement(Fournisseur $fournisseur, int $montant, Model $reference, User $auteur): EcritureCompteFournisseur
+    public function enregistrerReglement(Fournisseur $fournisseur, int $montant, Model $reference, User $auteur, ?int $plafond = null): EcritureCompteFournisseur
     {
         $fournisseur = Fournisseur::whereKey($fournisseur->id)->lockForUpdate()->firstOrFail();
-        $soldeActuel = $this->solde($fournisseur);
+        $plafondEffectif = $plafond ?? $this->solde($fournisseur);
 
-        if ($montant > $soldeActuel) {
-            throw new SoldeFournisseurInsuffisantException($fournisseur, $montant, $soldeActuel);
+        if ($montant > $plafondEffectif) {
+            throw new SoldeFournisseurInsuffisantException($fournisseur, $montant, $plafondEffectif);
         }
 
         return EcritureCompteFournisseur::create([

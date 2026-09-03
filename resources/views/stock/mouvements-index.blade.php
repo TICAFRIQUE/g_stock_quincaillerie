@@ -4,10 +4,12 @@
 
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-1">
-        <h2 class="h4 mb-0">Historique des mouvements de stock</h2>
+        <div class="d-flex align-items-center gap-2">
+            <x-bouton-retour :route="route('stock.index')" />
+            <h2 class="h4 mb-0">Historique des mouvements de stock</h2>
+        </div>
         <div class="d-flex gap-2">
             <x-bouton-imprimer tout />
-            <a href="{{ route('stock.index') }}" class="btn btn-link ps-0 d-print-none">Retour au stock</a>
         </div>
     </div>
     <p class="text-secondary small mb-3">
@@ -37,9 +39,7 @@
         </div>
         @if (request()->hasAny(['date_debut', 'date_fin', 'type']))
             <div class="col-auto">
-                <a href="{{ route('stock.mouvements.index') }}" class="btn btn-outline-danger">
-                    <i class="bi bi-x-circle me-1"></i>Réinitialiser
-                </a>
+                <x-bouton-reinitialiser :route="route('stock.mouvements.index')" />
             </div>
         @endif
     </form>

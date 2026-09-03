@@ -3,7 +3,10 @@
 @section('title', 'Nouveau transfert')
 
 @section('content')
-    <h2 class="h4 mb-3">Nouveau transfert de stock</h2>
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <x-bouton-retour :route="route('transferts.index')" />
+        <h2 class="h4 mb-0">Nouveau transfert de stock</h2>
+    </div>
 
     <div class="card mx-auto" style="max-width: 700px;">
         <div class="card-body">

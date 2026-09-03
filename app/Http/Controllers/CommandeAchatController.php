@@ -10,9 +10,11 @@ use App\Models\Magasin;
 use App\Models\MoyenPaiement;
 use App\Models\Parametre;
 use App\Models\Produit;
+use App\Models\Stock;
 use App\Models\Taxe;
 use App\Models\UniteVente;
 use App\Services\AchatService;
+use App\Services\ReceptionAchatService;
 use App\Support\Decimal;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -40,14 +42,20 @@ class CommandeAchatController extends Controller
             // lignes.taxe/paiements/reglementsFournisseur : nécessaires à
             // CommandeAchat::totalTtc()/montantRegle()/resteDu() (colonnes
             // Montant dû/Déjà réglé/Reste à régler), chargées ici pour
-            // éviter un N+1 sur chaque ligne de la page.
-            ->with(['fournisseur', 'lignes.taxe', 'paiements', 'reglementsFournisseur'])
+            // éviter un N+1 sur chaque ligne de la page. receptions.lignes :
+            // nécessaires à totalTtcReel() (montant réel). lignes.receptions
+            // (chemin inverse, distinct du précédent) : nécessaires à
+            // quantiteRecuePieces()/tauxCompletion() (colonne Réception) —
+            // voir les docblocks de CommandeAchat pour le détail de chaque
+            // chemin d'eager loading.
+            ->with(['fournisseur', 'lignes.taxe', 'lignes.receptions.taxe', 'paiements', 'reglementsFournisseur', 'receptions.lignes.taxe'])
             ->whereBetween('date_commande', [$debut->toDateString(), $fin->toDateString()])
             ->when($request->filled('recherche'), function ($q) use ($request) {
                 $recherche = $request->string('recherche');
                 $q->where('numero', 'like', "%{$recherche}%");
             })
-            ->when($request->filled('statut'), fn ($q) => $q->where('statut', $request->string('statut')));
+            ->when($request->filled('statut'), fn ($q) => $q->where('statut', $request->string('statut')))
+            ->when($request->boolean('reception_incomplete'), fn ($q) => $q->receptionIncomplete());
 
         $commandes = $this->appliquerTri($query, $request, ['numero', 'date_commande', 'statut'], 'created_at')
             ->paginate(20)
@@ -55,6 +63,7 @@ class CommandeAchatController extends Controller
 
         return view('commande-achats.index', [
             'commandes' => $commandes,
+            'receptionIncomplete' => $request->boolean('reception_incomplete'),
             'dateDebut' => $debut->toDateString(),
             'dateFin' => $fin->toDateString(),
         ]);
@@ -93,17 +102,25 @@ class CommandeAchatController extends Controller
                     ])->values(),
                 ],
             ]),
+            // Stock actuel, tous magasins/dépôts confondus (pas la
+            // destination de la ligne, pas encore choisie à ce stade) —
+            // simple repère pour aider à décider combien recommander, même
+            // agrégat que le sélecteur produit de la vente (VenteController).
+            'stocksParProduit' => Stock::selectRaw('produit_id, SUM(quantite) as total')
+                ->groupBy('produit_id')
+                ->pluck('total', 'produit_id'),
             'peutValider' => request()->user()->can('achat.valider'),
+            'peutReceptionner' => request()->user()->can('achat.receptionner'),
         ]);
     }
 
-    public function store(Request $request, AchatService $achatService): RedirectResponse
+    public function store(Request $request, AchatService $achatService, ReceptionAchatService $receptionService): RedirectResponse
     {
         $donnees = $request->validate([
             'numero' => ['nullable', 'string', 'max:255', 'unique:commande_achats,numero'],
             'fournisseur_id' => ['required', 'exists:fournisseurs,id'],
             'date_commande' => ['required', 'date'],
-            'action' => ['required', 'in:brouillon,valider'],
+            'action' => ['required', 'in:brouillon,recevoir'],
         ]);
 
         // Un select laissé sur son option vide envoie "" (chaîne), pas
@@ -128,46 +145,69 @@ class CommandeAchatController extends Controller
             'lignes.*.prix_achat' => ['required', 'integer', 'min:0'],
         ])['lignes'];
 
-        $validerImmediatement = $donnees['action'] === 'valider';
-        abort_if($validerImmediatement && ! $request->user()->can('achat.valider'), 403);
+        $receptionnerImmediatement = $donnees['action'] === 'recevoir';
+        abort_if($receptionnerImmediatement && ! ($request->user()->can('achat.valider') && $request->user()->can('achat.receptionner')), 403);
         unset($donnees['action']);
 
-        $paiements = $validerImmediatement ? $request->validate([
-            'paiements' => ['sometimes', 'array'],
-            'paiements.*.moyen_paiement_id' => ['required_with:paiements', 'exists:moyen_paiements,id'],
-            'paiements.*.montant' => ['required_with:paiements', 'integer', 'min:1'],
-        ])['paiements'] ?? [] : [];
+        $paiements = [];
+        $numeroFactureFournisseur = null;
+        $numeroBonLivraisonFournisseur = null;
+        if ($receptionnerImmediatement) {
+            $donneesReception = $request->validate([
+                'paiements' => ['sometimes', 'array'],
+                'paiements.*.moyen_paiement_id' => ['required_with:paiements', 'exists:moyen_paiements,id'],
+                'paiements.*.montant' => ['required_with:paiements', 'integer', 'min:1'],
+                'numero_facture_fournisseur' => ['nullable', 'string', 'max:255'],
+                'numero_bon_livraison_fournisseur' => ['nullable', 'string', 'max:255'],
+            ]);
+            $paiements = $donneesReception['paiements'] ?? [];
+            $numeroFactureFournisseur = $donneesReception['numero_facture_fournisseur'] ?? null;
+            $numeroBonLivraisonFournisseur = $donneesReception['numero_bon_livraison_fournisseur'] ?? null;
+        }
 
         $numeroGenere = blank($donnees['numero']);
         if ($numeroGenere) {
             $donnees['numero'] = $this->genererNumero();
         }
 
-        $commande = DB::transaction(function () use ($donnees, $lignes, $request) {
-            $commande = CommandeAchat::create($donnees + [
-                'statut' => 'brouillon',
-                'created_by' => $request->user()->id,
-            ]);
+        try {
+            $commande = DB::transaction(function () use ($donnees, $lignes, $paiements, $numeroFactureFournisseur, $numeroBonLivraisonFournisseur, $receptionnerImmediatement, $request, $achatService, $receptionService) {
+                $commande = CommandeAchat::create($donnees + [
+                    'statut' => 'brouillon',
+                    'created_by' => $request->user()->id,
+                ]);
 
-            foreach ($lignes as $ligne) {
-                $commande->lignes()->create($ligne);
-            }
+                foreach ($lignes as $ligne) {
+                    $commande->lignes()->create($ligne);
+                }
 
-            return $commande;
-        });
+                if (! $receptionnerImmediatement) {
+                    return $commande;
+                }
 
-        if ($validerImmediatement) {
-            try {
-                $achatService->valider($commande, $request->user(), $paiements);
-            } catch (RuntimeException|InvalidArgumentException $e) {
-                return redirect()->route('commande-achats.show', $commande)->with('erreur', $e->getMessage());
-            }
+                $commande = $achatService->valider($commande, $request->user());
 
-            return redirect()->route('commande-achats.show', $commande)
-                ->with('succes', "Bon d'achat créé et validé : le stock a été mis à jour.");
+                $lignesReception = $commande->lignes->map(fn ($l) => [
+                    'ligne_commande_achat_id' => $l->id,
+                    'magasin_id' => $l->magasin_destination_id,
+                    'quantite_pieces' => $l->quantite_pieces,
+                    'prix_achat_reel' => $l->prixAchatParPiece(),
+                ])->all();
+
+                $receptionService->receptionner($commande, $lignesReception, $request->user(), $paiements, numeroFactureFournisseur: $numeroFactureFournisseur, numeroBonLivraisonFournisseur: $numeroBonLivraisonFournisseur);
+
+                return $commande;
+            });
+        } catch (RuntimeException|InvalidArgumentException $e) {
+            return back()->withInput()->with('erreur', $e->getMessage());
         }
 
-        $message = "Bon d'achat créé.".($numeroGenere ? " Numéro généré automatiquement : {$commande->numero}." : '');
+        if ($receptionnerImmediatement) {
+            return redirect()->route('commande-achats.show', $commande)
+                ->with('succes', "Achat enregistré et réceptionné : le stock et le compte fournisseur ont été mis à jour.");
+        }
+
+        $message = "Bon de commande créé.".($numeroGenere ? " Numéro généré automatiquement : {$commande->numero}." : '');
 
         return redirect()->route('commande-achats.show', $commande)->with('succes', $message);
     }
@@ -176,18 +216,13 @@ class CommandeAchatController extends Controller
     {
         $commandeAchat->load([
             'fournisseur', 'lignes.produit', 'lignes.uniteVente.unite', 'lignes.taxe', 'lignes.magasinDestination',
+            'lignes.receptions',
             'paiements.moyenPaiement', 'reglementsFournisseur.paiements.moyenPaiement', 'reglementsFournisseur.auteur',
             'retours.lignes.produit', 'retours.auteur',
+            'receptions.lignes.produit', 'receptions.lignes.magasin', 'receptions.lignes.taxe',
+            'receptions.paiements.moyenPaiement', 'receptions.auteur',
             'auteur', 'validateur', 'annulateur',
         ]);
-
-        // Reste retournable par ligne (quantite_pieces − déjà retourné) — une
-        // seule passe sur les retours déjà chargés (voir RetourAchatService,
-        // même logique de calcul, et VenteController::ticket()).
-        $dejaRetourneParLigne = $commandeAchat->retours
-            ->flatMap(fn ($retour) => $retour->lignes)
-            ->groupBy('ligne_commande_achat_id')
-            ->map(fn ($lignes) => $lignes->sum('quantite_pieces'));
 
         return view('commande-achats.show', [
             'commande' => $commandeAchat,
@@ -195,9 +230,87 @@ class CommandeAchatController extends Controller
             'peutAnnuler' => request()->user()->can('achat.annuler'),
             'peutRegler' => request()->user()->can('fournisseur.reglement'),
             'peutRetourner' => request()->user()->can('achat.retour'),
-            'dejaRetourneParLigne' => $dejaRetourneParLigne,
+            'peutReceptionner' => request()->user()->can('achat.receptionner'),
+            'lignesRetournables' => $this->calculerLignesRetournables($commandeAchat),
+            'dejaRecuParLigne' => $this->calculerDejaRecuParLigne($commandeAchat),
             'moyensPaiement' => MoyenPaiement::actifs(),
+            'magasins' => Magasin::where('actif', true)->orderBy('nom')->get(),
         ]);
+    }
+
+    /**
+     * Une "ligne retournable" par (ligne de commande × magasin ayant
+     * effectivement reçu quelque chose), pas juste par ligne — une commande
+     * sans réception (ancien modèle) n'a qu'un seul magasin possible (celui
+     * de la ligne, la totalité y a été reçue à la validation) ; une commande
+     * avec réceptions (nouveau modèle) peut avoir reçu une même ligne à
+     * plusieurs destinations (magasin choisi à chaque réception), chacune
+     * devenant sa propre ligne retournable avec son propre plafond — voir
+     * RetourAchatService, même logique de calcul. Suppose `lignes`,
+     * `retours.lignes`, `receptions.lignes.magasin` chargées.
+     *
+     * @return \Illuminate\Support\Collection<int, object{ligne: \App\Models\LigneCommandeAchat, magasin: Magasin, quantiteRecue: float, dejaRetourne: float, reste: float}>
+     */
+    private function calculerLignesRetournables(CommandeAchat $commandeAchat): \Illuminate\Support\Collection
+    {
+        $hasReceptions = $commandeAchat->receptions->isNotEmpty();
+
+        $dejaRetourneParClef = $commandeAchat->retours
+            ->flatMap(fn ($retour) => $retour->lignes)
+            ->groupBy(fn ($l) => "{$l->ligne_commande_achat_id}-{$l->magasin_id}")
+            ->map(fn ($lignes) => (float) $lignes->sum('quantite_pieces'));
+
+        $recuParClef = $commandeAchat->receptions->flatMap->lignes
+            ->groupBy(fn ($l) => "{$l->ligne_commande_achat_id}-{$l->magasin_id}");
+
+        $lignesRetournables = collect();
+
+        foreach ($commandeAchat->lignes as $ligne) {
+            $groupesAConsiderer = $hasReceptions
+                ? $recuParClef->filter(fn ($_, $clef) => str_starts_with($clef, "{$ligne->id}-"))
+                : collect(["{$ligne->id}-{$ligne->magasin_destination_id}" => collect()]);
+
+            foreach ($groupesAConsiderer as $clef => $lignesRecues) {
+                if ($hasReceptions) {
+                    $magasin = $lignesRecues->first()->magasin;
+                    $quantiteRecue = (float) $lignesRecues->sum('quantite_pieces');
+                } else {
+                    $magasin = $ligne->magasinDestination;
+                    $quantiteRecue = (float) $ligne->quantite_pieces;
+                }
+
+                $dejaRetourne = (float) ($dejaRetourneParClef[$clef] ?? 0);
+                $reste = $quantiteRecue - $dejaRetourne;
+
+                if ($reste > 0) {
+                    $lignesRetournables->push((object) [
+                        'ligne' => $ligne,
+                        'magasin' => $magasin,
+                        'quantiteRecue' => $quantiteRecue,
+                        'dejaRetourne' => $dejaRetourne,
+                        'reste' => $reste,
+                    ]);
+                }
+            }
+        }
+
+        return $lignesRetournables;
+    }
+
+    /**
+     * Déjà reçu par ligne de commande (quantite_pieces cumulée, toutes
+     * réceptions confondues), quelle que soit la destination — utilisé pour
+     * la colonne "Reçu" et le reste à recevoir. Suppose `receptions.lignes`
+     * chargée.
+     *
+     * @return \Illuminate\Support\Collection<int, float>
+     */
+    private function calculerDejaRecuParLigne(CommandeAchat $commandeAchat): \Illuminate\Support\Collection
+    {
+        return $commandeAchat->receptions
+            ->flatMap(fn ($reception) => $reception->lignes)
+            ->groupBy('ligne_commande_achat_id')
+            ->map(fn ($lignes) => (float) $lignes->sum('quantite_pieces'));
     }
 
     public function facture(CommandeAchat $commandeAchat): View
@@ -213,25 +326,31 @@ class CommandeAchatController extends Controller
         // au lieu de forcer un téléchargement, pour que le bouton "Imprimer"
         // du détail du bon d'achat ne fasse jamais naviguer vers une autre
         // page (même mécanisme que ExporteListe::pdfDepuisListe()).
-        $nomFichier = "bon-d-achat-{$commandeAchat->numero}.pdf";
+        $nomFichier = "bon-de-commande-{$commandeAchat->numero}.pdf";
 
         return $request->boolean('imprimer') ? $pdf->stream($nomFichier) : $pdf->download($nomFichier);
     }
 
     public function excel(CommandeAchat $commandeAchat): StreamedResponse
     {
-        $commandeAchat->load(['fournisseur', 'lignes.produit', 'lignes.uniteVente.unite', 'lignes.taxe', 'lignes.magasinDestination', 'paiements.moyenPaiement', 'reglementsFournisseur']);
+        $commandeAchat->load([
+            'fournisseur', 'lignes.produit', 'lignes.uniteVente.unite', 'lignes.taxe', 'lignes.magasinDestination',
+            'paiements.moyenPaiement', 'reglementsFournisseur',
+            'receptions.lignes.taxe', 'receptions.lignes.produit', 'receptions.lignes.magasin', 'receptions.paiements.moyenPaiement',
+        ]);
+        $dejaRecuParLigne = $this->calculerDejaRecuParLigne($commandeAchat);
+        $aDesReceptions = $commandeAchat->receptions->isNotEmpty();
 
         $spreadsheet = new Spreadsheet();
         $feuille = $spreadsheet->getActiveSheet();
-        $feuille->setTitle("Bon d'achat");
+        $feuille->setTitle("Bon de commande");
 
         $parametre = Parametre::actuel();
         $feuille->setCellValue('A1', $parametre->nom);
         $feuille->setCellValue('A2', $parametre->adresse);
         $feuille->setCellValue('A3', $parametre->numero ? 'Tél : '.$parametre->numero : '');
 
-        $feuille->setCellValue('D1', "BON D'ACHAT");
+        $feuille->setCellValue('D1', "BON DE COMMANDE");
         $feuille->setCellValue('D2', 'N° '.$commandeAchat->numero);
         $feuille->setCellValue('D3', 'Date : '.$commandeAchat->date_commande->format('d/m/Y'));
 
@@ -241,7 +360,11 @@ class CommandeAchatController extends Controller
         $feuille->setCellValue('A9', $commandeAchat->fournisseur->adresse ?? '');
 
         $ligneEnTete = 11;
-        foreach (['A' => 'Désignation', 'B' => 'Unité', 'C' => 'Destination', 'D' => 'Quantité', 'E' => 'Prix HT', 'F' => 'Taxe', 'G' => 'Total HT', 'H' => 'Total TTC'] as $colonne => $libelle) {
+        $entetes = ['A' => 'Désignation', 'B' => 'Unité', 'C' => 'Destination', 'D' => 'Quantité', 'E' => 'Prix HT', 'F' => 'Taxe', 'G' => 'Total HT', 'H' => 'Total TTC'];
+        if ($commandeAchat->statut === 'validee') {
+            $entetes['I'] = 'Reçu';
+        }
+        foreach ($entetes as $colonne => $libelle) {
             $feuille->setCellValue("{$colonne}{$ligneEnTete}", $libelle);
         }
 
@@ -255,6 +378,9 @@ class CommandeAchatController extends Controller
             $feuille->setCellValue("F{$ligne}", $ligneAchat->taxe->nom ?? '—');
             $feuille->setCellValue("G{$ligne}", $ligneAchat->montantHt());
             $feuille->setCellValue("H{$ligne}", $ligneAchat->montantTtc());
+            if ($commandeAchat->statut === 'validee') {
+                $feuille->setCellValue("I{$ligne}", ($dejaRecuParLigne[$ligneAchat->id] ?? 0).'/'.(float) $ligneAchat->quantite_pieces);
+            }
             $ligne++;
         }
 
@@ -265,9 +391,14 @@ class CommandeAchatController extends Controller
         $feuille->setCellValue("F{$ligne}", 'Total taxes');
         $feuille->setCellValue("G{$ligne}", $commandeAchat->totalTaxes());
         $ligne++;
-        $feuille->setCellValue("F{$ligne}", 'Total TTC');
-        $feuille->setCellValue("G{$ligne}", $commandeAchat->totalTtc());
+        $feuille->setCellValue("F{$ligne}", $aDesReceptions ? 'Total TTC réel' : 'Total TTC');
+        $feuille->setCellValue("G{$ligne}", $commandeAchat->totalTtcReel());
         $ligne++;
+        if ($aDesReceptions && $commandeAchat->ecartMontant() !== 0) {
+            $feuille->setCellValue("F{$ligne}", 'Total TTC indicatif (commande)');
+            $feuille->setCellValue("G{$ligne}", $commandeAchat->totalTtc());
+            $ligne++;
+        }
         foreach ($commandeAchat->paiements as $paiement) {
             $feuille->setCellValue("F{$ligne}", $paiement->moyenPaiement->nom);
             $feuille->setCellValue("G{$ligne}", $paiement->montant);
@@ -281,13 +412,41 @@ class CommandeAchatController extends Controller
         if ($commandeAchat->resteDu() > 0) {
             $feuille->setCellValue("F{$ligne}", 'Reste dû au fournisseur');
             $feuille->setCellValue("G{$ligne}", $commandeAchat->resteDu());
+            $ligne++;
         }
 
-        foreach (['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as $colonne) {
+        if ($aDesReceptions) {
+            $ligne++;
+            $feuille->setCellValue("A{$ligne}", 'Bons d\'achat (réceptions)');
+            $ligne++;
+            foreach ($commandeAchat->receptions as $reception) {
+                $feuille->setCellValue("A{$ligne}", $reception->numero);
+                $feuille->setCellValue("B{$ligne}", $reception->created_at->format('d/m/Y'));
+                $feuille->setCellValue("C{$ligne}", 'Montant TTC');
+                $feuille->setCellValue("D{$ligne}", $reception->totalTtc());
+                $references = array_filter([
+                    $reception->numero_bon_livraison_fournisseur ? 'BL n° '.$reception->numero_bon_livraison_fournisseur : null,
+                    $reception->numero_facture_fournisseur ? 'Facture n° '.$reception->numero_facture_fournisseur : null,
+                ]);
+                if (! empty($references)) {
+                    $feuille->setCellValue("E{$ligne}", implode(' — ', $references));
+                }
+                $ligne++;
+                foreach ($reception->lignes as $ligneReception) {
+                    $feuille->setCellValue("A{$ligne}", '  '.$ligneReception->produit->libelle_affichage);
+                    $feuille->setCellValue("B{$ligne}", $ligneReception->magasin->nom);
+                    $feuille->setCellValue("C{$ligne}", (float) $ligneReception->quantite_pieces);
+                    $feuille->setCellValue("D{$ligne}", $ligneReception->prix_achat_reel);
+                    $ligne++;
+                }
+            }
+        }
+
+        foreach (['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'] as $colonne) {
             $feuille->getColumnDimension($colonne)->setAutoSize(true);
         }
 
-        $nomFichier = "bon-d-achat-{$commandeAchat->numero}.xlsx";
+        $nomFichier = "bon-de-commande-{$commandeAchat->numero}.xlsx";
         $writer = new Xlsx($spreadsheet);
 
         return response()->streamDownload(function () use ($writer) {
@@ -301,7 +460,11 @@ class CommandeAchatController extends Controller
      */
     private function chargerDonneesFacture(CommandeAchat $commandeAchat): array
     {
-        $commandeAchat->load(['fournisseur', 'lignes.produit', 'lignes.uniteVente.unite', 'lignes.taxe', 'lignes.magasinDestination', 'paiements.moyenPaiement', 'reglementsFournisseur']);
+        $commandeAchat->load([
+            'fournisseur', 'lignes.produit', 'lignes.uniteVente.unite', 'lignes.taxe', 'lignes.magasinDestination',
+            'paiements.moyenPaiement', 'reglementsFournisseur',
+            'receptions.lignes.taxe', 'receptions.lignes.produit', 'receptions.lignes.magasin', 'receptions.paiements.moyenPaiement', 'receptions.auteur',
+        ]);
 
         $parametre = Parametre::actuel();
         $logo = $parametre->getFirstMedia('logo');
@@ -311,6 +474,7 @@ class CommandeAchatController extends Controller
 
         return [
             'commande' => $commandeAchat,
+            'dejaRecuParLigne' => $this->calculerDejaRecuParLigne($commandeAchat),
             'parametre' => $parametre,
             'logoDataUri' => $logoDataUri,
         ];
@@ -320,19 +484,13 @@ class CommandeAchatController extends Controller
     {
         abort_unless($request->user()->can('achat.valider'), 403);
 
-        $paiements = $request->validate([
-            'paiements' => ['sometimes', 'array'],
-            'paiements.*.moyen_paiement_id' => ['required_with:paiements', 'exists:moyen_paiements,id'],
-            'paiements.*.montant' => ['required_with:paiements', 'integer', 'min:1'],
-        ])['paiements'] ?? [];
-
         try {
-            $achatService->valider($commandeAchat, $request->user(), $paiements);
-        } catch (RuntimeException|InvalidArgumentException $e) {
+            $achatService->valider($commandeAchat, $request->user());
+        } catch (RuntimeException $e) {
             return redirect()->route('commande-achats.show', $commandeAchat)->with('erreur', $e->getMessage());
         }
 
-        return redirect()->route('commande-achats.show', $commandeAchat)->with('succes', 'Commande validée : le stock a été mis à jour.');
+        return redirect()->route('commande-achats.show', $commandeAchat)->with('succes', 'Commande validée : prête à être réceptionnée.');
     }
 
     public function destroy(Request $request, CommandeAchat $commandeAchat): RedirectResponse
@@ -340,7 +498,7 @@ class CommandeAchatController extends Controller
         abort_unless($request->user()->can('achat.annuler'), 403);
 
         if ($commandeAchat->statut !== 'brouillon') {
-            return redirect()->route('commande-achats.index')->with('erreur', 'Seule une commande en brouillon peut être supprimée : une commande validée a déjà mis à jour le stock, utilisez « Annuler le bon d\'achat » à la place.');
+            return redirect()->route('commande-achats.index')->with('erreur', 'Seule une commande en brouillon peut être supprimée : utilisez « Annuler le bon de commande » à la place pour une commande déjà confirmée.');
         }
 
         $commandeAchat->delete();

@@ -5,7 +5,10 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
-            <h2 class="h4 mb-1">Inventaire — {{ $inventaire->magasin->nom }} — {{ $inventaire->date->format('d/m/Y') }}</h2>
+            <div class="d-flex align-items-center gap-2">
+                <x-bouton-retour :route="route('inventaires.index')" />
+                <h2 class="h4 mb-0">Inventaire — {{ $inventaire->magasin->nom }} — {{ $inventaire->date->format('d/m/Y') }}</h2>
+            </div>
             @if ($inventaire->statut === 'valide')
                 <span class="badge text-bg-success">Validé le {{ $inventaire->valide_at->format('d/m/Y à H:i') }} par {{ $inventaire->validateur->name }}</span>
             @else
@@ -102,10 +105,6 @@
             </div>
         </div>
     @endif
-
-    <div class="mt-3">
-        <a href="{{ route('inventaires.index') }}" class="btn btn-link ps-0">Retour à la liste</a>
-    </div>
 @endsection
 
 @if ($inventaire->statut === 'brouillon' && $peutRealiser)

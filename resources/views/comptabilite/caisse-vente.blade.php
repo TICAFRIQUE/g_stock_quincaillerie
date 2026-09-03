@@ -5,22 +5,17 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-start mb-1">
         <div>
-            <h2 class="h4 mb-1">{{ $caisse->nom }} — {{ $caisse->magasin->nom }}</h2>
-            <p class="text-secondary small mb-0">
+            <div class="d-flex align-items-center gap-2">
+                <x-bouton-retour :route="route('comptabilite.caisses.index')" />
+                <h2 class="h4 mb-0">{{ $caisse->nom }} — {{ $caisse->magasin->nom }}</h2>
+            </div>
+            <p class="text-secondary small mb-0 ms-5 ps-1">
                 Ventes en espèces et mouvements manuels de cette caisse, toutes sessions confondues.
             </p>
         </div>
         <div class="d-flex gap-2 flex-wrap flex-shrink-0">
-            <a href="{{ route('comptabilite.caisses.index') }}" class="btn btn-link">
-                <i class="bi bi-arrow-left me-1"></i>Retour
-            </a>
-            <x-bouton-imprimer :pdf-route="route('rapports.mouvements-caisse.pdf', array_merge(request()->query(), ['caisse_id' => $caisse->id]))" />
-            <a href="{{ route('rapports.mouvements-caisse.pdf', array_merge(request()->query(), ['caisse_id' => $caisse->id])) }}" class="btn btn-outline-secondary d-print-none">
-                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
-            </a>
-            <a href="{{ route('rapports.mouvements-caisse.excel', array_merge(request()->query(), ['caisse_id' => $caisse->id])) }}" class="btn btn-outline-secondary d-print-none">
-                <i class="bi bi-file-earmark-excel me-1"></i>Excel
-            </a>
+            <x-export-buttons :pdf-route="route('rapports.mouvements-caisse.pdf', array_merge(request()->query(), ['caisse_id' => $caisse->id]))"
+                :excel-route="route('rapports.mouvements-caisse.excel', array_merge(request()->query(), ['caisse_id' => $caisse->id]))" />
         </div>
     </div>
 
@@ -71,9 +66,7 @@
         </div>
         @if (request()->hasAny(['debut', 'fin', 'caissier_id', 'type']))
             <div class="col-auto">
-                <a href="{{ route('comptabilite.caisses-vente.show', $caisse) }}" class="btn btn-sm btn-outline-danger" title="Réinitialiser les filtres">
-                    <i class="bi bi-x-circle me-1"></i>Réinitialiser
-                </a>
+                <x-bouton-reinitialiser :route="route('comptabilite.caisses-vente.show', $caisse)" />
             </div>
         @endif
     </form>

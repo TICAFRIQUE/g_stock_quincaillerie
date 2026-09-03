@@ -5,8 +5,11 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
-            <h2 class="h4 mb-1">{{ $client->nom }} <code class="fs-6 text-secondary">{{ $client->code }}</code></h2>
-            <p class="text-secondary small mb-0">
+            <div class="d-flex align-items-center gap-2">
+                <x-bouton-retour :route="route('clients.index')" />
+                <h2 class="h4 mb-0">{{ $client->nom }} <code class="fs-6 text-secondary">{{ $client->code }}</code></h2>
+            </div>
+            <p class="text-secondary small mb-0 ms-5 ps-1">
                 {{ $client->telephone ?? 'Aucun téléphone' }}
                 @if ($client->adresse) — {{ $client->adresse }} @endif
             </p>
@@ -66,9 +69,7 @@
     <div class="card mb-3">
         <div class="card-body d-flex justify-content-between align-items-center">
             <h3 class="h6 mb-0">Ventes</h3>
-            <a href="{{ route('clients.ventes.excel', $client) }}" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-file-earmark-excel me-1"></i>Exporter en Excel
-            </a>
+            <x-export-buttons :pdf-route="route('clients.ventes.pdf', $client)" :excel-route="route('clients.ventes.excel', $client)" />
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
@@ -156,9 +157,7 @@
     <div class="card mb-3">
         <div class="card-body d-flex justify-content-between align-items-center">
             <h3 class="h6 mb-0">Devis</h3>
-            <a href="{{ route('clients.devis.excel', $client) }}" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-file-earmark-excel me-1"></i>Exporter en Excel
-            </a>
+            <x-export-buttons :pdf-route="route('clients.devis.pdf', $client)" :excel-route="route('clients.devis.excel', $client)" />
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
@@ -267,10 +266,6 @@
                 {{ $ecritures->onEachSide(1)->links() }}
             </div>
         @endif
-    </div>
-
-    <div class="mt-3">
-        <a href="{{ route('clients.index') }}" class="btn btn-link ps-0">Retour à la liste</a>
     </div>
 
     @can('client.reglement')

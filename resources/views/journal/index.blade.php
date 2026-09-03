@@ -39,9 +39,7 @@
         </div>
         @if (request()->hasAny(['debut', 'fin', 'type', 'causeur_id']))
             <div class="col-auto">
-                <a href="{{ route('journal.index') }}" class="btn btn-sm btn-outline-danger" title="Réinitialiser les filtres">
-                    <i class="bi bi-x-circle me-1"></i>Réinitialiser
-                </a>
+                <x-bouton-reinitialiser :route="route('journal.index')" />
             </div>
         @endif
     </form>

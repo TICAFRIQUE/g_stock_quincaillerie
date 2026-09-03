@@ -202,40 +202,62 @@ client, réglé plus tard.
 
 - **Fournisseur** : fiche référentielle (nom, téléphone, e-mail, adresse, actif),
   symétrique du `Client` mais sans notion de limite de crédit.
-- **Chaque ligne d'achat précise sa destination** (magasin ou dépôt, voir « Dépôts »
-  ci-dessous) : une même commande d'achat peut livrer plusieurs sites en une fois. Le
-  magasin porté par l'en-tête de la commande reste le magasin gestionnaire (qui passe la
-  commande), pas nécessairement l'unique destinataire du stock.
-- **Taxe par ligne d'achat** : optionnelle, choisie parmi un référentiel `Taxe`
-  préenregistré (nom + taux %). `prix_achat` sur une ligne est **HT** ; le **TTC** est
-  dérivé (jamais stocké), calculé et affiché par ligne et en récapitulatif de commande
-  (total HT, total TTC) — voir règle d'arrondi unique.
-- **Règlement à la validation** : à la validation d'une commande d'achat, un ou plusieurs
-  paiements immédiats (`PaiementAchat`, paiement mixte comme pour une vente) peuvent être
-  saisis ; le reste (total TTC − paiements) devient une dette portée au compte du
-  fournisseur (règle 16). Aucun paiement saisi = dette intégrale.
+- **Chaque ligne de commande précise une destination prévue** (magasin ou dépôt, voir
+  « Dépôts » ci-dessous) : un même bon de commande peut livrer plusieurs sites en une
+  fois. Cette destination n'est qu'un **plan** — la destination réelle se choisit à
+  nouveau, ligne par ligne, à chaque réception (voir ci-dessous), et peut en dévier.
+- **Taxe par ligne** : optionnelle, choisie parmi un référentiel `Taxe` préenregistré
+  (nom + taux %). `prix_achat` sur une ligne de commande est **HT indicatif** ; le
+  **TTC** est dérivé (jamais stocké), calculé et affiché par ligne et en récapitulatif
+  (total HT, total TTC) — voir règle d'arrondi unique. Le prix **réellement facturé**
+  (qui peut différer de cet indicatif) n'est capturé qu'à la réception.
+- **Réceptions échelonnées (bon d'achat)** : un bon de commande **validé** (`statut` =
+  `validee`, prix indicatifs, aucun impact stock/argent à ce stade) peut être
+  **réceptionné en une ou plusieurs fois** (`ReceptionAchat`/`LigneReceptionAchat`),
+  chacune un document immuable — le **bon d'achat** au sens propre — qui capture, ligne
+  par ligne : la quantité réellement arrivée (plafonnée au reste à recevoir de la
+  ligne), le prix **réellement facturé** par le fournisseur pour ce lot (peut différer
+  de l'indicatif, alimente le CMP — règle « coût suivi via CMP »), et la destination
+  réelle (éditable, pré-remplie avec le plan de la ligne mais librement modifiable — une
+  même ligne de commande peut ainsi finir répartie sur plusieurs destinations via
+  plusieurs réceptions). Un ou plusieurs paiements (`PaiementAchat`, paiement mixte)
+  peuvent être saisis à **chaque réception** (pas à la validation du bon de commande) ;
+  le reste devient une dette fournisseur pour cette réception (règle 16). `CommandeAchat`
+  reste la seule chose visible/gérée du fournisseur (numéro, prix indicatifs) ; le
+  montant réellement dû (`CommandeAchat::totalTtcReel()`, somme des `totalTtc()` de
+  chaque réception, ou l'indicatif tant qu'aucune réception n'existe) et le reste à
+  recevoir (`quantiteRecuePieces()`/`quantiteResteARecevoirPieces()`/`tauxCompletion()`)
+  s'affichent sur sa fiche. **Achat direct (sans document envoyé au préalable)** : pour
+  un achat déjà effectué (ex. achat comptant chez le fournisseur), l'écran de création
+  propose une action « Enregistrer et réceptionner immédiatement » qui enchaîne, dans
+  une seule transaction, la création du bon de commande, sa validation et sa réception
+  complète (mêmes lignes/prix/destinations/paiement saisis, indicatif = réel puisque
+  c'est un seul événement) — évite de forcer un achat comptant à traverser
+  brouillon → validation → réception séparément. Le chemin classique (brouillon →
+  validation séparée → réception en une ou plusieurs fois) reste disponible pour une
+  vraie commande envoyée au fournisseur, en attente de livraison.
 - **Solde fournisseur dérivé** (règle 16) : somme des `EcritureCompteFournisseur`
-  (+dette à chaque achat à crédit, −dette à chaque règlement) — même logique que le
+  (+dette à chaque réception à crédit, −dette à chaque règlement) — même logique que le
   compte client.
-- **Règlement fournisseur** : encaissement ultérieur d'une dette, un ou plusieurs moyens de
-  paiement, **jamais rattaché à une session de caisse de caissier** (règle 17, contrairement
-  au règlement client) — la part payée en espèces sort directement de la Caisse Générale
-  (voir « Trésorerie »), sans aucune session requise. Immuable, comme un règlement client.
-  Deux modes, réservés chacun à un usage précis pour ne jamais laisser un règlement "en
-  l'air" :
-  - **Ciblé sur un bon d'achat précis** (bouton dédié depuis la fiche fournisseur ou le
-    détail du bon d'achat) : **partiel ou total autorisé**, plafonné au reste dû de CE bon
-    d'achat (`CommandeAchat::resteDu()`, indépendant de la dette totale du fournisseur qui
-    peut inclure d'autres bons d'achat).
-  - **Global** (bouton général de la fiche fournisseur, sans bon d'achat ciblé) :
+- **Règlement fournisseur** : encaissement ultérieur d'une dette (au-delà de ce qui a
+  déjà été réglé à la réception), un ou plusieurs moyens de paiement, **jamais rattaché
+  à une session de caisse de caissier** (règle 17, contrairement au règlement client) —
+  la part payée en espèces sort directement de la Caisse Générale (voir « Trésorerie »),
+  sans aucune session requise. Immuable, comme un règlement client. Deux modes, réservés
+  chacun à un usage précis pour ne jamais laisser un règlement "en l'air" :
+  - **Ciblé sur un bon de commande précis** (bouton dédié depuis la fiche fournisseur ou
+    le détail du bon de commande) : **partiel ou total autorisé**, plafonné au reste dû
+    de CE bon de commande (`CommandeAchat::resteDu()`, indépendant de la dette totale du
+    fournisseur qui peut inclure d'autres bons de commande).
+  - **Global** (bouton général de la fiche fournisseur, sans bon de commande ciblé) :
     **intégral uniquement** — doit couvrir exactement le solde actuel du compte, jamais un
     montant partiel. `ReglementFournisseurService::reglerIntegralite()` répartit alors
-    automatiquement ce montant en une `ReglementFournisseur` **par bon d'achat encore dû**,
-    le plus ancien d'abord (répartition "en cascade", entière, sans arrondi) — jamais un
-    règlement non imputé à un bon d'achat précis. Sans cette répartition, le solde du
-    compte diminuait bien après un règlement global, mais le "reste dû" affiché sur chaque
-    bon d'achat ne bougeait jamais, ce qui semblait un bug alors que c'était juste une
-    dette non imputée.
+    automatiquement ce montant en une `ReglementFournisseur` **par bon de commande encore
+    dû**, le plus ancien d'abord (répartition "en cascade", entière, sans arrondi) —
+    jamais un règlement non imputé à un bon de commande précis. Sans cette répartition,
+    le solde du compte diminuait bien après un règlement global, mais le "reste dû"
+    affiché sur chaque bon de commande ne bougeait jamais, ce qui semblait un bug alors
+    que c'était juste une dette non imputée.
 - Pas de limite de crédit fournisseur ni de blocage associé dans le MVP.
 - **Avoir fournisseur** : symétrique de l'avoir client (voir « Vente à crédit et comptes
   clients ») — un solde négatif se déduit automatiquement de la dette d'un prochain achat
@@ -265,9 +287,15 @@ client, réglé plus tard.
 - **Stock remis directement en stock vendable**, sans zone d'inspection séparée : le
   mouvement (type `retour_client` ou `retour_fournisseur`, immuable comme tout
   `MouvementStock`, règle 2) porte sur le magasin/dépôt d'origine de la ligne
-  (`magasin_source_id` de la `LigneVente`, `magasin_destination_id` de la
-  `LigneCommandeAchat`). Un retour fournisseur peut échouer (stock insuffisant) si la
-  marchandise reçue a déjà été revendue ou transférée ailleurs.
+  (`magasin_source_id` de la `LigneVente` ; côté achat, le magasin **réellement reçu** —
+  `LigneReceptionAchat.magasin_id` si le bon de commande a été réceptionné via le
+  système de réceptions échelonnées, sinon `magasin_destination_id` de la
+  `LigneCommandeAchat` pour un bon de commande légitimement antérieur à ce système). Un
+  retour fournisseur est plafonné à ce qui a été **réellement reçu à cette destination
+  précise** (pas la quantité commandée), et peut échouer (stock insuffisant) si la
+  marchandise reçue a déjà été revendue ou transférée ailleurs. L'avoir crédité se base
+  sur le prix **réellement facturé** à la réception (voir « Achat à crédit et comptes
+  fournisseurs »), pas sur l'indicatif du bon de commande.
 - **CMP jamais recalculé** par un retour, comme tout mouvement hors réception. Le coût
   historique d'un retour client reprend `cout_applique` de la `LigneVente` d'origine
   (CMP figé au moment de la vente).
@@ -476,19 +504,39 @@ client, réglé plus tard.
 - **Fournisseur** : nom, **code** (identifiant type `FRN-000001`, saisi ou généré
   automatiquement, comme le SKU produit), téléphone, e-mail, adresse, actif. Référentiel
   central, comme `Client`.
-- **CommandeAchat** : pas d'entité « Réception » séparée — un numéro, un fournisseur, un
-  magasin gestionnaire, une date, des lignes ; à sa **validation**, le stock est
-  directement impacté (mouvements d'entrée, un par ligne vers sa propre destination) et
-  le CMP recalculé. Un produit peut être acheté à des prix différents dans le temps : le
-  CMP lisse ça en une seule valeur de référence par (produit × magasin).
+- **CommandeAchat** (« bon de commande » à l'écran) : un numéro, un fournisseur, une
+  date, des lignes à prix **indicatifs** ; pas de magasin d'en-tête (la destination est
+  par ligne, voir `LigneCommandeAchat`). Statut `brouillon` → `validee` (confirmation
+  simple : envoyée au fournisseur, prête à être réceptionnée — n'impacte ni stock ni
+  argent) → réceptionnée une ou plusieurs fois (voir `ReceptionAchat`). Un produit peut
+  être acheté à des prix différents dans le temps : le **CMP** (recalculé à chaque
+  réception, au prix réellement facturé) lisse ça en une seule valeur de référence par
+  (produit × magasin).
 - **LigneCommandeAchat** : produit + unité d'achat (pièce ou `UniteVente`, même
-  référentiel qu'à la vente) + quantité + **prix d'achat HT** + **taxe** optionnelle
-  (`Taxe`) + **destination** (`Magasin`, magasin ou dépôt) ; TTC dérivé, jamais stocké.
+  référentiel qu'à la vente) + quantité + **prix d'achat HT indicatif** + **taxe**
+  optionnelle (`Taxe`) + **destination prévue** (`Magasin`, magasin ou dépôt — un plan,
+  potentiellement modifié à la réception) ; TTC dérivé, jamais stocké.
 - **Taxe** : nom + taux (%) + actif. Référentiel préenregistré, utilisé uniquement côté
   achat (voir « Argent et arrondis »).
-- **PaiementAchat** : rattaché à une commande d'achat ; moyen + montant (paiement mixte
-  possible), saisi à la validation. Le reste (total TTC − paiements) devient une dette
-  fournisseur (voir « Achat à crédit et comptes fournisseurs »).
+- **ReceptionAchat** (« bon d'achat » à l'écran) : immuable, comme un mouvement (règle
+  2/18) — numéro (`{numero_commande}-R{rang}`), la `CommandeAchat` (obligatoirement
+  `validee`) qu'elle réceptionne, motif optionnel, auteur. Matérialise l'événement réel
+  (marchandise + prix + argent) : c'est elle, et seulement elle, qui mouvemente le stock,
+  recalcule le CMP et pose la dette fournisseur — jamais `CommandeAchat`. Une même
+  commande peut avoir plusieurs réceptions successives (partielles), jusqu'à réception
+  complète.
+- **LigneReceptionAchat** : `LigneCommandeAchat` d'origine + produit + **destination
+  réelle** (`Magasin`, choix éditable au moment de la réception, pré-rempli avec le plan
+  de la ligne mais librement modifiable — une même ligne de commande peut ainsi finir
+  répartie sur plusieurs destinations via plusieurs réceptions) + quantité en pièces
+  (plafonnée au reste à recevoir de la ligne) + **prix d'achat réel HT** par pièce (peut
+  différer de l'indicatif de la ligne de commande) + taxe (reprise de la ligne d'origine).
+- **PaiementAchat** : rattaché à une `CommandeAchat` (toujours renseigné, y compris pour
+  un paiement de réception) et, le cas échéant, à une `ReceptionAchat` précise ; moyen +
+  montant (paiement mixte possible), saisi **à chaque réception** (pas à la validation
+  du bon de commande). Le reste (total TTC de la réception − ses paiements) devient une
+  dette fournisseur pour cette réception (voir « Achat à crédit et comptes
+  fournisseurs »).
 - **Caisse** : rattachée à un magasin ; au plus une session ouverte à la fois.
 - **SessionCaisse** : caissier + fond de caisse + ouverture/clôture + écart ; totaux
   espèces stockés à la clôture (ventes, règlements clients, entrées et sorties de caisse
@@ -672,8 +720,6 @@ client, réglé plus tard.
 - **Remboursement en espèces sur un retour** — un retour crédite toujours un avoir sur
   le compte client/fournisseur, jamais un mouvement de tiroir (règle 18).
 - **Limite de crédit fournisseur** — pas de blocage, contrairement au client.
-- Entité « Réception » séparée d'une commande d'achat — la validation d'une commande
-  d'achat impacte le stock directement (voir modèle de domaine).
 - **Transformation partielle d'un devis** — un devis se transforme en bloc, pas ligne
   par ligne.
 
@@ -727,3 +773,20 @@ caisses » (écran séparé pour saisir un mouvement de tiroir) a été retiré 
 avec `sessions.show` qui affichait déjà l'essentiel des mêmes informations pour une
 session de caissier, le formulaire entrée/sortie et le solde théorique temps réel ont
 été fusionnés directement dans `/sessions/{session}` (voir « Mouvements de caisse »).
+
+Nouvelle extension (réceptions échelonnées côté achat) : **remplace** la décision MVP
+initiale « achat = entrée de stock directe à la validation, pas de Réception séparée »
+(première ligne de la première décision actée ci-dessus, laissée telle quelle comme
+trace historique). `CommandeAchat` (« bon de commande » à l'écran) ne mouvemente plus
+rien à la validation ; seule sa réception — une ou plusieurs fois, chacune une
+`ReceptionAchat` immuable (« bon d'achat » à l'écran) — impacte réellement stock, CMP
+et dette fournisseur, au prix et à la destination **réellement constatés** (peuvent
+différer de l'indicatif/du plan de la ligne de commande, voir « Achat à crédit et
+comptes fournisseurs »). Aucune donnée/mouvement historique touché : un bon de commande
+déjà validé avant cette extension se comporte à l'identique (`totalTtcReel()`/
+`resteDu()` retombent naturellement sur l'ancien calcul quand aucune réception
+n'existe), la distinction se fait uniquement par présence ou non de `ReceptionAchat`
+liées, sans flag stocké. Pour un achat déjà effectué (achat comptant chez le
+fournisseur, sans document envoyé au préalable), l'écran de création propose un
+raccourci « Enregistrer et réceptionner immédiatement » qui enchaîne création,
+validation et réception complète en une seule action.

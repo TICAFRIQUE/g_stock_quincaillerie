@@ -3,18 +3,7 @@
 @section('title', 'Mouvements de caisse')
 
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-1">
-        <h2 class="h4 mb-0">Mouvements de caisse</h2>
-        <div class="d-flex gap-2 flex-wrap">
-            <x-bouton-imprimer :pdf-route="route('rapports.mouvements-caisse.pdf', request()->query())" />
-            <a href="{{ route('rapports.mouvements-caisse.pdf', request()->query()) }}" class="btn btn-outline-secondary d-print-none">
-                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
-            </a>
-            <a href="{{ route('rapports.mouvements-caisse.excel', request()->query()) }}" class="btn btn-outline-secondary d-print-none">
-                <i class="bi bi-file-earmark-excel me-1"></i>Excel
-            </a>
-        </div>
-    </div>
+    <h2 class="h4 mb-1">Mouvements de caisse</h2>
     @php
         $magasinIdActif = auth()->user()->magasin_id ?: request('magasin_id');
         $filtresActifs = collect([
@@ -81,11 +70,12 @@
         </div>
         @if (request()->hasAny(['debut', 'fin', 'magasin_id', 'caisse_id', 'caissier_id', 'type']))
             <div class="col-auto">
-                <a href="{{ route('rapports.mouvements-caisse') }}" class="btn btn-sm btn-outline-danger" title="Réinitialiser les filtres">
-                    <i class="bi bi-x-circle me-1"></i>Réinitialiser
-                </a>
+                <x-bouton-reinitialiser :route="route('rapports.mouvements-caisse')" />
             </div>
         @endif
+        <div class="col-auto ms-auto">
+            <x-export-buttons :pdf-route="route('rapports.mouvements-caisse.pdf', request()->query())" :excel-route="route('rapports.mouvements-caisse.excel', request()->query())" />
+        </div>
     </form>
 
     <div class="row g-3 mb-3">

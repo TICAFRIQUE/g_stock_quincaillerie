@@ -3,11 +3,9 @@
 @section('title', 'Ventes en attente')
 
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <x-bouton-retour :route="route('sessions.show', $session)" />
         <h2 class="h4 mb-0">Ventes en attente — {{ $session->caisse->nom }}</h2>
-        <a href="{{ route('sessions.show', $session) }}" class="btn btn-link">
-            <i class="bi bi-arrow-left me-1"></i>Retour à la session
-        </a>
     </div>
 
     <div class="row g-3">

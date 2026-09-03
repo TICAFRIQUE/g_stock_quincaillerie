@@ -4,14 +4,12 @@
 
 @section('content')
     <div x-data="reglementApp()">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
-            <div>
+        <div class="mb-3">
+            <div class="d-flex align-items-center gap-2">
+                <x-bouton-retour :route="route('sessions.show', $session)" />
                 <h2 class="h4 mb-0">Règlement client — {{ $session->caisse->nom }}</h2>
-                <p class="text-secondary small mb-0">{{ $session->caisse->magasin->nom }}</p>
             </div>
-            <a href="{{ route('sessions.show', $session) }}" class="btn btn-link">
-                <i class="bi bi-arrow-left me-1"></i>Retour à la session
-            </a>
+            <p class="text-secondary small mb-0 ms-5 ps-1">{{ $session->caisse->magasin->nom }}</p>
         </div>
 
         @if ($clients->isEmpty())

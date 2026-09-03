@@ -19,7 +19,6 @@
                     <i class="bi bi-sliders me-1"></i>Casse / ajustement
                 </a>
             @endcan
-            <x-export-buttons :pdf-route="route('stock.pdf', request()->query())" :excel-route="route('stock.excel', request()->query())" :tout="true" />
         </div>
     </div>
 
@@ -85,11 +84,12 @@
         </div>
         @if (request()->hasAny(['magasin_id', 'produit_id', 'sous_seuil', 'tri', 'direction']))
             <div class="col-auto">
-                <a href="{{ route('stock.index') }}" class="btn btn-outline-danger">
-                    <i class="bi bi-x-circle me-1"></i>Réinitialiser
-                </a>
+                <x-bouton-reinitialiser :route="route('stock.index')" />
             </div>
         @endif
+        <div class="col-auto ms-auto">
+            <x-export-buttons :pdf-route="route('stock.pdf', request()->query())" :excel-route="route('stock.excel', request()->query())" :tout="true" />
+        </div>
     </form>
 
     <div class="card">

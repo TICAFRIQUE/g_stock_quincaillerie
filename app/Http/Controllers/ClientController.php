@@ -212,6 +212,27 @@ class ClientController extends Controller
         ]);
     }
 
+    public function ventesPdf(Client $client): Response
+    {
+        $ventes = $client->ventes()->withTrashed()->with(['magasin', 'lignes', 'bonsLivraison.lignes'])->orderBy('created_at')->get();
+
+        return $this->pdfDepuisListe(
+            "Ventes — {$client->nom}",
+            ['Numéro', 'Date', 'Magasin', 'Total net', 'Statut', 'Livraison'],
+            $ventes->map(fn (Vente $vente) => [
+                $vente->numero,
+                $vente->created_at->format('d/m/Y H:i'),
+                $vente->magasin->nom,
+                montant($vente->total_net),
+                $vente->trashed() ? 'Annulée' : 'Validée',
+                ! $vente->livraisonEngagee() ? '—' : ($vente->entierementLivree()
+                    ? 'Entièrement livrée'
+                    : quantite($vente->quantiteLivreePieces()).'/'.quantite($vente->lignes->sum('quantite_pieces')).' pièce(s)'),
+            ]),
+            'ventes-'.Str::slug($client->nom).'.pdf',
+        );
+    }
+
     public function exporterVentes(Client $client): StreamedResponse
     {
         $ventes = $client->ventes()->withTrashed()->with(['magasin', 'lignes', 'bonsLivraison.lignes'])->orderBy('created_at')->get();
@@ -244,6 +265,23 @@ class ClientController extends Controller
         return response()->streamDownload(function () use ($writer) {
             $writer->save('php://output');
         }, $nomFichier, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
+    public function devisPdf(Client $client): Response
+    {
+        $devis = $client->devis()->orderBy('created_at')->get();
+
+        return $this->pdfDepuisListe(
+            "Devis — {$client->nom}",
+            ['Numéro', 'Date', 'Statut', "Valide jusqu'au"],
+            $devis->map(fn ($unDevis) => [
+                $unDevis->numero,
+                $unDevis->created_at->format('d/m/Y H:i'),
+                $unDevis->statutEffectif()->libelle(),
+                $unDevis->date_validite->format('d/m/Y'),
+            ]),
+            'devis-'.Str::slug($client->nom).'.pdf',
+        );
     }
 
     public function exporterDevis(Client $client): StreamedResponse

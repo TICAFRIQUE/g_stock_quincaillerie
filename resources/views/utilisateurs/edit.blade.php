@@ -3,7 +3,10 @@
 @section('title', 'Modifier l\'utilisateur')
 
 @section('content')
-    <h2 class="h4 mb-3">Modifier « {{ $utilisateur->name }} »</h2>
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <x-bouton-retour :route="route('utilisateurs.index')" />
+        <h2 class="h4 mb-0">Modifier « {{ $utilisateur->name }} »</h2>
+    </div>
 
     <div class="card mx-auto" style="max-width: 560px;">
         <div class="card-body">

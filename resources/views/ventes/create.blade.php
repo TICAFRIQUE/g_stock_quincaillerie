@@ -15,8 +15,11 @@
     )">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
             <div>
-                <h2 class="h4 mb-0">Facture — {{ $session->caisse->nom }}</h2>
-                <p class="text-secondary small mb-0">
+                <div class="d-flex align-items-center gap-2">
+                    <x-bouton-retour :route="$devisTransformation ? route('devis.show', $devisTransformation) : route('sessions.show', $session)" />
+                    <h2 class="h4 mb-0">Facture — {{ $session->caisse->nom }}</h2>
+                </div>
+                <p class="text-secondary small mb-0 ms-5 ps-1">
                     {{ $session->caisse->magasin->nom }}
                     @if ($venteEnAttente)
                         <span class="badge text-bg-warning ms-2">
@@ -41,9 +44,6 @@
                         </a>
                     @endcan
                 @endunless
-                <a href="{{ $devisTransformation ? route('devis.show', $devisTransformation) : route('sessions.show', $session) }}" class="btn btn-link">
-                    <i class="bi bi-arrow-left me-1"></i>{{ $devisTransformation ? 'Retour au devis' : 'Retour à la session' }}
-                </a>
             </div>
         </div>
 

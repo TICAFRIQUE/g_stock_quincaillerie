@@ -25,6 +25,7 @@ use App\Http\Controllers\ReglementClientController;
 use App\Http\Controllers\ReglementFournisseurController;
 use App\Http\Controllers\RemboursementAvoirClientController;
 use App\Http\Controllers\RemboursementAvoirFournisseurController;
+use App\Http\Controllers\ReceptionAchatController;
 use App\Http\Controllers\RetourAchatController;
 use App\Http\Controllers\RetourVenteController;
 use App\Http\Controllers\RoleController;
@@ -130,6 +131,8 @@ Route::middleware(['auth', 'abonnement.actif'])->group(function () {
     });
 
     Route::middleware('can:fournisseur.voir')->group(function () {
+        Route::get('fournisseurs/{fournisseur}/commandes/pdf', [FournisseurController::class, 'commandesPdf'])->name('fournisseurs.commandes.pdf');
+        Route::get('fournisseurs/{fournisseur}/commandes/excel', [FournisseurController::class, 'commandesExcel'])->name('fournisseurs.commandes.excel');
         Route::get('fournisseurs/{fournisseur}', [FournisseurController::class, 'show'])->name('fournisseurs.show');
     });
 
@@ -183,7 +186,9 @@ Route::middleware(['auth', 'abonnement.actif'])->group(function () {
 
     Route::middleware('can:client.voir')->group(function () {
         Route::get('clients/{client}', [ClientController::class, 'show'])->name('clients.show');
+        Route::get('clients/{client}/ventes/pdf', [ClientController::class, 'ventesPdf'])->name('clients.ventes.pdf');
         Route::get('clients/{client}/ventes/excel', [ClientController::class, 'exporterVentes'])->name('clients.ventes.excel');
+        Route::get('clients/{client}/devis/pdf', [ClientController::class, 'devisPdf'])->name('clients.devis.pdf');
         Route::get('clients/{client}/devis/excel', [ClientController::class, 'exporterDevis'])->name('clients.devis.excel');
     });
 
@@ -205,6 +210,10 @@ Route::middleware(['auth', 'abonnement.actif'])->group(function () {
 
     Route::middleware('can:achat.retour')->group(function () {
         Route::post('commande-achats/{commandeAchat}/retours', [RetourAchatController::class, 'store'])->name('commande-achats.retours.store');
+    });
+
+    Route::middleware('can:achat.receptionner')->group(function () {
+        Route::post('commande-achats/{commandeAchat}/receptions', [ReceptionAchatController::class, 'store'])->name('commande-achats.receptions.store');
     });
 
     Route::middleware('can:stock.voir')->group(function () {

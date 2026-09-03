@@ -6,7 +6,6 @@
     <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
         <h2 class="h4 mb-0">Clients</h2>
         <div class="d-flex gap-2 flex-wrap">
-            <x-export-buttons :pdf-route="route('clients.pdf', request()->query())" :excel-route="route('clients.excel', request()->query())" :tout="true" />
             @can('client.gerer')
                 <a href="{{ route('clients.create') }}" class="btn btn-primary">Nouveau client</a>
             @endcan
@@ -16,7 +15,11 @@
     <h2 class="h4 mb-3 d-none d-print-block">Clients</h2>
 
     <div class="d-print-none">
-        <x-recherche-form :action="route('clients.index')" placeholder="Nom ou téléphone…" />
+        <x-recherche-form :action="route('clients.index')" placeholder="Nom ou téléphone…">
+            <x-slot:export>
+                <x-export-buttons :pdf-route="route('clients.pdf', request()->query())" :excel-route="route('clients.excel', request()->query())" :tout="true" />
+            </x-slot:export>
+        </x-recherche-form>
     </div>
 
     <div class="card">
@@ -52,6 +55,7 @@
                                 @endif
                             </td>
                             <td class="text-end d-print-none">
+                                <x-detail-button :href="route('clients.show', $client)" />
                                 @can('client.gerer')
                                     <x-edit-button :href="route('clients.edit', $client)" />
                                     <x-delete-button :action="route('clients.destroy', $client)" :label="'le client « '.$client->nom.' »'" />

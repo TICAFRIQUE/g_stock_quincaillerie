@@ -6,6 +6,7 @@ use App\Enums\MouvementStockType;
 use App\Exceptions\QuantiteRetourInvalideException;
 use App\Models\CommandeAchat;
 use App\Models\LigneRetourAchat;
+use App\Models\Magasin;
 use App\Models\RetourAchat;
 use App\Models\User;
 use App\Support\Arrondi;
@@ -16,6 +17,17 @@ use InvalidArgumentException;
  * Retour fournisseur, symétrique de RetourVenteService : toujours lié à une
  * commande d'achat validée, ligne par ligne. Indépendant de la caisse, comme
  * ReglementFournisseur (voir CLAUDE.md).
+ *
+ * Le plafond et le prix de référence (pour l'avoir crédité) se calculent par
+ * (ligne de commande × magasin), pas par ligne seule : une commande sans
+ * réception (ancien modèle) n'a qu'un seul magasin possible — celui de la
+ * ligne — donc une seule "ligne retournable" par produit, exactement comme
+ * avant. Une commande avec réceptions (nouveau modèle) peut avoir reçu une
+ * même ligne à plusieurs destinations (magasin choisi à chaque réception,
+ * voir ReceptionAchatService) : chaque destination effectivement reçue
+ * devient sa propre ligne retournable, avec son propre plafond et son
+ * propre prix réel de référence — jamais retourner vers/depuis un magasin
+ * qui n'a rien reçu.
  */
 class RetourAchatService
 {
@@ -25,7 +37,7 @@ class RetourAchatService
     ) {}
 
     /**
-     * @param  array<int, array{ligne_commande_achat_id:int, quantite_pieces:int|float}>  $lignes
+     * @param  array<int, array{ligne_commande_achat_id:int, magasin_id:int, quantite_pieces:int|float}>  $lignes
      */
     public function retourner(CommandeAchat $commandeAchat, array $lignes, User $auteur, ?string $motif = null): RetourAchat
     {
@@ -45,14 +57,31 @@ class RetourAchatService
             throw new InvalidArgumentException('Un retour doit comporter au moins une ligne avec une quantité positive.');
         }
 
-        $commandeAchat->loadMissing('lignes.produit', 'lignes.magasinDestination', 'lignes.taxe', 'fournisseur');
+        $commandeAchat->loadMissing('lignes.produit', 'lignes.magasinDestination', 'lignes.taxe', 'fournisseur', 'receptions.lignes');
 
+        $hasReceptions = $commandeAchat->receptions->isNotEmpty();
+
+        // Déjà retourné, groupé par (ligne × magasin) — magasin_id est déjà
+        // stocké sur chaque LigneRetourAchat, jamais recalculé après coup.
         $dejaRetourne = LigneRetourAchat::whereIn('ligne_commande_achat_id', $commandeAchat->lignes->pluck('id'))
-            ->selectRaw('ligne_commande_achat_id, SUM(quantite_pieces) as total')
-            ->groupBy('ligne_commande_achat_id')
-            ->pluck('total', 'ligne_commande_achat_id');
+            ->selectRaw('ligne_commande_achat_id, magasin_id, SUM(quantite_pieces) as total')
+            ->groupBy('ligne_commande_achat_id', 'magasin_id')
+            ->get()
+            ->keyBy(fn ($r) => "{$r->ligne_commande_achat_id}-{$r->magasin_id}")
+            ->map(fn ($r) => (float) $r->total);
 
-        return DB::transaction(function () use ($commandeAchat, $lignes, $auteur, $motif, $dejaRetourne) {
+        // Reçu par (ligne × magasin), uniquement pertinent en nouveau modèle
+        // (whereHas() du chargement receptions.lignes exclut déjà tout ce
+        // qui viendrait d'une réception — il n'y en a pas en legacy).
+        $recuParClef = $commandeAchat->receptions->flatMap->lignes
+            ->groupBy(fn ($l) => "{$l->ligne_commande_achat_id}-{$l->magasin_id}");
+
+        $magasinIds = collect($lignes)->pluck('magasin_id')->filter()->unique();
+        $magasinsParId = $magasinIds->isNotEmpty()
+            ? Magasin::whereIn('id', $magasinIds)->get()->keyBy('id')
+            : collect();
+
+        return DB::transaction(function () use ($commandeAchat, $lignes, $auteur, $motif, $dejaRetourne, $hasReceptions, $recuParClef, $magasinsParId) {
             $retour = RetourAchat::create([
                 'numero' => $this->genererNumero(),
                 'commande_achat_id' => $commandeAchat->id,
@@ -71,20 +100,43 @@ class RetourAchatService
                     throw new InvalidArgumentException("Ligne de commande introuvable sur ce bon d'achat.");
                 }
 
-                $quantiteAvant = (float) ($dejaRetourne[$ligne->id] ?? 0);
-                $quantiteRestante = (float) $ligne->quantite_pieces - $quantiteAvant;
+                $magasinId = (int) ($demande['magasin_id'] ?? 0);
+                $clef = "{$ligne->id}-{$magasinId}";
+
+                if ($hasReceptions) {
+                    $magasin = $magasinsParId->get($magasinId);
+                    if ($magasin === null) {
+                        throw new InvalidArgumentException('Destination introuvable pour une ligne de retour.');
+                    }
+                    $lignesRecues = $recuParClef->get($clef, collect());
+                    $quantiteRecue = (float) $lignesRecues->sum('quantite_pieces');
+                    $totalLigneTtcRef = (int) $lignesRecues->sum(fn ($lr) => $lr->montantTtc());
+                } else {
+                    // Ancien modèle : un seul magasin possible, celui fixé
+                    // sur la ligne de commande (jamais un autre — le stock
+                    // n'a bougé qu'à cet endroit à la validation).
+                    if ($magasinId !== $ligne->magasin_destination_id) {
+                        throw new InvalidArgumentException('Destination invalide pour cette ligne.');
+                    }
+                    $magasin = $ligne->magasinDestination;
+                    $quantiteRecue = (float) $ligne->quantite_pieces;
+                    $totalLigneTtcRef = $ligne->montantTtc();
+                }
+
+                $quantiteAvant = (float) ($dejaRetourne[$clef] ?? 0);
+                $quantiteRestante = $quantiteRecue - $quantiteAvant;
                 $quantiteRetour = (float) $demande['quantite_pieces'];
 
                 if ($quantiteRetour > $quantiteRestante) {
                     throw new QuantiteRetourInvalideException($ligne, $quantiteRetour, $quantiteRestante);
                 }
 
-                $montantLigne = $this->montantTelescope($ligne->montantTtc(), $ligne->quantite_pieces, $quantiteAvant, $quantiteRetour);
+                $montantLigne = $this->montantTelescope($totalLigneTtcRef, $quantiteRecue, $quantiteAvant, $quantiteRetour);
 
                 $retour->lignes()->create([
                     'ligne_commande_achat_id' => $ligne->id,
                     'produit_id' => $ligne->produit_id,
-                    'magasin_id' => $ligne->magasin_destination_id,
+                    'magasin_id' => $magasin->id,
                     'quantite_pieces' => $quantiteRetour,
                     'montant' => $montantLigne,
                 ]);
@@ -93,7 +145,7 @@ class RetourAchatService
                 // si une partie a déjà été revendue/transférée ailleurs.
                 $this->stockService->enregistrerMouvement(
                     produit: $ligne->produit,
-                    magasin: $ligne->magasinDestination,
+                    magasin: $magasin,
                     quantite: -$quantiteRetour,
                     type: MouvementStockType::RetourFournisseur,
                     auteur: $auteur,
@@ -102,7 +154,7 @@ class RetourAchatService
                 );
 
                 $montantTotal += $montantLigne;
-                $dejaRetourne[$ligne->id] = $quantiteAvant + $quantiteRetour;
+                $dejaRetourne[$clef] = $quantiteAvant + $quantiteRetour;
             }
 
             $retour->update(['montant_total' => $montantTotal]);

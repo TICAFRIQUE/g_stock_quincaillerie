@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -67,6 +68,11 @@ class CommandeAchat extends Model
         return $this->hasMany(RetourAchat::class);
     }
 
+    public function receptions(): HasMany
+    {
+        return $this->hasMany(ReceptionAchat::class);
+    }
+
     /**
      * Suppose `lignes` chargée (loadMissing en amont, voir
      * CommandeAchatController::show()).
@@ -84,6 +90,82 @@ class CommandeAchat extends Model
     public function totalTaxes(): int
     {
         return $this->totalTtc() - $this->totalHt();
+    }
+
+    /**
+     * Montant réellement dû/facturé, au prix réel des réceptions plutôt que
+     * l'indicatif de la commande — bascule automatiquement selon l'époque
+     * (aucun flag stocké) : une commande sans aucune réception (créée avant
+     * ce système, ou pas encore reçue) retombe sur l'indicatif totalTtc(),
+     * qui EST le réel pour ces cas (tout reçu d'un coup à la validation dans
+     * l'ancien modèle). Suppose `receptions.lignes.taxe` et `lignes` chargées.
+     */
+    public function totalTtcReel(): int
+    {
+        return $this->receptions->isNotEmpty()
+            ? $this->receptions->sum(fn (ReceptionAchat $r) => $r->totalTtc())
+            : $this->totalTtc();
+    }
+
+    /**
+     * Quantité totale commandée (pièces), toutes lignes confondues. Suppose
+     * `lignes` chargée.
+     */
+    public function quantiteCommandeePieces(): float
+    {
+        return (float) $this->lignes->sum('quantite_pieces');
+    }
+
+    /**
+     * Quantité totale reçue (pièces), toutes réceptions confondues. Suppose
+     * `lignes.receptions` chargée.
+     */
+    public function quantiteRecuePieces(): float
+    {
+        return (float) $this->lignes->flatMap->receptions->sum('quantite_pieces');
+    }
+
+    public function quantiteResteARecevoirPieces(): float
+    {
+        return $this->quantiteCommandeePieces() - $this->quantiteRecuePieces();
+    }
+
+    /**
+     * Taux de complétion de la réception, en pourcentage entier. Suppose
+     * `lignes.receptions` chargée.
+     */
+    public function tauxCompletion(): int
+    {
+        $commandee = $this->quantiteCommandeePieces();
+
+        return $commandee > 0 ? (int) round($this->quantiteRecuePieces() / $commandee * 100) : 0;
+    }
+
+    /**
+     * Bons de commande validés dont la réception n'est pas encore complète
+     * (jamais réceptionnés, ou seulement partiellement) — comparaison SQL
+     * directe (pas de tauxCompletion() PHP ligne par ligne, qui filtrerait
+     * après pagination) entre quantité commandée et quantité reçue.
+     */
+    public function scopeReceptionIncomplete(Builder $query): Builder
+    {
+        return $query->where('statut', 'validee')->whereNull('deleted_at')->whereRaw(
+            '(select coalesce(sum(lca.quantite_pieces), 0) from ligne_commande_achats lca where lca.commande_achat_id = commande_achats.id)'
+            .' > '
+            .'(select coalesce(sum(lra.quantite_pieces), 0) from ligne_reception_achats lra'
+            .' inner join ligne_commande_achats lca2 on lca2.id = lra.ligne_commande_achat_id'
+            .' where lca2.commande_achat_id = commande_achats.id)'
+        );
+    }
+
+    /**
+     * Écart entre le montant réellement facturé (réceptions) et l'indicatif
+     * de la commande — positif si le fournisseur a facturé plus cher que
+     * prévu. Suppose `lignes`, `receptions.lignes.taxe` chargées.
+     */
+    public function ecartMontant(): int
+    {
+        return $this->totalTtcReel() - $this->totalTtc();
     }
 
     public function paiements(): HasMany
@@ -104,8 +186,12 @@ class CommandeAchat extends Model
 
     /**
      * Total réglé au fournisseur pour cette commande : paiements versés à la
-     * validation + règlements ultérieurs imputés à cette commande. Suppose
-     * `paiements` et `reglementsFournisseur` chargées.
+     * validation (ancien modèle) ou à chaque réception (nouveau modèle — un
+     * paiement de réception garde toujours commande_achat_id renseigné, voir
+     * migration add_reception_achat_id_to_paiement_achats_table, donc cette
+     * relation couvre déjà les deux époques sans distinction) + règlements
+     * ultérieurs imputés à cette commande. Suppose `paiements` et
+     * `reglementsFournisseur` chargées.
      */
     public function montantRegle(): int
     {
@@ -113,11 +199,13 @@ class CommandeAchat extends Model
     }
 
     /**
-     * Reste dû au fournisseur : total TTC moins le montant réglé. Suppose
-     * `lignes`, `paiements` et `reglementsFournisseur` chargées.
+     * Reste dû au fournisseur : montant réellement dû (totalTtcReel(), pas
+     * l'indicatif) moins le montant réglé. Suppose `lignes`,
+     * `receptions.lignes.taxe`, `paiements` et `reglementsFournisseur`
+     * chargées.
      */
     public function resteDu(): int
     {
-        return $this->totalTtc() - $this->montantRegle();
+        return $this->totalTtcReel() - $this->montantRegle();
     }
 }
