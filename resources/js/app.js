@@ -311,26 +311,6 @@ window.posApp = function (produits, panierInitial = [], libelleInitial = '', cli
             });
         },
 
-        dupliquerLigne(index) {
-            const original = this.panier[index];
-            this.panier.splice(index + 1, 0, {
-                produit_id: original.produit_id,
-                unite_vente_id: undefined,
-                taxe_id: original.taxe_id ?? '',
-                produitLibelle: original.produitLibelle,
-                uniteLibelle: null,
-                facteur: null,
-                quantite: 1,
-                prixUnitaire: null,
-                remise_type: '',
-                remise_valeur: null,
-                prixPersonnalise: false,
-                prixSaisi: null,
-                magasin_source_id: original.magasin_source_id,
-                magasinSourceNom: original.magasinSourceNom ?? null,
-            });
-        },
-
         // magasinSourceId : undefined tant qu'aucun lieu n'a été choisi. Deux
         // lignes du même produit prélevant sur des lieux différents ont des
         // stocks indépendants, donc jamais cumulées entre elles.

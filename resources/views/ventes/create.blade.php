@@ -48,7 +48,7 @@
         </div>
 
         <div class="row g-3 align-items-start">
-            <div class="col-12 col-lg-8">
+            <div class="col-12 col-lg-9">
                 <div class="mb-3">
                     <select id="produit-picker" class="form-select" @change="ajouterDepuisSelect($event)">
                         <option value="">— Rechercher un produit à ajouter —</option>
@@ -169,14 +169,9 @@
                                             @endif
                                             <td class="text-end fw-medium" x-text="totalLigne(ligne) + ' ' + window.DEVISE_ABREVIATION"></td>
                                             <td>
-                                                <div class="d-flex gap-1">
-                                                    <button type="button" class="btn btn-sm btn-icon btn-outline-secondary" title="Dupliquer (pour ajouter une autre variante de ce produit)" @click="dupliquerLigne(index)">
-                                                        <i class="bi bi-copy"></i>
-                                                    </button>
-                                                    <button type="button" class="btn btn-sm btn-icon btn-outline-danger" @click="retirerLigne(index)">
-                                                        <i class="bi bi-x-lg"></i>
-                                                    </button>
-                                                </div>
+                                                <button type="button" class="btn btn-sm btn-icon btn-outline-danger" @click="retirerLigne(index)">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
                                             </td>
                                         </tr>
                                     </template>
@@ -187,7 +182,7 @@
                 </div>
             </div>
 
-            <div class="col-12 col-lg-4">
+            <div class="col-12 col-lg-3">
                 <div style="position: sticky; top: 1rem;">
                     <div class="card mb-3">
                         <div class="card-body">
