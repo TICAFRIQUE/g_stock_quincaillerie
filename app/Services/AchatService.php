@@ -6,7 +6,6 @@ use App\Enums\EcritureCompteFournisseurType;
 use App\Enums\MouvementStockType;
 use App\Models\CommandeAchat;
 use App\Models\EcritureCompteFournisseur;
-use App\Models\MouvementStock;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -77,10 +76,7 @@ class AchatService
             throw new RuntimeException("La commande {$commandeAchat->numero} a déjà fait l'objet d'un retour partiel : annulation totale impossible.");
         }
 
-        $estLegacyMouvementee = MouvementStock::where('reference_type', CommandeAchat::class)
-            ->where('reference_id', $commandeAchat->id)
-            ->where('type', MouvementStockType::Reception)
-            ->exists();
+        $estLegacyMouvementee = $commandeAchat->aDesMouvementsStockDirects();
 
         return DB::transaction(function () use ($commandeAchat, $auteur, $motif, $estLegacyMouvementee) {
             if ($estLegacyMouvementee) {

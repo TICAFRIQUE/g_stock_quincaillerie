@@ -136,7 +136,7 @@ class FournisseurController extends Controller
         return $commandes->map(fn (CommandeAchat $c) => [
             $c->numero,
             $c->created_at->format('d/m/Y H:i'),
-            $c->lignes->pluck('magasinDestination.nom')->unique()->implode(', '),
+            $c->lignes->pluck('magasinDestination.nom')->filter()->unique()->implode(', ') ?: '—',
             $c->trashed() ? 'Annulée' : ($c->statut === 'validee' ? 'Validée' : 'Brouillon'),
             $c->statut === 'validee' ? quantite($c->quantiteRecuePieces()).'/'.quantite($c->quantiteCommandeePieces()).' ('.$c->tauxCompletion().' %)' : '—',
             montant($c->totalTtcReel()),

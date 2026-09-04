@@ -72,7 +72,8 @@
         {{-- Ces trois chiffres décomposent le chiffre d'affaires ci-dessus :
              dû (crédit encore ouvert), avoir (compensé, jamais encaissé) et
              espèces (réellement dans le tiroir) — volontairement séparés
-             pour ne jamais laisser croire que le CA est de l'argent en caisse. --}}
+             pour ne jamais laisser croire que le CA est de l'argent en
+             caisse. --}}
         <p class="text-secondary small mb-2">Décomposition</p>
         <div class="row g-3 mb-3">
             <div class="col-6 col-md-4">

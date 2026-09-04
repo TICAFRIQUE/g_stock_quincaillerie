@@ -16,12 +16,14 @@ use App\Models\UniteVente;
 use App\Services\AchatService;
 use App\Services\ReceptionAchatService;
 use App\Support\Decimal;
+use App\Support\NumeroDocument;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use InvalidArgumentException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -55,6 +57,7 @@ class CommandeAchatController extends Controller
                 $q->where('numero', 'like', "%{$recherche}%");
             })
             ->when($request->filled('statut'), fn ($q) => $q->where('statut', $request->string('statut')))
+            ->when($request->filled('type'), fn ($q) => $q->where('type', $request->string('type')))
             ->when($request->boolean('reception_incomplete'), fn ($q) => $q->receptionIncomplete());
 
         $commandes = $this->appliquerTri($query, $request, ['numero', 'date_commande', 'statut'], 'created_at')
@@ -140,7 +143,7 @@ class CommandeAchatController extends Controller
             'lignes.*.produit_id' => ['required', 'exists:produits,id'],
             'lignes.*.unite_vente_id' => ['nullable', 'exists:unite_ventes,id'],
             'lignes.*.taxe_id' => ['nullable', 'exists:taxes,id'],
-            'lignes.*.magasin_destination_id' => ['required', 'exists:magasins,id'],
+            'lignes.*.magasin_destination_id' => [Rule::requiredIf($donnees['action'] === 'recevoir'), 'nullable', 'exists:magasins,id'],
             'lignes.*.quantite' => ['required', 'numeric', 'min:0.001'],
             'lignes.*.prix_achat' => ['required', 'integer', 'min:0'],
         ])['lignes'];
@@ -167,15 +170,25 @@ class CommandeAchatController extends Controller
 
         $numeroGenere = blank($donnees['numero']);
         if ($numeroGenere) {
-            $donnees['numero'] = $this->genererNumero();
+            // Placeholder temporaire, unique, jamais visible : la contrainte
+            // NOT NULL + unique sur `numero` empêche d'insérer d'abord un
+            // numéro vide, donc on écrase ce placeholder juste après la
+            // création par le numéro séquentiel basé sur l'id réel (voir
+            // genererNumeroSequentiel() ci-dessous).
+            $donnees['numero'] = $this->genererNumeroTemporaire();
         }
 
         try {
-            $commande = DB::transaction(function () use ($donnees, $lignes, $paiements, $numeroFactureFournisseur, $numeroBonLivraisonFournisseur, $receptionnerImmediatement, $request, $achatService, $receptionService) {
+            $commande = DB::transaction(function () use ($donnees, $lignes, $paiements, $numeroFactureFournisseur, $numeroBonLivraisonFournisseur, $receptionnerImmediatement, $numeroGenere, $request, $achatService, $receptionService) {
                 $commande = CommandeAchat::create($donnees + [
                     'statut' => 'brouillon',
+                    'type' => $receptionnerImmediatement ? 'achat_direct' : 'commande',
                     'created_by' => $request->user()->id,
                 ]);
+
+                if ($numeroGenere) {
+                    $commande->update(['numero' => $this->genererNumeroSequentiel($commande)]);
+                }
 
                 foreach ($lignes as $ligne) {
                     $commande->lignes()->create($ligne);
@@ -254,6 +267,15 @@ class CommandeAchatController extends Controller
     private function calculerLignesRetournables(CommandeAchat $commandeAchat): \Illuminate\Support\Collection
     {
         $hasReceptions = $commandeAchat->receptions->isNotEmpty();
+
+        // Commande validée mais jamais réceptionnée (cas normal, réception
+        // différée) : rien n'a réellement été reçu, donc rien à retourner —
+        // à distinguer de l'ancien modèle (tout reçu à la validation), seul
+        // repérable via un vrai MouvementStock direct. Voir même garde dans
+        // RetourAchatService::retourner().
+        if (! $hasReceptions && ! $commandeAchat->aDesMouvementsStockDirects()) {
+            return collect();
+        }
 
         $dejaRetourneParClef = $commandeAchat->retours
             ->flatMap(fn ($retour) => $retour->lignes)
@@ -372,7 +394,7 @@ class CommandeAchatController extends Controller
         foreach ($commandeAchat->lignes as $ligneAchat) {
             $feuille->setCellValue("A{$ligne}", $ligneAchat->produit->libelle_affichage);
             $feuille->setCellValue("B{$ligne}", $ligneAchat->uniteVente->unite->nom_avec_abbreviation ?? $ligneAchat->produit->unite_base_libelle);
-            $feuille->setCellValue("C{$ligne}", $ligneAchat->magasinDestination->nom);
+            $feuille->setCellValue("C{$ligne}", $ligneAchat->magasinDestination->nom ?? '—');
             $feuille->setCellValue("D{$ligne}", (float) $ligneAchat->quantite);
             $feuille->setCellValue("E{$ligne}", $ligneAchat->prix_achat);
             $feuille->setCellValue("F{$ligne}", $ligneAchat->taxe->nom ?? '—');
@@ -529,13 +551,24 @@ class CommandeAchatController extends Controller
         return redirect()->route('commande-achats.index')->with('succes', "Commande annulée : le stock a été mis à jour.");
     }
 
-    private function genererNumero(): string
+    /**
+     * Placeholder temporaire, unique, jamais visible par l'utilisateur — voir
+     * store(), remplacé juste après l'insertion par genererNumeroSequentiel().
+     */
+    private function genererNumeroTemporaire(): string
     {
-        do {
-            $numero = 'BC-'.str_pad((string) random_int(1, 999999), 6, '0', STR_PAD_LEFT);
-        } while (CommandeAchat::where('numero', $numero)->exists());
+        return NumeroDocument::genererUnique('BC', CommandeAchat::class);
+    }
 
-        return $numero;
+    /**
+     * Numéro séquentiel lisible (BC-00001, BC-00002…, s'allonge naturellement
+     * au-delà de 99999) basé sur l'id auto-incrémenté réel de la commande —
+     * garanti unique et sans collision par la BDD elle-même (pas de compteur
+     * séparé à maintenir), donc jamais appelé avant la création de la ligne.
+     */
+    private function genererNumeroSequentiel(CommandeAchat $commande): string
+    {
+        return 'BC-'.str_pad((string) $commande->id, 5, '0', STR_PAD_LEFT);
     }
 
     private function nettoyerLignes(Request $request): void

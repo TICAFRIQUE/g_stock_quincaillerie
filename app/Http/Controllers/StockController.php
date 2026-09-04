@@ -59,7 +59,13 @@ class StockController extends Controller
 
         $pdf = Pdf::loadView('stock.pdf', ['stocks' => $stocks, 'filtres' => $this->libellesFiltres($request)]);
 
-        return $pdf->download('etat-du-stock.pdf');
+        // ?imprimer=1 (voir x-bouton-imprimer) : ouvre le PDF dans l'iframe
+        // caché au lieu de forcer un téléchargement, sinon le navigateur
+        // déclenche un téléchargement du fichier au lieu d'imprimer — même
+        // mécanisme que CommandeAchatController::pdf()/VenteController::pdf().
+        $nomFichier = 'etat-du-stock.pdf';
+
+        return $request->boolean('imprimer') ? $pdf->stream($nomFichier) : $pdf->download($nomFichier);
     }
 
     public function excel(Request $request): StreamedResponse

@@ -11,7 +11,7 @@
     </div>
 
     <x-recherche-form :action="route('commande-achats.index')" placeholder="Numéro de commande…"
-        :autres-params="['date_debut', 'date_fin', 'statut', 'reception_incomplete']">
+        :autres-params="['date_debut', 'date_fin', 'statut', 'type', 'reception_incomplete']">
         <div>
             <label for="date_debut" class="form-label small mb-1">Du</label>
             <input type="date" name="date_debut" id="date_debut" class="form-control" value="{{ $dateDebut }}" onchange="this.form.submit()">
@@ -26,6 +26,14 @@
                 <option value="">Tous les statuts</option>
                 <option value="brouillon" @selected(request('statut') === 'brouillon')>Brouillon</option>
                 <option value="validee" @selected(request('statut') === 'validee')>Validée</option>
+            </select>
+        </div>
+        <div>
+            <label for="type" class="form-label small mb-1">Type</label>
+            <select name="type" id="type" class="form-select" onchange="this.form.submit()">
+                <option value="">Tous les types</option>
+                <option value="commande" @selected(request('type') === 'commande')>Bon de commande</option>
+                <option value="achat_direct" @selected(request('type') === 'achat_direct')>Achat direct</option>
             </select>
         </div>
         <div class="form-check mb-2">
@@ -44,6 +52,7 @@
                         <th>Fournisseur</th>
                         <x-th-tri champ="date_commande" label="Date" />
                         <x-th-tri champ="statut" label="Statut" />
+                        <th>Type</th>
                         <th>Réception</th>
                         <th class="text-end">Montant dû</th>
                         <th class="text-end">Déjà réglé</th>
@@ -62,6 +71,13 @@
                                     <span class="badge text-bg-success">Validée</span>
                                 @else
                                     <span class="badge text-bg-secondary">Brouillon</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if ($commande->type === 'achat_direct')
+                                    <span class="badge text-bg-info-subtle text-info-emphasis">Achat direct</span>
+                                @else
+                                    <span class="badge text-bg-light text-secondary-emphasis border">Bon de commande</span>
                                 @endif
                             </td>
                             <td>
@@ -91,7 +107,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center text-secondary py-4">Aucun bon de commande pour l'instant.</td>
+                            <td colspan="10" class="text-center text-secondary py-4">Aucun bon de commande pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>

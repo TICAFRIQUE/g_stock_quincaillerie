@@ -161,9 +161,13 @@
                             </td>
                             <td>{{ quantite($ligne->quantite_pieces) }} {{ $ligne->produit->unite_base_libelle }}</td>
                             <td>
-                                {{ $ligne->magasinDestination->nom }}
-                                @if ($ligne->magasinDestination->estDepot())
-                                    <span class="badge text-bg-info">Dépôt</span>
+                                @if ($ligne->magasinDestination)
+                                    {{ $ligne->magasinDestination->nom }}
+                                    @if ($ligne->magasinDestination->estDepot())
+                                        <span class="badge text-bg-info">Dépôt</span>
+                                    @endif
+                                @else
+                                    <span class="text-secondary fst-italic">Non planifiée</span>
                                 @endif
                             </td>
                             <td>
@@ -220,7 +224,7 @@
                     @endforelse
                     @foreach ($commande->reglementsFournisseur as $reglement)
                         <tr>
-                            <td class="text-success">Règlement du {{ $reglement->created_at->format('d/m/Y') }}</td>
+                            <td class="text-success">Règlement du {{ $reglement->created_at->format('d/m/Y H:i') }}</td>
                             <td class="text-end text-success">{{ montant($reglement->montant) }}</td>
                         </tr>
                     @endforeach
@@ -246,7 +250,7 @@
                         <div class="d-flex justify-content-between">
                             <span>
                                 <i class="bi bi-box-seam me-1"></i>Bon d'achat <code>{{ $reception->numero }}</code>
-                                du {{ $reception->created_at->format('d/m/Y') }}
+                                du {{ $reception->created_at->format('d/m/Y H:i') }}
                                 par {{ $reception->auteur?->name ?? 'utilisateur supprimé' }}
                                 @if ($reception->numero_bon_livraison_fournisseur)
                                     · BL n° <strong>{{ $reception->numero_bon_livraison_fournisseur }}</strong>
@@ -289,7 +293,7 @@
                         <div class="d-flex justify-content-between">
                             <span>
                                 <i class="bi bi-arrow-return-left me-1"></i><code>{{ $retour->numero }}</code>
-                                du {{ $retour->created_at->format('d/m/Y') }}
+                                du {{ $retour->created_at->format('d/m/Y H:i') }}
                                 par {{ $retour->auteur?->name ?? 'utilisateur supprimé' }}
                             </span>
                             <span class="fw-medium">Avoir {{ montant($retour->montant_total) }}</span>
@@ -409,9 +413,40 @@
             <div class="modal-dialog modal-xl">
                 <div class="modal-content"
                      x-data="{
-                        lignes: {{ $lignesAReceptionner->mapWithKeys(fn ($l) => [$l->id => 0])->toJson() }},
+                        // Groupé par ligne de commande : chaque ligne peut être
+                        // reçue à plusieurs destinations en une seule réception
+                        // (voir ajouterDestination) — un même produit livré et
+                        // réparti sur plusieurs sites d'un coup.
+                        groupes: {{ $lignesAReceptionner->mapWithKeys(fn ($l) => [$l->id => [[
+                            'magasin_id' => $l->magasin_destination_id ?? '',
+                            'quantite_pieces' => 0,
+                            'prix_achat_reel' => $l->prixAchatParPiece(),
+                        ]]])->toJson() }},
+                        sommeGroupe(ligneId) {
+                            return (this.groupes[ligneId] || []).reduce((s, r) => s + (Number(r.quantite_pieces) || 0), 0);
+                        },
+                        resteGroupe(ligneId, resteInitial) {
+                            return Math.max(0, resteInitial - this.sommeGroupe(ligneId));
+                        },
+                        ajouterDestination(ligneId, prixDefaut) {
+                            this.groupes[ligneId].push({ magasin_id: '', quantite_pieces: 0, prix_achat_reel: prixDefaut, _cle: 'r' + this.groupes[ligneId].length + '-' + Date.now() + '-' + Math.random() });
+                        },
+                        retirerDestination(ligneId, index) {
+                            this.groupes[ligneId].splice(index, 1);
+                        },
+                        // Même logique de « pool restant » que reglerFournisseurModal
+                        // (clamperMontant) : le plafond d'une ligne de destination
+                        // dépend de ce que les AUTRES lignes du même groupe ont
+                        // déjà pris.
+                        clamperQuantite(ligneId, index, resteInitial, valeurBrute) {
+                            const valeur = Number(valeurBrute) || 0;
+                            const autres = this.groupes[ligneId].reduce((s, r, i) => i === index ? s : s + (Number(r.quantite_pieces) || 0), 0);
+                            return Math.min(valeur, Math.max(0, resteInitial - autres));
+                        },
+                        get total() {
+                            return Object.values(this.groupes).reduce((total, rows) => total + rows.reduce((s, r) => s + (Number(r.quantite_pieces) || 0), 0), 0);
+                        },
                         paiements: [],
-                        get total() { return Object.values(this.lignes).reduce((s, q) => s + (Number(q) || 0), 0); },
                         get totalPaiements() { return this.paiements.reduce((total, p) => total + (Number(p.montant) || 0), 0); },
                         ajouterPaiement() { this.paiements.push({ moyen_paiement_id: '', montant: '' }); },
                         retirerPaiement(index) { this.paiements.splice(index, 1); },
@@ -442,51 +477,63 @@
                                 </div>
                             </div>
 
-                            <div class="table-responsive">
-                                <table class="table table-sm align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th>Produit</th>
-                                            <th class="text-end">Commandé</th>
-                                            <th class="text-end">Reste à recevoir</th>
-                                            <th style="min-width: 160px;">Destination</th>
-                                            <th style="width: 130px;">Prix réel HT / pièce</th>
-                                            <th class="text-end" style="width: 130px;">Reçu</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach ($lignesAReceptionner as $ligne)
-                                            @php $ligneDejaRecu = (float) ($dejaRecuParLigne[$ligne->id] ?? 0); @endphp
-                                            <tr>
-                                                <td>
-                                                    {{ $ligne->produit->libelle_affichage }}
-                                                    <input type="hidden" name="lignes[{{ $ligne->id }}][ligne_commande_achat_id]" value="{{ $ligne->id }}">
-                                                </td>
-                                                <td class="text-end">{{ quantite($ligne->quantite_pieces) }}</td>
-                                                <td class="text-end">{{ quantite((float) $ligne->quantite_pieces - $ligneDejaRecu) }}</td>
-                                                <td>
-                                                    <select name="lignes[{{ $ligne->id }}][magasin_id]" class="form-select form-select-sm">
-                                                        @foreach ($magasins as $magasinOption)
-                                                            <option value="{{ $magasinOption->id }}" @selected($magasinOption->id === $ligne->magasin_destination_id)>{{ $magasinOption->nom }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </td>
-                                                <td>
-                                                    <input type="number" name="lignes[{{ $ligne->id }}][prix_achat_reel]"
-                                                           value="{{ $ligne->prixAchatParPiece() }}" min="0" step="1"
-                                                           class="form-control form-control-sm text-end">
-                                                </td>
-                                                <td>
-                                                    <input type="number" name="lignes[{{ $ligne->id }}][quantite_pieces]"
-                                                           x-model.number="lignes[{{ $ligne->id }}]"
-                                                           min="0" step="0.001" max="{{ (float) $ligne->quantite_pieces - $ligneDejaRecu }}"
-                                                           class="form-control form-control-sm text-end">
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
+                            @foreach ($lignesAReceptionner as $ligne)
+                                @php
+                                    $ligneDejaRecu = (float) ($dejaRecuParLigne[$ligne->id] ?? 0);
+                                    $reste = (float) $ligne->quantite_pieces - $ligneDejaRecu;
+                                @endphp
+                                <div class="border rounded p-2 mb-2">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                                        <div>
+                                            <strong>{{ $ligne->produit->libelle_affichage }}</strong>
+                                            <span class="text-secondary small ms-2">Commandé {{ quantite($ligne->quantite_pieces) }} · Reste à recevoir {{ quantite($reste) }}</span>
+                                        </div>
+                                        <span class="small fw-medium" :class="resteGroupe({{ $ligne->id }}, {{ $reste }}) <= 0 ? 'text-success' : 'text-secondary'">
+                                            Alloué : <span x-text="sommeGroupe({{ $ligne->id }})"></span> / {{ quantite($reste) }}
+                                        </span>
+                                    </div>
+
+                                    <template x-for="(row, ri) in groupes[{{ $ligne->id }}]" :key="row._cle ?? 'seed-{{ $ligne->id }}'">
+                                        <div class="row g-1 align-items-end mb-2">
+                                            <div class="col-6 col-md-4">
+                                                <label class="form-label small mb-0">Destination</label>
+                                                <select :name="'lignes['+{{ $ligne->id }}+'-'+ri+'][magasin_id]'" x-model="row.magasin_id"
+                                                        class="form-select form-select-sm" :required="Number(row.quantite_pieces) > 0">
+                                                    <option value="">— Destination —</option>
+                                                    @foreach ($magasins as $magasinOption)
+                                                        <option value="{{ $magasinOption->id }}">{{ $magasinOption->nom }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div class="col-3 col-md-3">
+                                                <label class="form-label small mb-0">Prix réel HT/pièce</label>
+                                                <input type="number" :name="'lignes['+{{ $ligne->id }}+'-'+ri+'][prix_achat_reel]'"
+                                                       x-model.number="row.prix_achat_reel" min="0" step="1"
+                                                       class="form-control form-control-sm text-end">
+                                            </div>
+                                            <div class="col-3 col-md-3">
+                                                <label class="form-label small mb-0">Qté reçue</label>
+                                                <input type="number" :name="'lignes['+{{ $ligne->id }}+'-'+ri+'][quantite_pieces]'"
+                                                       :value="row.quantite_pieces"
+                                                       @input="row.quantite_pieces = clamperQuantite({{ $ligne->id }}, ri, {{ $reste }}, $event.target.value); $event.target.value = row.quantite_pieces"
+                                                       min="0" step="0.001" class="form-control form-control-sm text-end">
+                                                <input type="hidden" :name="'lignes['+{{ $ligne->id }}+'-'+ri+'][ligne_commande_achat_id]'" value="{{ $ligne->id }}">
+                                            </div>
+                                            <div class="col-md-2 text-end">
+                                                <button type="button" class="btn btn-sm btn-icon btn-outline-danger" @click="retirerDestination({{ $ligne->id }}, ri)"
+                                                        x-show="groupes[{{ $ligne->id }}].length > 1" title="Retirer cette destination">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <button type="button" class="btn btn-sm btn-outline-info mt-1" @click="ajouterDestination({{ $ligne->id }}, {{ $ligne->prixAchatParPiece() }})"
+                                            :disabled="resteGroupe({{ $ligne->id }}, {{ $reste }}) <= 0">
+                                        <i class="bi bi-plus-lg"></i> Ajouter une destination
+                                    </button>
+                                </div>
+                            @endforeach
 
                             <label class="form-label small">Paiement (optionnel)</label>
                             <template x-for="(paiement, index) in paiements" :key="index">

@@ -106,17 +106,21 @@
          est de l'argent en caisse (règle 10). --}}
     <p class="text-secondary small mb-1">Décomposition</p>
     <div class="row g-2 mb-3">
-        <div class="col-6 col-md-4">
+        <div class="col-6 col-md-3">
             <x-kpi-card compact label="Total dû (crédit)" icon="bi-credit-card" :color="$totalDu > 0 ? 'warning' : 'secondary'"
                 :value="montant($totalDu)" />
         </div>
-        <div class="col-6 col-md-4">
+        <div class="col-6 col-md-3">
             <x-kpi-card compact label="Avoirs appliqués" icon="bi-piggy-bank" color="info"
                 :value="montant($avoirApplique)" />
         </div>
-        <div class="col-6 col-md-4">
+        <div class="col-6 col-md-3">
             <x-kpi-card compact label="Total en caisse" icon="bi-cash-stack" color="success"
                 :value="montant($totalEspeces)" />
+        </div>
+        <div class="col-6 col-md-3">
+            <x-kpi-card compact label="Règlements clients" icon="bi-cash-coin" color="primary"
+                :value="montant($totalReglementsClient)" />
         </div>
     </div>
 

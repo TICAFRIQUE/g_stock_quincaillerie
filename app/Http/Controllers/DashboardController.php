@@ -25,7 +25,14 @@ class DashboardController extends Controller
     {
         $utilisateur = $request->user();
 
-        if ($utilisateur->hasRole('Caissier')) {
+        // Vendre exige une session de caisse ouverte pour TOUS les rôles, y
+        // compris gérant et superadmin (CLAUDE.md règle 6) — un gérant qui
+        // tient lui-même une caisse doit donc voir le même suivi de session
+        // (décomposition, règlements, alerte session ancienne...) qu'un
+        // caissier, pas seulement les utilisateurs ayant le rôle Spatie
+        // « Caissier ». Sans session ouverte, il retombe sur son dashboard
+        // habituel (vue du magasin) comme avant.
+        if ($utilisateur->hasRole('Caissier') || $this->aUneSessionOuverte($utilisateur)) {
             return view('dashboard.caissier', ['utilisateur' => $utilisateur] + $this->donneesCaissier($utilisateur));
         }
 
@@ -36,6 +43,11 @@ class DashboardController extends Controller
         return view('dashboard.superadmin', ['utilisateur' => $utilisateur]
             + $this->donneesMagasin(null)
             + ['comparatifMagasins' => $this->comparatifMagasins()]);
+    }
+
+    private function aUneSessionOuverte(User $utilisateur): bool
+    {
+        return SessionCaisse::where('caissier_id', $utilisateur->id)->whereNull('date_fermeture')->exists();
     }
 
     private function donneesCaissier(User $utilisateur): array

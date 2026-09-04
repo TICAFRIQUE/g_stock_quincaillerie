@@ -90,7 +90,7 @@
                         <tr>
                             <td><code>{{ $commande->numero }}</code></td>
                             <td>{{ $commande->created_at->format('d/m/Y H:i') }}</td>
-                            <td>{{ $commande->lignes->pluck('magasinDestination.nom')->unique()->implode(', ') }}</td>
+                            <td>{{ $commande->lignes->pluck('magasinDestination.nom')->filter()->unique()->implode(', ') ?: '—' }}</td>
                             <td>
                                 @if ($commande->trashed())
                                     <span class="badge text-bg-danger">Annulée</span>

@@ -155,7 +155,7 @@
                 <tr>
                     <td>{{ $ligne->produit->libelle_affichage }}</td>
                     <td>{{ $ligne->uniteVente->unite->nom_avec_abbreviation ?? $ligne->produit->unite_base_libelle }}</td>
-                    <td>{{ $ligne->magasinDestination->nom }}</td>
+                    <td>{{ $ligne->magasinDestination->nom ?? '—' }}</td>
                     <td class="text-end">{{ quantite($ligne->quantite) }}</td>
                     <td class="text-end">{{ montant($ligne->prix_achat) }}</td>
                     <td>{{ $ligne->taxe->nom ?? '—' }}</td>
@@ -219,7 +219,7 @@
                 @foreach ($commande->receptions as $reception)
                     <tr>
                         <td colspan="5" style="font-weight: bold; background: #f6f3ef;">
-                            Bon d'achat {{ $reception->numero }} — {{ $reception->created_at->format('d/m/Y') }}
+                            Bon d'achat {{ $reception->numero }} — {{ $reception->created_at->format('d/m/Y H:i') }}
                             @if ($reception->numero_bon_livraison_fournisseur) — BL n° {{ $reception->numero_bon_livraison_fournisseur }} @endif
                             @if ($reception->numero_facture_fournisseur) — Facture n° {{ $reception->numero_facture_fournisseur }} @endif
                             @if ($reception->motif) — {{ $reception->motif }} @endif

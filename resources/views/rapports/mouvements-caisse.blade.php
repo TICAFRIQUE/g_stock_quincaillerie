@@ -13,6 +13,7 @@
             request('type') ? 'Type : ' . match (request('type')) {
                 'sortie' => 'Sortie',
                 'vente' => 'Vente / Facture',
+                'reglement' => 'Règlement client',
                 default => 'Entrée',
             } : null,
         ])->filter();
@@ -63,6 +64,7 @@
                 <option value="entree" @selected(request('type') === 'entree')>Entrée</option>
                 <option value="sortie" @selected(request('type') === 'sortie')>Sortie</option>
                 <option value="vente" @selected(request('type') === 'vente')>Vente / Facture</option>
+                <option value="reglement" @selected(request('type') === 'reglement')>Règlement client</option>
             </select>
         </div>
         <div class="col-auto">

@@ -10,6 +10,7 @@ use App\Models\Magasin;
 use App\Models\RetourAchat;
 use App\Models\User;
 use App\Support\Arrondi;
+use App\Support\NumeroDocument;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -60,6 +61,17 @@ class RetourAchatService
         $commandeAchat->loadMissing('lignes.produit', 'lignes.magasinDestination', 'lignes.taxe', 'fournisseur', 'receptions.lignes');
 
         $hasReceptions = $commandeAchat->receptions->isNotEmpty();
+
+        // Une commande validée mais jamais réceptionnée (cas normal depuis
+        // que la réception est différée, receptions() reste vide comme en
+        // legacy) n'a réellement rien reçu : seul un vrai MouvementStock
+        // direct distingue un ancien modèle (tout reçu à la validation) de
+        // ce cas — voir CommandeAchat::aDesMouvementsStockDirects().
+        if (! $hasReceptions && ! $commandeAchat->aDesMouvementsStockDirects()) {
+            throw new InvalidArgumentException(
+                "Cette commande n'a encore rien reçu : rien à retourner. Réceptionnez-la d'abord."
+            );
+        }
 
         // Déjà retourné, groupé par (ligne × magasin) — magasin_id est déjà
         // stocké sur chaque LigneRetourAchat, jamais recalculé après coup.
@@ -112,9 +124,13 @@ class RetourAchatService
                     $quantiteRecue = (float) $lignesRecues->sum('quantite_pieces');
                     $totalLigneTtcRef = (int) $lignesRecues->sum(fn ($lr) => $lr->montantTtc());
                 } else {
-                    // Ancien modèle : un seul magasin possible, celui fixé
-                    // sur la ligne de commande (jamais un autre — le stock
-                    // n'a bougé qu'à cet endroit à la validation).
+                    // Ancien modèle : la garde en tête de méthode
+                    // (aDesMouvementsStockDirects()) garantit qu'on n'atteint
+                    // cette branche que pour une commande réellement reçue en
+                    // bloc à la validation — magasin_destination_id y est
+                    // donc forcément rempli. Un seul magasin possible, celui
+                    // fixé sur la ligne de commande (jamais un autre — le
+                    // stock n'a bougé qu'à cet endroit à la validation).
                     if ($magasinId !== $ligne->magasin_destination_id) {
                         throw new InvalidArgumentException('Destination invalide pour cette ligne.');
                     }
@@ -181,10 +197,6 @@ class RetourAchatService
 
     private function genererNumero(): string
     {
-        do {
-            $numero = 'RF-'.str_pad((string) random_int(1, 999999), 6, '0', STR_PAD_LEFT);
-        } while (RetourAchat::where('numero', $numero)->exists());
-
-        return $numero;
+        return NumeroDocument::genererUnique('RF', RetourAchat::class);
     }
 }

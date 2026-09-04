@@ -132,7 +132,6 @@
                                     form.reportValidity();
                                     return;
                                 }
-                                this.actionSoumission = 'recevoir';
                                 window.bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmActionModal')).show(event.currentTarget);
                             },
                         }">
@@ -170,6 +169,37 @@
                             </div>
                         </div>
 
+                        @if ($peutValider && $peutReceptionner)
+                            <div class="mb-3">
+                                <label class="form-label d-block">Type de document</label>
+                                <div class="btn-group" role="group" aria-label="Type de document">
+                                    <button type="button" class="btn btn-sm" :class="actionSoumission === 'brouillon' ? 'btn-primary' : 'btn-outline-primary'" @click="actionSoumission = 'brouillon'">
+                                        <i class="bi bi-file-earmark-text me-1"></i>Bon de commande
+                                    </button>
+                                    <button type="button" class="btn btn-sm" :class="actionSoumission === 'recevoir' ? 'btn-success' : 'btn-outline-success'" @click="actionSoumission = 'recevoir'">
+                                        <i class="bi bi-box-seam me-1"></i>Achat direct (déjà reçu)
+                                    </button>
+                                </div>
+                                <div class="form-text small">
+                                    <span x-show="actionSoumission === 'brouillon'">Envoyé au fournisseur, à réceptionner plus tard (une ou plusieurs fois) — destination et paiement se décident à la réception.</span>
+                                    <span x-show="actionSoumission === 'recevoir'" x-cloak>Marchandise déjà reçue chez le fournisseur : stock, CMP et dette fournisseur mis à jour immédiatement.</span>
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-3" x-show="actionSoumission === 'recevoir'" x-cloak>
+                                <div class="col-md-6">
+                                    <label for="numero-bl-fournisseur" class="form-label small">N° de bon de livraison (optionnel)</label>
+                                    <input type="text" name="numero_bon_livraison_fournisseur" id="numero-bl-fournisseur" class="form-control form-control-sm"
+                                           placeholder="Numéro écrit sur le bon de livraison">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="numero-facture-fournisseur" class="form-label small">N° de facture fournisseur (optionnel)</label>
+                                    <input type="text" name="numero_facture_fournisseur" id="numero-facture-fournisseur" class="form-control form-control-sm"
+                                           placeholder="Numéro écrit sur la facture, si déjà remise">
+                                </div>
+                            </div>
+                        @endif
+
                         <hr>
 
                         <div class="d-flex align-items-center justify-content-between mb-2">
@@ -185,17 +215,17 @@
                         {{-- signalée quand plusieurs lignes sont dupliquées). --}}
                         <div class="bg-light rounded p-2 p-md-3 mb-2">
                         <template x-for="(ligne, index) in lignes" :key="ligne._cle">
-                            <div class="card bg-white shadow-sm mb-3" :class="{ 'border-danger': estDoublon(index) }">
-                                <div class="card-body">
-                                    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-                                        <span class="fw-semibold text-secondary">Ligne <span x-text="index + 1"></span></span>
+                            <div class="card bg-white shadow-sm mb-2" :class="{ 'border-danger': estDoublon(index) }">
+                                <div class="card-body p-2 p-md-3">
+                                    <div class="d-flex align-items-center justify-content-between mb-2 pb-1 border-bottom">
+                                        <span class="fw-semibold text-secondary small">Ligne <span x-text="index + 1"></span></span>
                                         <button type="button" class="btn btn-sm btn-icon btn-outline-danger" title="Retirer cette ligne" @click="lignes.length > 1 && lignes.splice(index, 1)">
                                             <i class="bi bi-x-lg"></i>
                                             <span class="visually-hidden">Retirer cette ligne</span>
                                         </button>
                                     </div>
                                     <div class="row g-2 align-items-end mb-2">
-                                        <div class="col-12 col-md-7">
+                                        <div class="col-12 col-md-4">
                                             <label class="form-label small">Produit<span class="required-marker">*</span></label>
                                             <select :name="'lignes['+index+'][produit_id]'" x-model="ligne.produit_id" @change="ligne.unite_vente_id = ''"
                                                     class="form-select form-select-sm produit-ligne-select" :class="{ 'is-invalid': estDoublon(index) }"
@@ -208,7 +238,7 @@
                                             <div class="text-danger small mt-1" x-show="estDoublon(index)" x-cloak>Ce produit, avec la même unité et la même destination, est déjà présent dans une autre ligne.</div>
                                             <div class="text-danger small mt-1" x-show="erreurs['lignes.'+index+'.produit_id']" x-text="(erreurs['lignes.'+index+'.produit_id'] || [])[0]"></div>
                                         </div>
-                                        <div class="col-12 col-md-5">
+                                        <div class="col-6 col-md-2">
                                             <label class="form-label small">Unité d'achat<span class="required-marker">*</span></label>
                                             <select :name="'lignes['+index+'][unite_vente_id]'" x-model="ligne.unite_vente_id" class="form-select form-select-sm">
                                                 <option value="" :selected="!ligne.unite_vente_id" x-text="baseLibelle(ligne.produit_id)"></option>
@@ -218,30 +248,34 @@
                                             </select>
                                             <div class="text-danger small mt-1" x-show="erreurs['lignes.'+index+'.unite_vente_id']" x-text="(erreurs['lignes.'+index+'.unite_vente_id'] || [])[0]"></div>
                                         </div>
-                                    </div>
-                                    <div class="row g-2 align-items-end mb-2">
-                                        <div class="col-4">
-                                            <label class="form-label small" x-text="'Quantité (' + uniteChoisie(ligne).libelle + ') *'"></label>
+                                        <div class="col-6 col-md-2">
+                                            <label class="form-label small" x-text="'Qté (' + uniteChoisie(ligne).libelle + ') *'"></label>
                                             <input type="number" :name="'lignes['+index+'][quantite]'" x-model="ligne.quantite" class="form-control form-control-sm" min="0.001" step="0.001" required>
                                         </div>
-                                        <div class="col-4">
-                                            <label class="form-label small" x-text="'Prix d\'achat HT (' + uniteChoisie(ligne).libelle + ', F) *'"></label>
+                                        <div class="col-6 col-md-2">
+                                            <label class="form-label small" x-text="'Prix d\'achat HT (' + uniteChoisie(ligne).libelle + ') *'"></label>
                                             <input type="number" :name="'lignes['+index+'][prix_achat]'" x-model="ligne.prix_achat" class="form-control form-control-sm" min="0" step="1" required>
                                         </div>
-                                        <div class="col-4">
+                                        <div class="col-6 col-md-2">
                                             <label class="form-label small">Qté en pièces (stock)</label>
                                             <input type="text" class="form-control form-control-sm" :value="quantitePieces(ligne)" disabled>
                                         </div>
                                     </div>
                                     <div class="row g-2 align-items-end">
                                         <div class="col-6 col-md-4">
-                                            <label class="form-label small">Destination<span class="required-marker">*</span></label>
-                                            <select :name="'lignes['+index+'][magasin_destination_id]'" x-model="ligne.magasin_destination_id" class="form-select form-select-sm" required>
+                                            <label class="form-label small">
+                                                Destination<span class="required-marker" x-show="actionSoumission === 'recevoir'" x-cloak>*</span>
+                                            </label>
+                                            <select :name="'lignes['+index+'][magasin_destination_id]'" x-model="ligne.magasin_destination_id"
+                                                    class="form-select form-select-sm" :required="actionSoumission === 'recevoir'">
                                                 <option value="">— Choisir —</option>
                                                 @foreach ($magasins as $magasin)
                                                     <option value="{{ $magasin->id }}">{{ $magasin->nom }} @if ($magasin->estDepot()) (dépôt) @endif</option>
                                                 @endforeach
                                             </select>
+                                            <div class="form-text small" x-show="actionSoumission !== 'recevoir'" x-cloak>
+                                                Optionnel — se décide à la réception si laissé vide.
+                                            </div>
                                             <div class="text-danger small mt-1" x-show="erreurs['lignes.'+index+'.magasin_destination_id']" x-text="(erreurs['lignes.'+index+'.magasin_destination_id'] || [])[0]"></div>
                                         </div>
                                         <div class="col-6 col-md-3">
@@ -290,15 +324,12 @@
                         </div>
 
                         @if ($peutValider && $peutReceptionner)
-                            <div class="card mb-3 bg-white border">
+                            <div class="card mb-3 bg-white border" x-show="actionSoumission === 'recevoir'" x-cloak>
                                 <div class="card-body">
-                                    <h3 class="h6">Achat direct — paiement (optionnel)</h3>
+                                    <h3 class="h6">Paiement (optionnel)</h3>
                                     <p class="text-secondary small">
-                                        Pour un achat déjà effectué (ex. achat comptant chez le fournisseur) : utilisez le
-                                        bouton « Enregistrer et réceptionner immédiatement » ci-dessous — le stock, le CMP
-                                        et la dette fournisseur seront mis à jour tout de suite avec ces lignes. Laissez le
-                                        paiement vide pour ne rien encaisser maintenant : le total TTC devient une dette
-                                        fournisseur.
+                                        Laissez le paiement vide pour ne rien encaisser maintenant : le total TTC devient
+                                        une dette fournisseur.
                                     </p>
 
                                     <template x-for="(paiement, index) in paiements" :key="paiement._cle">
@@ -327,29 +358,17 @@
                                     <div class="mb-2 small text-secondary">
                                         Reste dû au fournisseur après validation : <span class="fw-semibold" x-text="resteDu.toLocaleString('fr-FR') + ' ' + window.DEVISE_ABREVIATION"></span>
                                     </div>
-                                    <div class="row g-2">
-                                        <div class="col-md-6">
-                                            <label for="numero-bl-fournisseur" class="form-label small">N° de bon de livraison (optionnel)</label>
-                                            <input type="text" name="numero_bon_livraison_fournisseur" id="numero-bl-fournisseur" class="form-control form-control-sm"
-                                                   placeholder="Numéro écrit sur le bon de livraison">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label for="numero-facture-fournisseur" class="form-label small">N° de facture fournisseur (optionnel)</label>
-                                            <input type="text" name="numero_facture_fournisseur" id="numero-facture-fournisseur" class="form-control form-control-sm"
-                                                   placeholder="Numéro écrit sur la facture, si déjà remise">
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         @endif
 
                         <hr>
 
-                        <button type="submit" class="btn btn-outline-primary" @click="actionSoumission = 'brouillon'" :disabled="aUnDoublon">
+                        <button type="submit" class="btn btn-outline-primary" :disabled="aUnDoublon" x-show="actionSoumission === 'brouillon'" x-cloak>
                             Enregistrer en brouillon
                         </button>
                         @if ($peutValider && $peutReceptionner)
-                            <button type="button" class="btn btn-success" :disabled="aUnDoublon"
+                            <button type="button" class="btn btn-success" :disabled="aUnDoublon" x-show="actionSoumission === 'recevoir'" x-cloak
                                     @click="declencherReceptionImmediate($event)"
                                     data-form-id="formCommandeAchat"
                                     data-message="Enregistrer et réceptionner cet achat maintenant ? Le stock, le CMP et la dette fournisseur seront mis à jour immédiatement. Cette action est irréversible."

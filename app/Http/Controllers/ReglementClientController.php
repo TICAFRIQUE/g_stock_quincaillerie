@@ -25,9 +25,24 @@ class ReglementClientController extends Controller
         $this->assurerMagasin($session->caisse->magasin_id);
         abort_if($session->date_cloture || $session->date_fermeture, 403, 'Cette session n\'est plus ouverte.');
 
+        // Chaque facture encore ouverte (reste dû réel > 0) est chargée avec
+        // ses paiements/règlements pour permettre un règlement ciblé par
+        // facture directement depuis cet écran — sans ça, un règlement saisi
+        // ici n'était imputé à aucune vente précise et son montant réglé/
+        // reste dû par facture ne bougeait jamais (voir CLAUDE.md règle 14,
+        // Vente::montantRegle()/soldeDuReel()).
+        $clients = Client::actifsAvecDette();
+        $clients->load(['ventes.paiements', 'ventes.reglementsClient']);
+        $clients->each(function (Client $client) {
+            $client->facturesOuvertes = $client->ventes
+                ->filter(fn (Vente $v) => $v->soldeDuReel() > 0)
+                ->sortBy('created_at')
+                ->values();
+        });
+
         return view('reglements.create', [
             'session' => $session,
-            'clients' => Client::actifsAvecDette(),
+            'clients' => $clients,
             'moyensPaiement' => MoyenPaiement::actifs(),
         ]);
     }

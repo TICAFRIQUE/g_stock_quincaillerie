@@ -102,17 +102,64 @@ trait JournalCaisse
                 'users.name as auteur_nom',
             ]);
 
-        // Filtre "type" qui exclut explicitement les ventes (entree/sortie
-        // choisi) : ne pas unir la branche du tout plutôt que fabriquer un
-        // HAVING toujours faux.
-        if ($type && $type !== 'vente') {
+        // Seule la part encaissée en espèces d'un règlement client entre
+        // dans le tiroir (règle 10) — même principe que la branche ventes
+        // ci-dessus. reglement_clients.caissier_id est l'auteur (celui qui a
+        // encaissé), jamais le client. Le motif reprend le nom du client
+        // (+ la facture visée si le règlement cible une vente précise,
+        // jamais son solde global — vente_id nullable, voir ReglementClient).
+        $reglements = DB::table('reglement_clients')
+            ->join('reglement_paiements', 'reglement_paiements.reglement_client_id', '=', 'reglement_clients.id')
+            ->join('moyen_paiements', function ($join) {
+                $join->on('moyen_paiements.id', '=', 'reglement_paiements.moyen_paiement_id')
+                    ->where('moyen_paiements.est_espece', true);
+            })
+            ->join('session_caisses', 'session_caisses.id', '=', 'reglement_clients.session_caisse_id')
+            ->join('caisses', 'caisses.id', '=', 'session_caisses.caisse_id')
+            ->join('magasins', 'magasins.id', '=', 'caisses.magasin_id')
+            ->join('users', 'users.id', '=', 'reglement_clients.caissier_id')
+            ->join('clients', 'clients.id', '=', 'reglement_clients.client_id')
+            ->leftJoin('ventes', 'ventes.id', '=', 'reglement_clients.vente_id')
+            ->when($sessionCaisseId, fn ($q) => $q->where('reglement_clients.session_caisse_id', $sessionCaisseId))
+            ->when($magasinId, fn ($q) => $q->where('caisses.magasin_id', $magasinId))
+            ->when($caisseId, fn ($q) => $q->where('session_caisses.caisse_id', $caisseId))
+            ->when($caissierId, fn ($q) => $q->where('reglement_clients.caissier_id', $caissierId))
+            ->whereBetween('reglement_clients.created_at', [$debut, $fin])
+            ->groupBy(
+                'reglement_clients.id', 'reglement_clients.created_at', 'clients.nom', 'ventes.numero',
+                'session_caisses.caisse_id', 'caisses.nom', 'caisses.magasin_id', 'magasins.nom',
+                'reglement_clients.caissier_id', 'users.name',
+            )
+            ->havingRaw('SUM(reglement_paiements.montant) > 0')
+            ->select([
+                DB::raw("'reglement' as source"),
+                'reglement_clients.id',
+                'reglement_clients.created_at',
+                DB::raw("'reglement' as type"),
+                DB::raw('SUM(reglement_paiements.montant) as montant'),
+                DB::raw("CONCAT('Règlement ', clients.nom, IF(ventes.numero IS NOT NULL, CONCAT(' — ', ventes.numero), '')) as motif"),
+                'session_caisses.caisse_id',
+                'caisses.nom as caisse_nom',
+                'caisses.magasin_id',
+                'magasins.nom as magasin_nom',
+                'reglement_clients.caissier_id as auteur_id',
+                'users.name as auteur_nom',
+            ]);
+
+        // Filtre "type" qui exclut explicitement une des trois branches
+        // (entree/sortie/vente/reglement choisi) : ne pas unir les autres
+        // branches du tout plutôt que fabriquer un HAVING toujours faux.
+        if ($type && ! in_array($type, ['vente', 'reglement'], true)) {
             return $mouvements->orderByDesc('created_at');
         }
         if ($type === 'vente') {
             return $ventes->orderByDesc('created_at');
         }
+        if ($type === 'reglement') {
+            return $reglements->orderByDesc('created_at');
+        }
 
-        return $mouvements->unionAll($ventes)->orderByDesc('created_at');
+        return $mouvements->unionAll($ventes)->unionAll($reglements)->orderByDesc('created_at');
     }
 
     /**
@@ -125,10 +172,11 @@ trait JournalCaisse
             'entree' => 'Entrée',
             'sortie' => 'Sortie',
             'vente' => 'Vente / Facture',
+            'reglement' => 'Règlement client',
             default => $ligne->type,
         };
         $ligne->type_badge = match ($ligne->type) {
-            'entree', 'vente' => 'text-bg-success',
+            'entree', 'vente', 'reglement' => 'text-bg-success',
             'sortie' => 'text-bg-danger',
             default => 'text-bg-secondary',
         };

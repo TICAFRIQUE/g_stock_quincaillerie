@@ -202,10 +202,14 @@ client, réglé plus tard.
 
 - **Fournisseur** : fiche référentielle (nom, téléphone, e-mail, adresse, actif),
   symétrique du `Client` mais sans notion de limite de crédit.
-- **Chaque ligne de commande précise une destination prévue** (magasin ou dépôt, voir
-  « Dépôts » ci-dessous) : un même bon de commande peut livrer plusieurs sites en une
-  fois. Cette destination n'est qu'un **plan** — la destination réelle se choisit à
-  nouveau, ligne par ligne, à chaque réception (voir ci-dessous), et peut en dévier.
+- **Chaque ligne de commande précise en option une destination prévue** (magasin ou
+  dépôt, voir « Dépôts » ci-dessous) : un même bon de commande peut livrer plusieurs
+  sites en une fois. Cette destination n'est qu'un **plan facultatif** — un bon de
+  commande standard (brouillon → validé → réceptionné plus tard) n'a pas besoin de la
+  connaître d'avance, la destination réelle se choisit de toute façon à nouveau, ligne
+  par ligne, à chaque réception (voir ci-dessous), et peut en dévier. Seul le raccourci
+  « Enregistrer et réceptionner immédiatement » (achat direct, voir plus bas) l'exige dès
+  la saisie, puisqu'il crée la réception dans la même transaction.
 - **Taxe par ligne** : optionnelle, choisie parmi un référentiel `Taxe` préenregistré
   (nom + taux %). `prix_achat` sur une ligne de commande est **HT indicatif** ; le
   **TTC** est dérivé (jamais stocké), calculé et affiché par ligne et en récapitulatif
@@ -514,12 +518,14 @@ client, réglé plus tard.
   (produit × magasin).
 - **LigneCommandeAchat** : produit + unité d'achat (pièce ou `UniteVente`, même
   référentiel qu'à la vente) + quantité + **prix d'achat HT indicatif** + **taxe**
-  optionnelle (`Taxe`) + **destination prévue** (`Magasin`, magasin ou dépôt — un plan,
-  potentiellement modifié à la réception) ; TTC dérivé, jamais stocké.
+  optionnelle (`Taxe`) + **destination prévue optionnelle** (`Magasin`, magasin ou dépôt —
+  un plan facultatif, potentiellement modifié à la réception ; obligatoire uniquement
+  pour l'achat direct, voir ci-dessus) ; TTC dérivé, jamais stocké.
 - **Taxe** : nom + taux (%) + actif. Référentiel préenregistré, utilisé uniquement côté
   achat (voir « Argent et arrondis »).
 - **ReceptionAchat** (« bon d'achat » à l'écran) : immuable, comme un mouvement (règle
-  2/18) — numéro (`{numero_commande}-R{rang}`), la `CommandeAchat` (obligatoirement
+  2/18) — numéro en série indépendante (`BA-000123`, comme `BC-000123` pour la commande
+  et `RF-000123` pour un retour fournisseur), la `CommandeAchat` (obligatoirement
   `validee`) qu'elle réceptionne, motif optionnel, auteur. Matérialise l'événement réel
   (marchandise + prix + argent) : c'est elle, et seulement elle, qui mouvemente le stock,
   recalcule le CMP et pose la dette fournisseur — jamais `CommandeAchat`. Une même

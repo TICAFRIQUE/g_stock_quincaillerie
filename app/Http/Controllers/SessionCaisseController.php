@@ -123,6 +123,7 @@ class SessionCaisseController extends Controller
         $totalEspeces = (int) $paiementsParMoyen
             ->filter(fn ($p) => $p->moyenPaiement->est_espece)
             ->sum('total');
+        $totalReglementsClient = (int) $session->reglementClients()->sum('montant');
 
         // paiements/reglementsClient : nécessaires à Vente::montantRegle()/
         // soldeDu() (colonnes Réglé/Reste dû du tableau) — chargées ici pour
@@ -152,6 +153,7 @@ class SessionCaisseController extends Controller
             'totalDu' => $totalDu,
             'avoirApplique' => $avoirApplique,
             'totalEspeces' => $totalEspeces,
+            'totalReglementsClient' => $totalReglementsClient,
             'venteEnAttentesVisibles' => $venteEnAttentesVisibles,
             'paiementsParMoyen' => $paiementsParMoyen,
             'ventes' => $ventes,
@@ -283,6 +285,11 @@ class SessionCaisseController extends Controller
             'totalVentes' => (int) $session->ventes()->sum('total_net'),
             'paiementsParMoyen' => $this->paiementsParMoyen($session),
             'ventes' => $session->ventes()->orderBy('created_at')->get(),
+            // Liste détaillée en complément du total agrégé déjà affiché
+            // (total_reglements_especes, voir bilanRapportSession()) — sans
+            // ça, impossible de savoir depuis ce rapport quel client/quelle
+            // facture précise a été réglée pendant la session.
+            'reglements' => $session->reglementClients()->with(['client', 'vente', 'paiements.moyenPaiement'])->orderBy('created_at')->get(),
         ]);
     }
 

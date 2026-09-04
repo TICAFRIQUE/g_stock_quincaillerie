@@ -10,6 +10,111 @@ pas supprimer les entrées cochées (historique).
 
 ---
 
+## 2026-09-04
+
+- [ ] **Correctif : règlement de dette client, désormais uniquement par
+  facture** — l'écran « Règlement client »
+  (`/sessions/{session}/reglements/creer`) listait déjà les clients endettés
+  mais un règlement saisi dessus n'était rattaché à aucune facture précise :
+  le solde total du client baissait bien (dérivé des écritures, toujours
+  juste), mais le « réglé »/« reste dû » de chaque facture individuelle ne
+  bougeait jamais — impossible de savoir quelle facture avait été payée. Le
+  bouton « Régler la dette totale » (règlement non ciblé) est retiré : le
+  règlement se fait maintenant uniquement facture par facture, avec un
+  contrôle qui empêche de saisir plus que le reste dû de CETTE facture
+  (bloqué côté formulaire et rejeté côté serveur si dépassé). Déploiement
+  standard, plus :
+  ```
+  npm run build
+  ```
+  Aucune migration (aucun changement de schéma). `npm run build` nécessaire
+  car `resources/js/app.js` a aussi changé (voir point suivant).
+  - [ ] **Correctif associé : tableau de bord caissier accessible à tout
+    rôle ayant une session ouverte** — le dashboard caissier (avec la
+    répartition Décomposition) ne s'affichait qu'aux utilisateurs ayant
+    littéralement le rôle Spatie « Caissier » ; un Gérant/Superadmin qui
+    ouvre lui-même une session de caisse (règle 6 : autorisé pour tous les
+    rôles) ne voyait jamais ce tableau de bord. Corrigé
+    (`DashboardController::__invoke()`) : affiché dès qu'une session ouverte
+    existe pour l'utilisateur connecté, peu importe son rôle.
+  - [ ] **Nouveau KPI « Règlements clients »** sur l'écran de session de
+    caisse (`/sessions/{session}`, section Décomposition — PAS sur le
+    dashboard) : total encaissé pour des dettes clients pendant cette
+    session précise, tous moyens de paiement confondus.
+  - [ ] Les règlements clients (part espèces) apparaissent désormais comme
+    lignes distinctes dans le rapport `rapports/mouvements-caisse` et dans
+    le rapport de session (`sessions/{id}/rapport`), filtrables par type.
+  - [ ] **Tester après déploiement** : créer une vente à crédit pour un
+    client, ouvrir « Encaisser un règlement » depuis une session (même
+    ouverte par un autre caissier que celui qui a fait la vente — n'importe
+    quelle session ouverte doit pouvoir encaisser n'importe quel client,
+    testé et confirmé fonctionnel) → dérouler le client, régler sa facture
+    d'un montant partiel → vérifier que « Réglé »/« Reste dû » de CETTE
+    facture précise se met à jour (ticket + fiche client), que le KPI
+    « Règlements clients » de la session affiche le bon total, et que la
+    ligne apparaît dans les deux rapports. Vérifier qu'un montant supérieur
+    au reste dû est refusé (bouton désactivé + rejet serveur si contourné).
+
+- [ ] **UI : détail facture et écran de vente réorganisés** — sur
+  `ventes/{vente}/ticket` (détail facture), les boutons Ticket caisse/
+  Facture/PDF/Excel sont désormais alignés à droite sur la même ligne que
+  Régler/Retourner/Signaler/Annuler (au lieu d'être isolés dans l'en-tête).
+  Sur l'écran de vente (POS), le bouton « Dupliquer » d'une ligne du panier
+  a été retiré et les cartes Récapitulatif/Client réduites pour laisser plus
+  de place au tableau produits. Déploiement standard, plus :
+  ```
+  npm run build
+  ```
+  (déjà inclus dans la commande du point précédent si déployé en même
+  temps). Aucune migration, aucune permission nouvelle.
+  - [ ] **Tester après déploiement** : ouvrir le détail d'une facture,
+    vérifier l'alignement des boutons ; ouvrir l'écran de vente, vérifier
+    que le panier n'a plus d'icône dupliquer et que le tableau produits est
+    bien plus large.
+
+- [ ] **Correctif : destination de ligne d'achat désormais optionnelle sur
+  un bon de commande standard** — jusqu'ici `magasin_destination_id` était
+  obligatoire sur chaque ligne dès la création, alors qu'une commande
+  classique (brouillon → validée → réceptionnée plus tard) n'a pas besoin de
+  connaître sa destination à l'avance (elle se choisit de toute façon à
+  nouveau à la réception, voir CLAUDE.md « Achat à crédit et comptes
+  fournisseurs »). Désormais obligatoire uniquement pour le raccourci
+  « Enregistrer et réceptionner immédiatement » (achat direct), qui crée la
+  réception dans la même transaction. Nécessite :
+  ```
+  php artisan migrate
+  ```
+  (nouvelle colonne `commande_achats.type`, `commande` | `achat_direct`,
+  défaut `commande` pour les commandes existantes — voir
+  `2026_09_04_105029_add_type_to_commande_achats_table.php`).
+  - [ ] **Correctif associé : numérotation des documents d'achat** —
+    `ReceptionAchat` avait un numéro dérivé de la commande
+    (`{numero_commande}-R{rang}`), remplacé par une série indépendante
+    (`BA-000123`, comme `BC-000123`/`RF-000123`) via une nouvelle classe
+    partagée `App\Support\NumeroDocument`. Le numéro d'un bon de commande
+    auto-généré passe d'un tirage aléatoire à un numéro séquentiel basé sur
+    son id réel (`BC-00001`, `BC-00002`…). Aucun numéro déjà attribué n'est
+    modifié rétroactivement.
+  - [ ] **Correctif associé : retour fournisseur bloqué sur une commande
+    jamais réceptionnée** — une commande validée mais dont aucune réception
+    n'a encore été enregistrée n'a réellement rien reçu ; le retour lève
+    maintenant une erreur explicite au lieu de se comporter comme si tout
+    avait été reçu (legacy). Distingue une commande legacy (mouvement de
+    stock direct posé à la validation, avant les réceptions échelonnées)
+    d'une commande récente encore en attente via
+    `CommandeAchat::aDesMouvementsStockDirects()`.
+  - [ ] **Tester après déploiement** : créer un bon de commande standard
+    sans renseigner de destination sur les lignes → doit s'enregistrer ;
+    utiliser « Enregistrer et réceptionner immédiatement » sans destination
+    → doit être refusé. Réceptionner un bon de commande et vérifier que le
+    numéro du bon d'achat est bien `BA-xxxxxx`. Tenter un retour fournisseur
+    sur une commande validée mais jamais réceptionnée → doit être refusé
+    avec un message explicite.
+
+- [ ] **Coquille desktop** : aucune action — rien dans `desktop/` n'a changé
+  pour cette session, pas de nouvelle version à builder/publier (voir
+  `GUIDE-MISES-A-JOUR.md`, Cas 1 : changement Laravel/Blade pur).
+
 ## 2026-09-03 (suite)
 
 - [ ] **Nouveau : N° de bon de livraison et N° de facture fournisseur sur une

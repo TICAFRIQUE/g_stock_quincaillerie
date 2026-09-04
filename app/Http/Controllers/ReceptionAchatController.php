@@ -28,7 +28,21 @@ class ReceptionAchatController extends Controller
             'numero_bon_livraison_fournisseur' => ['nullable', 'string', 'max:255'],
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.ligne_commande_achat_id' => ['required', Rule::exists('ligne_commande_achats', 'id')->where('commande_achat_id', $commandeAchat->id)],
-            'lignes.*.magasin_id' => ['required', 'exists:magasins,id'],
+            // required seulement si sa propre quantite_pieces > 0 : une ligne
+            // de destination ajoutée dans l'UI puis laissée vide (l'utilisateur
+            // a changé d'avis sans la retirer) ne doit pas bloquer la
+            // soumission — ReceptionAchatService::receptionner() ignore de
+            // toute façon les lignes à quantité nulle.
+            'lignes.*.magasin_id' => [
+                function (string $attribute, mixed $value, \Closure $fail) use ($request) {
+                    $cle = str($attribute)->beforeLast('.magasin_id');
+                    $quantite = (float) $request->input("{$cle}.quantite_pieces", 0);
+                    if ($quantite > 0 && blank($value)) {
+                        $fail('La destination est obligatoire pour une ligne avec une quantité reçue.');
+                    }
+                },
+                'nullable', 'exists:magasins,id',
+            ],
             'lignes.*.quantite_pieces' => ['required', 'numeric', 'min:0'],
             'lignes.*.prix_achat_reel' => ['required', 'integer', 'min:0'],
             'paiements' => ['sometimes', 'array'],

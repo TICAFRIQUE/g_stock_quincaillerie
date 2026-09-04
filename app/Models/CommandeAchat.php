@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\MouvementStockType;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,7 @@ use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 #[Fillable([
-    'numero', 'fournisseur_id', 'statut', 'date_commande',
+    'numero', 'fournisseur_id', 'statut', 'type', 'date_commande',
     'created_by', 'valide_by', 'valide_at', 'motif_annulation', 'annulee_par',
 ])]
 class CommandeAchat extends Model
@@ -71,6 +72,23 @@ class CommandeAchat extends Model
     public function receptions(): HasMany
     {
         return $this->hasMany(ReceptionAchat::class);
+    }
+
+    /**
+     * Vrai si cette commande a un mouvement de stock de type Réception posé
+     * directement dessus (ancien modèle, avant les réceptions échelonnées).
+     * Distingue une commande "legacy" (tout reçu à la validation) d'une
+     * commande récente encore jamais réceptionnée : les deux ont `receptions`
+     * vide, seul un vrai MouvementStock permet de trancher — voir
+     * AchatService::annuler(), RetourAchatService::retourner(),
+     * CommandeAchatController::calculerLignesRetournables().
+     */
+    public function aDesMouvementsStockDirects(): bool
+    {
+        return MouvementStock::where('reference_type', self::class)
+            ->where('reference_id', $this->id)
+            ->where('type', MouvementStockType::Reception)
+            ->exists();
     }
 
     /**

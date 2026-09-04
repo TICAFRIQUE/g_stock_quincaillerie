@@ -9,6 +9,7 @@ use App\Models\LigneReceptionAchat;
 use App\Models\Magasin;
 use App\Models\ReceptionAchat;
 use App\Models\User;
+use App\Support\NumeroDocument;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -64,7 +65,7 @@ class ReceptionAchatService
 
         return DB::transaction(function () use ($commandeAchat, $lignes, $auteur, $paiements, $motif, $numeroFactureFournisseur, $numeroBonLivraisonFournisseur, $dejaRecu, $magasinsParId) {
             $reception = ReceptionAchat::create([
-                'numero' => $this->genererNumero($commandeAchat),
+                'numero' => $this->genererNumero(),
                 'commande_achat_id' => $commandeAchat->id,
                 'motif' => $motif,
                 'numero_facture_fournisseur' => $numeroFactureFournisseur,
@@ -143,10 +144,8 @@ class ReceptionAchatService
         });
     }
 
-    private function genererNumero(CommandeAchat $commandeAchat): string
+    private function genererNumero(): string
     {
-        $rang = $commandeAchat->receptions()->count() + 1;
-
-        return "{$commandeAchat->numero}-R{$rang}";
+        return NumeroDocument::genererUnique('BA', ReceptionAchat::class);
     }
 }

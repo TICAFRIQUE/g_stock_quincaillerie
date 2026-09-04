@@ -11,26 +11,9 @@
             </div>
             <div class="text-secondary small ms-5 ps-1"><code>{{ $vente->numero }}</code></div>
         </div>
-        <div class="d-flex gap-2">
-            <div class="btn-group">
-                <button type="button" class="btn btn-sm btn-outline-secondary"
-                    onclick="(window.gstock && window.gstock.print) ? window.gstock.print() : window.print()">
-                    <i class="bi bi-printer me-1"></i>Ticket caisse
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="imprimerFacture()">
-                    <i class="bi bi-receipt me-1"></i>Facture
-                </button>
-                <a href="{{ route('ventes.pdf', $vente) }}" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-file-earmark-pdf me-1"></i>PDF
-                </a>
-                <a href="{{ route('ventes.excel', $vente) }}" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-file-earmark-excel me-1"></i>Excel
-                </a>
-            </div>
-            <a href="{{ route('ventes.create', $vente->sessionCaisse) }}" class="btn btn-primary">
-                <i class="bi bi-cart-plus me-1"></i>Nouvelle facture
-            </a>
-        </div>
+        <a href="{{ route('ventes.create', $vente->sessionCaisse) }}" class="btn btn-primary">
+            <i class="bi bi-cart-plus me-1"></i>Nouvelle facture
+        </a>
     </div>
 
     @if ($vente->trashed())
@@ -121,12 +104,13 @@
         </div>
     @endif
 
-    {{-- Tous les boutons d'action sur une seule ligne — chacun ouvre sa --}}
-    {{-- propre modale (voir plus bas), désactivé avec une info-bulle quand --}}
-    {{-- l'action n'est pas possible plutôt que masqué (l'utilisateur --}}
-    {{-- comprend pourquoi). --}}
-    @if ($afficheReglerClient || $afficheLivrer || $afficheRetourner || $afficheSignaler || $afficheAnnulerVente)
-        <div class="d-flex flex-wrap gap-2 mb-3 d-print-none">
+    {{-- Actions métier (chacune ouvre sa propre modale, voir plus bas) à --}}
+    {{-- gauche, impression/export à droite — une seule ligne pour ne pas --}}
+    {{-- disperser les boutons de la facture sur plusieurs endroits. Une --}}
+    {{-- action désactivée garde une info-bulle expliquant pourquoi plutôt --}}
+    {{-- que d'être masquée. --}}
+    <div class="d-flex flex-wrap justify-content-between gap-2 mb-3 d-print-none">
+        <div class="d-flex flex-wrap gap-2">
             @if ($afficheReglerClient)
                 @if ($sessionOuverte)
                     <button type="button" class="btn btn-reglement btn-sm" data-bs-toggle="modal" data-bs-target="#reglerClientModal">
@@ -167,7 +151,23 @@
                 </button>
             @endif
         </div>
-    @endif
+
+        <div class="btn-group">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                onclick="(window.gstock && window.gstock.print) ? window.gstock.print() : window.print()">
+                <i class="bi bi-printer me-1"></i>Ticket caisse
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="imprimerFacture()">
+                <i class="bi bi-receipt me-1"></i>Facture
+            </button>
+            <a href="{{ route('ventes.pdf', $vente) }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+            </a>
+            <a href="{{ route('ventes.excel', $vente) }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+            </a>
+        </div>
+    </div>
 
     @php $venteTotalTaxes = $vente->totalTaxes(); @endphp
     <div class="card mb-3 d-print-none bg-white">
@@ -280,7 +280,7 @@
                         <div class="d-flex justify-content-between">
                             <span>
                                 <i class="bi bi-arrow-return-left me-1"></i><code>{{ $retour->numero }}</code>
-                                du {{ $retour->created_at->format('d/m/Y') }}
+                                du {{ $retour->created_at->format('d/m/Y H:i') }}
                                 par {{ $retour->auteur?->name ?? 'utilisateur supprimé' }}
                             </span>
                             <span class="fw-medium">Avoir {{ montant($retour->montant_total) }}</span>
@@ -321,7 +321,7 @@
                         @foreach ($vente->bonsLivraison as $bonLivraison)
                             <tr class="{{ $bonLivraison->trashed() ? 'text-secondary' : '' }}">
                                 <td><code>{{ $bonLivraison->numero }}</code></td>
-                                <td>{{ $bonLivraison->created_at->format('d/m/Y') }}</td>
+                                <td>{{ $bonLivraison->created_at->format('d/m/Y H:i') }}</td>
                                 <td>{{ $bonLivraison->auteur?->name ?? 'utilisateur supprimé' }}</td>
                                 <td>
                                     @foreach ($bonLivraison->lignes as $ligneBonLivraison)

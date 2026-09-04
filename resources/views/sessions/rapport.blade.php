@@ -33,6 +33,41 @@
 
             <hr>
 
+            @if ($reglements->isNotEmpty())
+                <h3 class="h6">Règlements clients</h3>
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Client</th>
+                                <th>Facture</th>
+                                <th>Date et heure</th>
+                                <th>Moyen(s) de paiement</th>
+                                <th class="text-end">Montant</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($reglements as $reglement)
+                                <tr>
+                                    <td>{{ $reglement->client->nom }}</td>
+                                    <td>
+                                        @if ($reglement->vente)
+                                            <code>{{ $reglement->vente->numero }}</code>
+                                        @else
+                                            <span class="text-secondary fst-italic">Dette globale</span>
+                                        @endif
+                                    </td>
+                                    <td>{{ $reglement->created_at->format('d/m/Y H:i') }}</td>
+                                    <td>{{ $reglement->paiements->pluck('moyenPaiement.nom')->implode(', ') }}</td>
+                                    <td class="text-end">{{ montant($reglement->montant) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <hr>
+            @endif
+
             <h3 class="h6">Liste des ventes</h3>
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
