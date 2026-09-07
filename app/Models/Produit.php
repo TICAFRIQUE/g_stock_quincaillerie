@@ -168,6 +168,32 @@ class Produit extends Model implements HasMedia
         return $this->hasMany(Stock::class);
     }
 
+    /**
+     * Détail du stock de ce produit pour chaque magasin/dépôt donné (0 si
+     * aucune ligne Stock à cette destination) — alimente la colonne "Stock"
+     * de la liste produits et de l'état de stock (calculé une seule fois ici,
+     * jamais dupliqué par vue/export, voir CLAUDE.md). Suppose la relation
+     * stocks() déjà chargée (eager loading), sinon déclenche une requête par
+     * produit (N+1).
+     *
+     * @param  iterable<Magasin>  $magasins
+     * @return array<int, array{magasin: Magasin, quantite: float, sous_seuil: bool}>
+     */
+    public function stockParMagasin(iterable $magasins): array
+    {
+        $stocksParMagasin = $this->stocks->keyBy('magasin_id');
+
+        return collect($magasins)->map(function (Magasin $magasin) use ($stocksParMagasin) {
+            $quantite = (float) ($stocksParMagasin->get($magasin->id)?->quantite ?? 0);
+
+            return [
+                'magasin' => $magasin,
+                'quantite' => $quantite,
+                'sous_seuil' => $quantite <= $this->seuil_alerte,
+            ];
+        })->all();
+    }
+
     public function mouvementStocks(): HasMany
     {
         return $this->hasMany(MouvementStock::class);

@@ -36,42 +36,30 @@
             <tr>
                 <th>Produit</th>
                 <th>SKU</th>
-                <th>Destination</th>
-                <th class="text-end">Quantité</th>
+                <th>Stock</th>
                 <th class="text-end">Seuil d'alerte</th>
                 <th class="text-end">Prix de vente</th>
-                <th class="text-end">Coût moyen pondéré</th>
             </tr>
         </thead>
         <tbody>
-            @forelse ($stocks as $stock)
-                @php
-                    $sousSeuil = $stock->quantite <= $stock->produit->seuil_alerte;
-                    $repartition = $stock->produit->repartirQuantite($stock->quantite);
-                @endphp
-                <tr class="{{ $sousSeuil ? 'sous-seuil' : '' }}">
-                    <td>{{ $stock->produit->libelle_affichage }}</td>
-                    <td>{{ $stock->produit->sku }}</td>
-                    <td>{{ $stock->magasin->nom }}</td>
-                    <td class="text-end">
-                        {{ quantite($stock->quantite) }} {{ $stock->produit->unite_base_libelle_complet }}
-                        @if ($repartition)
-                            <br><span style="font-style: italic; font-size: 9px; color: #666;">
-                                dont
-                                @if ($repartition['reste'] > 0)
-                                    {{ quantite($repartition['reste']) }} {{ $stock->produit->unite_base_libelle_complet }} et
-                                @endif
-                                {{ $repartition['nombre'] }} {{ $repartition['unite']->libelle }}
-                            </span>
-                        @endif
+            @forelse ($produits as $produit)
+                <tr>
+                    <td>{{ $produit->libelle_affichage }}</td>
+                    <td>{{ $produit->sku }}</td>
+                    <td>
+                        @foreach ($produit->stockParMagasin($magasinsAffiches) as $ligne)
+                            <div class="{{ $ligne['sous_seuil'] ? 'sous-seuil' : '' }}">
+                                {{ $ligne['magasin']->nom }} :
+                                {{ quantite($ligne['quantite']) }} {{ $produit->unite_base_libelle_complet }}
+                            </div>
+                        @endforeach
                     </td>
-                    <td class="text-end">{{ $stock->produit->seuil_alerte }}</td>
-                    <td class="text-end">{{ montant($stock->produit->prix_piece) }}</td>
-                    <td class="text-end">{{ montant($stock->cout_moyen_pondere) }}</td>
+                    <td class="text-end">{{ $produit->seuil_alerte }}</td>
+                    <td class="text-end">{{ montant($produit->prix_piece) }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="text-end">Aucun stock enregistré.</td>
+                    <td colspan="5" class="text-end">Aucun produit.</td>
                 </tr>
             @endforelse
         </tbody>

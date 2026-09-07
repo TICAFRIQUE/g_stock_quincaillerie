@@ -71,7 +71,7 @@
         <div class="col-auto" style="min-width: 260px;">
             <select name="produit_id" id="produit_id_filtre" class="form-select" onchange="this.form.submit()">
                 <option value="">Tous les produits</option>
-                @foreach ($produits as $produit)
+                @foreach ($produitsFiltrables as $produit)
                     <option value="{{ $produit->id }}" @selected(request('produit_id') == $produit->id)>{{ $produit->libelle_affichage }}</option>
                 @endforeach
             </select>
@@ -98,45 +98,22 @@
                 <thead>
                     <tr>
                         <x-th-tri champ="nom" label="Produit" />
-                        <th>Destination</th>
-                        <x-th-tri champ="quantite" label="Quantité" />
+                        <th>Stock</th>
                         <th>Seuil d'alerte</th>
                         <th>Prix de vente</th>
-                        <th>Coût moyen pondéré</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse ($stocks as $stock)
-                        @php
-                            $sousSeuil = $stock->quantite <= $stock->produit->seuil_alerte;
-                            $repartition = $stock->produit->repartirQuantite($stock->quantite);
-                        @endphp
-                        <tr class="{{ $sousSeuil ? 'table-danger' : '' }}">
-                            <td>{{ $stock->produit->libelle_affichage }} <code class="small">{{ $stock->produit->sku }}</code></td>
-                            <td>{{ $stock->magasin->nom }}</td>
-                            <td>
-                                {{ quantite($stock->quantite) }} {{ $stock->produit->unite_base_libelle_complet }}
-                                @if ($sousSeuil)
-                                    <i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="Sous le seuil d'alerte"></i>
-                                @endif
-                                @if ($repartition)
-                                    <br>
-                                    <span class="small fst-italic text-secondary">
-                                        dont
-                                        @if ($repartition['reste'] > 0)
-                                            {{ quantite($repartition['reste']) }} {{ $stock->produit->unite_base_libelle_complet }} et
-                                        @endif
-                                        {{ $repartition['nombre'] }} {{ $repartition['unite']->libelle }}
-                                    </span>
-                                @endif
-                            </td>
-                            <td>{{ $stock->produit->seuil_alerte }}</td>
-                            <td>{{ montant($stock->produit->prix_piece) }}</td>
-                            <td>{{ montant($stock->cout_moyen_pondere) }}</td>
+                    @forelse ($produits as $produit)
+                        <tr>
+                            <td>{{ $produit->libelle_affichage }} <code class="small">{{ $produit->sku }}</code></td>
+                            <td><x-stock-par-magasin :produit="$produit" :magasins="$magasinsAffiches" /></td>
+                            <td>{{ $produit->seuil_alerte }}</td>
+                            <td>{{ montant($produit->prix_piece) }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center text-secondary py-4">Aucun stock enregistré pour l'instant.</td>
+                            <td colspan="4" class="text-center text-secondary py-4">Aucun produit trouvé.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -144,9 +121,9 @@
         </div>
     </div>
 
-    @if ($stocks instanceof \Illuminate\Pagination\LengthAwarePaginator)
+    @if ($produits instanceof \Illuminate\Pagination\LengthAwarePaginator)
         <div class="mt-3 d-print-none">
-            {{ $stocks->links() }}
+            {{ $produits->links() }}
         </div>
     @endif
 

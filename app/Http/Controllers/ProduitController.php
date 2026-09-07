@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ExporteListe;
 use App\Http\Controllers\Concerns\TrieListe;
 use App\Models\Categorie;
+use App\Models\Magasin;
 use App\Models\Produit;
 use App\Models\Unite;
 use App\Services\StockService;
@@ -34,7 +35,7 @@ class ProduitController extends Controller
     public function index(Request $request): View
     {
         $query = Produit::query()
-            ->with('categorie')
+            ->with(['categorie', 'stocks'])
             ->when($request->filled('recherche'), function ($query) use ($request) {
                 $recherche = $request->string('recherche');
                 $query->where(function ($q) use ($recherche) {
@@ -50,14 +51,20 @@ class ProduitController extends Controller
         // filtré, pas seulement la page affichée à l'écran.
         $produits = $request->boolean('tout') ? $query->get() : $query->paginate(20)->withQueryString();
 
-        return view('produits.index', ['produits' => $produits]);
+        return view('produits.index', [
+            'produits' => $produits,
+            // Tous les magasins/dépôts actifs : la colonne "Stock" liste
+            // chacun d'eux (0 si le produit n'y a jamais été mouvementé),
+            // voir Produit::stockParMagasin().
+            'magasinsActifs' => Magasin::where('actif', true)->orderBy('nom')->get(),
+        ]);
     }
 
     public function pdf(Request $request): Response
     {
         return $this->pdfDepuisListe(
             'Produits',
-            ['SKU', 'Produit', 'Catégorie', 'Prix pièce', 'Statut'],
+            ['SKU', 'Produit', 'Catégorie', 'Stock', 'Prix pièce', 'Statut'],
             $this->lignesExport($request),
             'produits.pdf',
         );
@@ -67,7 +74,7 @@ class ProduitController extends Controller
     {
         return $this->excelDepuisListe(
             'Produits',
-            ['SKU', 'Produit', 'Catégorie', 'Prix pièce', 'Statut'],
+            ['SKU', 'Produit', 'Catégorie', 'Stock', 'Prix pièce', 'Statut'],
             $this->lignesExport($request),
             'produits.xlsx',
         );
@@ -79,8 +86,10 @@ class ProduitController extends Controller
      */
     private function lignesExport(Request $request): \Illuminate\Support\Collection
     {
+        $magasinsActifs = Magasin::where('actif', true)->orderBy('nom')->get();
+
         $query = Produit::query()
-            ->with('categorie')
+            ->with(['categorie', 'stocks'])
             ->when($request->filled('recherche'), function ($q) use ($request) {
                 $recherche = $request->string('recherche');
                 $q->where(function ($sub) use ($recherche) {
@@ -96,6 +105,9 @@ class ProduitController extends Controller
                 $p->sku,
                 $p->libelle_affichage,
                 $p->categorie->nom,
+                collect($p->stockParMagasin($magasinsActifs))
+                    ->map(fn (array $l) => $l['magasin']->nom.' : '.quantite($l['quantite']))
+                    ->implode(' | '),
                 montant($p->prix_piece),
                 $p->actif ? 'Actif' : 'Inactif',
             ]);

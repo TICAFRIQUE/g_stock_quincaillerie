@@ -31,6 +31,7 @@
                         <x-th-tri champ="sku" label="SKU" />
                         <x-th-tri champ="nom" label="Nom" />
                         <th>Catégorie</th>
+                        <th>Stock</th>
                         <x-th-tri champ="prix_piece" label="Prix / unité" />
                         <th>Seuil d'alerte</th>
                         <x-th-tri champ="actif" label="Statut" />
@@ -52,6 +53,7 @@
                             <td><code>{{ $produit->sku }}</code></td>
                             <td>{{ $produit->libelle_affichage }}</td>
                             <td>{{ $produit->categorie->nom }}</td>
+                            <td><x-stock-par-magasin :produit="$produit" :magasins="$magasinsActifs" /></td>
                             <td>{{ montant($produit->prix_piece) }} / {{ $produit->unite_base_libelle }}</td>
                             <td>{{ $produit->seuil_alerte }}</td>
                             <td>
@@ -70,7 +72,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-secondary py-4">Aucun produit trouvé.</td>
+                            <td colspan="9" class="text-center text-secondary py-4">Aucun produit trouvé.</td>
                         </tr>
                     @endforelse
                 </tbody>

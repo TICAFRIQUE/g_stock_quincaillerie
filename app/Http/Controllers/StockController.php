@@ -10,6 +10,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -22,42 +23,52 @@ class StockController extends Controller
 
     public function index(Request $request): View
     {
-        $baseFiltree = $this->requeteFiltree($request);
+        $magasinsActifs = Magasin::where('actif', true)->orderBy('nom')->get();
+        $magasinsAffiches = $this->magasinsAffiches($request, $magasinsActifs);
+
+        $baseStocks = $this->requeteStocksFiltree($request);
 
         $kpis = [
-            'totalPieces' => (clone $baseFiltree)->sum('stocks.quantite'),
-            'valeurStock' => (clone $baseFiltree)->sum(DB::raw('stocks.quantite * stocks.cout_moyen_pondere')),
-            'sousSeuil' => (clone $baseFiltree)->whereColumn('stocks.quantite', '<=', 'produits.seuil_alerte')->count(),
-            'nbMagasins' => $request->filled('magasin_id') ? 1 : Magasin::where('actif', true)->count(),
+            'totalPieces' => (clone $baseStocks)->sum('stocks.quantite'),
+            'valeurStock' => (clone $baseStocks)->sum(DB::raw('stocks.quantite * stocks.cout_moyen_pondere')),
+            'sousSeuil' => $this->requeteProduitsFiltree($request, sousSeuilUniquement: true)->count(),
+            'nbMagasins' => $request->filled('magasin_id') ? 1 : $magasinsActifs->count(),
         ];
 
-        $query = (clone $baseFiltree)
-            ->when($request->boolean('sous_seuil'), fn ($q) => $q->whereColumn('stocks.quantite', '<=', 'produits.seuil_alerte'))
-            ->select('stocks.*');
+        $query = $this->requeteProduitsFiltree($request, sousSeuilUniquement: $request->boolean('sous_seuil'))
+            ->with(['stocks' => fn ($q) => $q->when(
+                $request->filled('magasin_id'),
+                fn ($qq) => $qq->where('magasin_id', $request->integer('magasin_id')),
+            )]);
 
-        // Ordre alphabétique par défaut (le tri par défaut du trait est
-        // habituellement décroissant, pensé pour "created_at" — ici on veut
-        // explicitement A→Z tant que l'utilisateur n'a pas cliqué une colonne.
-        $query = $this->appliquerTri($query, $request, ['nom' => 'produits.nom', 'quantite' => 'stocks.quantite'], 'produits.nom', 'asc')
-            ->with(['produit.uniteVentes', 'magasin']);
+        // Ordre alphabétique par défaut, comme avant la refonte (une ligne
+        // par produit désormais — trier par quantité n'a plus de sens
+        // unique, un produit ayant potentiellement une quantité différente
+        // par magasin/dépôt).
+        $query = $this->appliquerTri($query, $request, ['nom'], 'nom', 'asc');
 
         // L'impression (voir x-bouton-imprimer) couvre tout le résultat
         // filtré, pas seulement la page affichée à l'écran.
-        $stocks = $request->boolean('tout') ? $query->get() : $query->paginate(20)->withQueryString();
+        $produits = $request->boolean('tout') ? $query->get() : $query->paginate(20)->withQueryString();
 
         return view('stock.index', [
-            'stocks' => $stocks,
-            'magasins' => Magasin::orderBy('nom')->get(),
-            'produits' => Produit::where('actif', true)->orderBy('nom')->get(['id', 'sku', 'nom', 'libelle_distinctif']),
+            'produits' => $produits,
+            'magasins' => $magasinsActifs,
+            'magasinsAffiches' => $magasinsAffiches,
+            'produitsFiltrables' => Produit::where('actif', true)->orderBy('nom')->get(['id', 'sku', 'nom', 'libelle_distinctif']),
             'kpis' => $kpis,
         ]);
     }
 
     public function pdf(Request $request): Response
     {
-        $stocks = $this->ligneExport($request);
+        $magasinsActifs = Magasin::where('actif', true)->orderBy('nom')->get();
 
-        $pdf = Pdf::loadView('stock.pdf', ['stocks' => $stocks, 'filtres' => $this->libellesFiltres($request)]);
+        $pdf = Pdf::loadView('stock.pdf', [
+            'produits' => $this->produitsExport($request),
+            'magasinsAffiches' => $this->magasinsAffiches($request, $magasinsActifs),
+            'filtres' => $this->libellesFiltres($request),
+        ]);
 
         // ?imprimer=1 (voir x-bouton-imprimer) : ouvre le PDF dans l'iframe
         // caché au lieu de forcer un téléchargement, sinon le navigateur
@@ -70,26 +81,30 @@ class StockController extends Controller
 
     public function excel(Request $request): StreamedResponse
     {
-        $stocks = $this->ligneExport($request);
+        $magasinsActifs = Magasin::where('actif', true)->orderBy('nom')->get();
+        $magasinsAffiches = $this->magasinsAffiches($request, $magasinsActifs);
+        $produits = $this->produitsExport($request);
 
         $spreadsheet = new Spreadsheet();
         $feuille = $spreadsheet->getActiveSheet();
         $feuille->setTitle('État du stock');
-        $feuille->fromArray(['Produit', 'SKU', 'Destination', 'Quantité', 'Seuil d\'alerte', 'Prix de vente', 'Coût moyen pondéré'], null, 'A1');
+        $feuille->fromArray(['Produit', 'SKU', 'Stock', 'Seuil d\'alerte', 'Prix de vente'], null, 'A1');
 
         $ligne = 2;
-        foreach ($stocks as $stock) {
-            $feuille->setCellValue("A{$ligne}", $stock->produit->libelle_affichage);
-            $feuille->setCellValue("B{$ligne}", $stock->produit->sku);
-            $feuille->setCellValue("C{$ligne}", $stock->magasin->nom);
-            $feuille->setCellValue("D{$ligne}", (float) $stock->quantite);
-            $feuille->setCellValue("E{$ligne}", $stock->produit->seuil_alerte);
-            $feuille->setCellValue("F{$ligne}", $stock->produit->prix_piece);
-            $feuille->setCellValue("G{$ligne}", $stock->cout_moyen_pondere);
+        foreach ($produits as $produit) {
+            $detail = collect($produit->stockParMagasin($magasinsAffiches))
+                ->map(fn (array $l) => $l['magasin']->nom.' : '.quantite($l['quantite']))
+                ->implode(' | ');
+
+            $feuille->setCellValue("A{$ligne}", $produit->libelle_affichage);
+            $feuille->setCellValue("B{$ligne}", $produit->sku);
+            $feuille->setCellValue("C{$ligne}", $detail);
+            $feuille->setCellValue("D{$ligne}", $produit->seuil_alerte);
+            $feuille->setCellValue("E{$ligne}", $produit->prix_piece);
             $ligne++;
         }
 
-        foreach (['A', 'B', 'C', 'D', 'E', 'F', 'G'] as $colonne) {
+        foreach (['A', 'B', 'C', 'D', 'E'] as $colonne) {
             $feuille->getColumnDimension($colonne)->setAutoSize(true);
         }
 
@@ -100,7 +115,24 @@ class StockController extends Controller
         }, 'etat-du-stock.xlsx', ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
     }
 
-    private function requeteFiltree(Request $request): Builder
+    /**
+     * Magasins/dépôts à détailler dans la colonne "Stock" : tous les actifs,
+     * ou seulement celui filtré (?magasin_id=) — jamais recalculé ailleurs
+     * (écran, PDF, Excel), voir Produit::stockParMagasin().
+     */
+    private function magasinsAffiches(Request $request, Collection $magasinsActifs): Collection
+    {
+        return $request->filled('magasin_id')
+            ? $magasinsActifs->where('id', $request->integer('magasin_id'))->values()
+            : $magasinsActifs;
+    }
+
+    /**
+     * Requête Stock brute (jointe produits/magasins), utilisée uniquement
+     * pour les KPI agrégés (pièces en stock, valeur CMP) — inchangée par la
+     * refonte "une ligne par produit" de la liste elle-même.
+     */
+    private function requeteStocksFiltree(Request $request): Builder
     {
         return Stock::query()
             ->join('produits', 'produits.id', '=', 'stocks.produit_id')
@@ -110,18 +142,47 @@ class StockController extends Controller
     }
 
     /**
-     * Même filtre que l'écran (magasin, produit, sous seuil), mais sans
+     * Requête Produit (une ligne par produit, tous magasins confondus dans
+     * la colonne "Stock" — voir Produit::stockParMagasin()) : inclut
+     * volontairement les produits sans aucune ligne Stock (quantité 0
+     * partout), pour un état de stock complet plutôt qu'une simple liste des
+     * mouvements déjà enregistrés.
+     *
+     * $sousSeuilUniquement filtre aux produits dont AU MOINS un magasin/dépôt
+     * (le filtré s'il y en a un, sinon tous) est sous le seuil d'alerte —
+     * l'absence de toute ligne Stock à cette destination compte aussi comme
+     * "sous seuil" (quantité 0).
+     */
+    private function requeteProduitsFiltree(Request $request, bool $sousSeuilUniquement = false): Builder
+    {
+        return Produit::query()
+            ->when($request->filled('produit_id'), fn ($q) => $q->where('id', $request->integer('produit_id')))
+            ->when($sousSeuilUniquement, function ($q) use ($request) {
+                $q->where(function ($qq) use ($request) {
+                    $qq->whereHas('stocks', function ($sq) use ($request) {
+                        $sq->whereColumn('stocks.quantite', '<=', 'produits.seuil_alerte')
+                            ->when($request->filled('magasin_id'), fn ($s) => $s->where('magasin_id', $request->integer('magasin_id')));
+                    })->orWhereDoesntHave('stocks', function ($sq) use ($request) {
+                        $sq->when($request->filled('magasin_id'), fn ($s) => $s->where('magasin_id', $request->integer('magasin_id')));
+                    });
+                });
+            });
+    }
+
+    /**
+     * Même filtre que l'écran (magasin, produit, sous seuil), sans
      * pagination et toujours par ordre alphabétique — utilisé par les deux
      * exports (règle CLAUDE.md : les rapports ne dupliquent pas la logique
      * métier, ils réutilisent la même requête filtrée que l'écran).
      */
-    private function ligneExport(Request $request)
+    private function produitsExport(Request $request): Collection
     {
-        return $this->requeteFiltree($request)
-            ->when($request->boolean('sous_seuil'), fn ($q) => $q->whereColumn('stocks.quantite', '<=', 'produits.seuil_alerte'))
-            ->select('stocks.*')
-            ->orderBy('produits.nom')
-            ->with(['produit.uniteVentes', 'magasin'])
+        return $this->requeteProduitsFiltree($request, sousSeuilUniquement: $request->boolean('sous_seuil'))
+            ->with(['stocks' => fn ($q) => $q->when(
+                $request->filled('magasin_id'),
+                fn ($qq) => $qq->where('magasin_id', $request->integer('magasin_id')),
+            )])
+            ->orderBy('nom')
             ->get();
     }
 
