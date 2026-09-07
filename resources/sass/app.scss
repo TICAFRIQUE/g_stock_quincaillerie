@@ -120,6 +120,21 @@ input[type='number'] {
             padding-left: 1rem;
         }
     }
+
+    // Nom de l'application (Paramètres, texte libre potentiellement long) :
+    // Bootstrap impose white-space: nowrap sur .navbar-brand, donc un nom
+    // long poussait indéfiniment le menu horizontal vers la droite au lieu
+    // de passer à la ligne. Plafonné en largeur et autorisé à revenir à la
+    // ligne dans son propre espace, sans jamais faire bouger le menu.
+    .navbar-brand-texte {
+        max-width: 200px;
+
+        .fs-6 {
+            white-space: normal;
+            line-height: 1.15;
+            overflow-wrap: break-word;
+        }
+    }
 }
 
 // Sidebar coulissante mobile/tablette (< lg) : même palette que la barre

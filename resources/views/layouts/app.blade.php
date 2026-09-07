@@ -18,7 +18,7 @@
                     <span class="brand-logo-chip">
                         <img src="{{ $parametre->logoUrl() }}" alt="Logo {{ $parametre->nom }}">
                     </span>
-                    <span class="d-none d-sm-block">
+                    <span class="d-none d-sm-block navbar-brand-texte">
                         <span class="fs-6 fw-semibold text-white d-block lh-sm">{{ $parametre->nom }}</span>
                         @if ($parametre->slogan)
                             <span class="small d-block lh-sm" style="color: var(--erp-sidebar-color);">{{ $parametre->slogan }}</span>
