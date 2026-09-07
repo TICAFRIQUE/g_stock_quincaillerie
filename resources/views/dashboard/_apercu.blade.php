@@ -265,6 +265,14 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // Chart.js dessine sur un <canvas> : les variables CSS Bootstrap
+            // (voir partials/couleur-primaire) ne l'atteignent jamais tout
+            // seules — on relit --bs-primary(-rgb) à l'exécution pour rester
+            // cohérent avec la couleur primaire configurée en Paramètres.
+            const racine = getComputedStyle(document.documentElement);
+            const couleurPrimaire = (racine.getPropertyValue('--bs-primary') || '#e8590c').trim();
+            const couleurPrimaireRgb = (racine.getPropertyValue('--bs-primary-rgb') || '232, 89, 12').trim();
+
             const evolutionEl = document.getElementById('chart-evolution');
             if (evolutionEl) {
                 new Chart(evolutionEl, {
@@ -274,8 +282,8 @@
                         datasets: [{
                             label: 'Ventes ({{ App\Models\Devise::abreviationActuelle() }})',
                             data: JSON.parse(evolutionEl.dataset.valeurs),
-                            borderColor: '#e8590c',
-                            backgroundColor: 'rgba(232, 89, 12, 0.15)',
+                            borderColor: couleurPrimaire,
+                            backgroundColor: `rgba(${couleurPrimaireRgb}, 0.15)`,
                             tension: 0.3,
                             fill: true,
                         }],
@@ -292,7 +300,7 @@
                         labels: JSON.parse(moyensEl.dataset.labels),
                         datasets: [{
                             data: JSON.parse(moyensEl.dataset.valeurs),
-                            backgroundColor: ['#e8590c', '#2470a8', '#f5b800', '#c62828', '#2e7d32'],
+                            backgroundColor: [couleurPrimaire, '#2470a8', '#f5b800', '#c62828', '#2e7d32'],
                         }],
                     },
                 });

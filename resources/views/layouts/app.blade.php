@@ -8,6 +8,7 @@
     <title>@yield('title', 'Tableau de bord') — {{ $parametre->nom }}</title>
     <link rel="icon" href="{{ $parametre->logoUrl() }}">
     @vite(['resources/sass/app.scss', 'resources/js/app.js'])
+    @include('partials.couleur-primaire')
 </head>
 <body>
     <div class="d-flex flex-column min-vh-100">

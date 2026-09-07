@@ -6,6 +6,7 @@
     <title>@yield('titre', 'Erreur') — {{ $parametre->nom }}</title>
     <link rel="icon" href="{{ $parametre->logoUrl() }}">
     @vite(['resources/sass/app.scss', 'resources/js/app.js'])
+    @include('partials.couleur-primaire')
 </head>
 <body class="d-flex align-items-center" style="min-height: 100vh; background-color: var(--erp-sidebar-bg);">
     <div class="container">

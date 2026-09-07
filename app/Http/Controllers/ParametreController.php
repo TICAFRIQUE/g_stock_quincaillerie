@@ -27,6 +27,7 @@ class ParametreController extends Controller
         $donnees = $request->validate([
             'nom' => ['required', 'string', 'max:255'],
             'slogan' => ['nullable', 'string', 'max:255'],
+            'couleur_primaire' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'numero' => ['nullable', 'string', 'max:50'],
             'adresse' => ['nullable', 'string', 'max:255'],
             'duree_validite_devis_jours' => ['required', 'integer', 'min:1', 'max:365'],

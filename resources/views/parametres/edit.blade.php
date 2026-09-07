@@ -39,6 +39,24 @@
                             @error('slogan') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
 
+                        <div class="mb-4" x-data="{ valeur: '{{ old('couleur_primaire', $parametre->couleur_primaire ?: '#e8590c') }}' }">
+                            <label for="couleur_primaire" class="form-label">Couleur primaire</label>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <input type="color" class="form-control form-control-color" style="width: 3rem;"
+                                       x-model="valeur" aria-label="Sélecteur de couleur primaire">
+                                <input type="text" name="couleur_primaire" id="couleur_primaire"
+                                       class="form-control @error('couleur_primaire') is-invalid @enderror" style="max-width: 9rem;"
+                                       x-model="valeur" pattern="^#[0-9A-Fa-f]{6}$" maxlength="7" placeholder="#e8590c">
+                                <span class="rounded border flex-shrink-0" style="width: 2.25rem; height: 2.25rem;"
+                                      x-bind:style="'background-color: ' + valeur"></span>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" @click="valeur = '#e8590c'">
+                                    Réinitialiser
+                                </button>
+                            </div>
+                            @error('couleur_primaire') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                            <div class="form-text">Remplace l'orange par défaut (boutons, liens, menu, formulaires…).</div>
+                        </div>
+
                         <div class="mb-3">
                             <label for="numero" class="form-label">Numéro de téléphone</label>
                             <input type="text" name="numero" id="numero" class="form-control @error('numero') is-invalid @enderror"
