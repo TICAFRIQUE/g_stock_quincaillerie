@@ -103,7 +103,7 @@
                                                     <option value="" :selected="ligne.magasin_source_id === undefined">— Choisir un lieu —</option>
                                                     <template x-for="source in sourcesDisponibles(ligne)" :key="source.id">
                                                         <option :value="source.id" :selected="source.id === ligne.magasin_source_id"
-                                                                x-text="'Depuis : ' + source.nom + (source.id === magasinCaisseId ? ' (votre caisse)' : '') + (source.type === 'depot' ? ' (dépôt)' : '') + ' — ' + source.quantite + ' dispo'"></option>
+                                                                x-text="(source.id === magasinCaisseId ? '📍 ' : 'Depuis : ') + source.nom + ' — ' + source.quantite + ' dispo'"></option>
                                                     </template>
                                                 </select>
                                                 <div class="text-danger small mt-1" x-show="enRupture(ligne)" x-cloak>
