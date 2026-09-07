@@ -477,12 +477,18 @@
                                 </div>
                             </div>
 
+                            {{-- Fond gris clair pour le panneau : chaque ligne reste une
+                                 vraie carte blanche qui se détache nettement dessus, au lieu
+                                 de se fondre dans le blanc du corps de la modale (même
+                                 traitement que le panneau de lignes de commande-achats/create.blade.php). --}}
+                            <div class="bg-light rounded p-2 p-md-3 mb-2">
                             @foreach ($lignesAReceptionner as $ligne)
                                 @php
                                     $ligneDejaRecu = (float) ($dejaRecuParLigne[$ligne->id] ?? 0);
                                     $reste = (float) $ligne->quantite_pieces - $ligneDejaRecu;
                                 @endphp
-                                <div class="border rounded p-2 mb-2">
+                                <div class="card bg-white shadow-sm mb-2">
+                                <div class="card-body p-2 p-md-3">
                                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
                                         <div>
                                             <strong>{{ $ligne->produit->libelle_affichage }}</strong>
@@ -533,7 +539,9 @@
                                         <i class="bi bi-plus-lg"></i> Ajouter une destination
                                     </button>
                                 </div>
+                                </div>
                             @endforeach
+                            </div>
 
                             <label class="form-label small">Paiement (optionnel)</label>
                             <template x-for="(paiement, index) in paiements" :key="index">
