@@ -138,6 +138,61 @@
                         @csrf
                         <input type="hidden" name="action" x-model="actionSoumission">
 
+                        @if ($peutValider && $peutReceptionner)
+                            <div class="mb-3">
+                                <label class="form-label d-block">La marchandise est-elle déjà chez vous ?</label>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <div class="card h-100" role="button" tabindex="0"
+                                             :class="actionSoumission === 'brouillon' ? 'border-primary border-2 bg-primary-subtle' : 'border-secondary-subtle'"
+                                             @click="actionSoumission = 'brouillon'"
+                                             @keydown.enter.prevent="actionSoumission = 'brouillon'"
+                                             @keydown.space.prevent="actionSoumission = 'brouillon'">
+                                            <div class="card-body py-2 px-3">
+                                                <div class="d-flex align-items-start gap-2">
+                                                    <i class="bi" :class="actionSoumission === 'brouillon' ? 'bi-check-circle-fill text-primary' : 'bi-circle text-secondary'"></i>
+                                                    <div>
+                                                        <div class="fw-semibold"><i class="bi bi-file-earmark-text me-1"></i>Non — Bon de commande</div>
+                                                        <div class="small text-secondary">Envoyé au fournisseur, à réceptionner plus tard (une ou plusieurs fois) — destination et paiement se décident à la réception.</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card h-100" role="button" tabindex="0"
+                                             :class="actionSoumission === 'recevoir' ? 'border-success border-2 bg-success-subtle' : 'border-secondary-subtle'"
+                                             @click="actionSoumission = 'recevoir'"
+                                             @keydown.enter.prevent="actionSoumission = 'recevoir'"
+                                             @keydown.space.prevent="actionSoumission = 'recevoir'">
+                                            <div class="card-body py-2 px-3">
+                                                <div class="d-flex align-items-start gap-2">
+                                                    <i class="bi" :class="actionSoumission === 'recevoir' ? 'bi-check-circle-fill text-success' : 'bi-circle text-secondary'"></i>
+                                                    <div>
+                                                        <div class="fw-semibold"><i class="bi bi-box-seam me-1"></i>Oui — Achat direct (déjà reçu)</div>
+                                                        <div class="small text-secondary">Marchandise déjà reçue chez le fournisseur : stock, CMP et dette fournisseur mis à jour immédiatement.</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-3" x-show="actionSoumission === 'recevoir'" x-cloak>
+                                <div class="col-md-6">
+                                    <label for="numero-bl-fournisseur" class="form-label small">N° de bon de livraison (optionnel)</label>
+                                    <input type="text" name="numero_bon_livraison_fournisseur" id="numero-bl-fournisseur" class="form-control form-control-sm"
+                                           placeholder="Numéro écrit sur le bon de livraison">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="numero-facture-fournisseur" class="form-label small">N° de facture fournisseur (optionnel)</label>
+                                    <input type="text" name="numero_facture_fournisseur" id="numero-facture-fournisseur" class="form-control form-control-sm"
+                                           placeholder="Numéro écrit sur la facture, si déjà remise">
+                                </div>
+                            </div>
+                        @endif
+
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label for="numero" class="form-label">Numéro</label>
@@ -168,37 +223,6 @@
                                 @error('date_commande') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             </div>
                         </div>
-
-                        @if ($peutValider && $peutReceptionner)
-                            <div class="mb-3">
-                                <label class="form-label d-block">Type de document</label>
-                                <div class="btn-group" role="group" aria-label="Type de document">
-                                    <button type="button" class="btn btn-sm" :class="actionSoumission === 'brouillon' ? 'btn-primary' : 'btn-outline-primary'" @click="actionSoumission = 'brouillon'">
-                                        <i class="bi bi-file-earmark-text me-1"></i>Bon de commande
-                                    </button>
-                                    <button type="button" class="btn btn-sm" :class="actionSoumission === 'recevoir' ? 'btn-success' : 'btn-outline-success'" @click="actionSoumission = 'recevoir'">
-                                        <i class="bi bi-box-seam me-1"></i>Achat direct (déjà reçu)
-                                    </button>
-                                </div>
-                                <div class="form-text small">
-                                    <span x-show="actionSoumission === 'brouillon'">Envoyé au fournisseur, à réceptionner plus tard (une ou plusieurs fois) — destination et paiement se décident à la réception.</span>
-                                    <span x-show="actionSoumission === 'recevoir'" x-cloak>Marchandise déjà reçue chez le fournisseur : stock, CMP et dette fournisseur mis à jour immédiatement.</span>
-                                </div>
-                            </div>
-
-                            <div class="row g-2 mb-3" x-show="actionSoumission === 'recevoir'" x-cloak>
-                                <div class="col-md-6">
-                                    <label for="numero-bl-fournisseur" class="form-label small">N° de bon de livraison (optionnel)</label>
-                                    <input type="text" name="numero_bon_livraison_fournisseur" id="numero-bl-fournisseur" class="form-control form-control-sm"
-                                           placeholder="Numéro écrit sur le bon de livraison">
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="numero-facture-fournisseur" class="form-label small">N° de facture fournisseur (optionnel)</label>
-                                    <input type="text" name="numero_facture_fournisseur" id="numero-facture-fournisseur" class="form-control form-control-sm"
-                                           placeholder="Numéro écrit sur la facture, si déjà remise">
-                                </div>
-                            </div>
-                        @endif
 
                         <hr>
 
@@ -363,6 +387,17 @@
                         @endif
 
                         <hr>
+
+                        @if ($peutValider && $peutReceptionner)
+                            <div class="alert py-2 px-3 mb-3" :class="actionSoumission === 'brouillon' ? 'alert-primary' : 'alert-success'">
+                                <span x-show="actionSoumission === 'brouillon'">
+                                    <i class="bi bi-info-circle me-1"></i>Vous allez enregistrer un <strong>brouillon de bon de commande</strong> — aucun impact sur le stock ni la caisse pour l'instant.
+                                </span>
+                                <span x-show="actionSoumission === 'recevoir'" x-cloak>
+                                    <i class="bi bi-info-circle me-1"></i>Vous allez enregistrer un <strong>achat déjà reçu</strong> — stock, coût moyen et dette fournisseur mis à jour immédiatement.
+                                </span>
+                            </div>
+                        @endif
 
                         <button type="submit" class="btn btn-outline-primary" :disabled="aUnDoublon" x-show="actionSoumission === 'brouillon'" x-cloak>
                             Enregistrer en brouillon
