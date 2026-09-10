@@ -50,6 +50,11 @@ class Fournisseur extends Model
         return $this->hasMany(ReglementFournisseur::class);
     }
 
+    public function retours(): HasMany
+    {
+        return $this->hasMany(RetourAchat::class);
+    }
+
     /**
      * Solde dérivé, jamais stocké (même principe que Client::solde()) :
      * somme des écritures du compte. Positif = on doit de l'argent au
@@ -61,20 +66,26 @@ class Fournisseur extends Model
     }
 
     /**
-     * Total des achats passés auprès de ce fournisseur (commandes validées
-     * non annulées, TTC). KPI fiche fournisseur. Suppose que le total TTC de
-     * chaque ligne peut être sommé en SQL : prix_achat HT × quantité ×
-     * (1 + taux taxe / 100) n'est pas trivial à exprimer en SQL brut à cause
-     * de l'arrondi applicatif (voir Arrondi::entier) — calculé ligne par
-     * ligne en PHP via LigneCommandeAchat::montantTtc() plutôt qu'une requête
-     * agrégée, sur un nombre de lignes qui reste raisonnable par fournisseur.
+     * Total NET des achats passés auprès de ce fournisseur (commandes
+     * validées non annulées, TTC indicatif) moins les retours déjà
+     * enregistrés, tous documents confondus — un volume de business réel,
+     * pas juste la somme brute des commandes passées (qui ne dit rien de ce
+     * qui a ensuite été retourné). KPI fiche fournisseur ("Total achats net").
+     * Suppose que le total TTC de chaque ligne peut être sommé en SQL :
+     * prix_achat HT × quantité × (1 + taux taxe / 100) n'est pas trivial à
+     * exprimer en SQL brut à cause de l'arrondi applicatif (voir
+     * Arrondi::entier) — calculé ligne par ligne en PHP via
+     * LigneCommandeAchat::montantTtc() plutôt qu'une requête agrégée, sur un
+     * nombre de lignes qui reste raisonnable par fournisseur.
      */
     public function totalAchats(): int
     {
-        return LigneCommandeAchat::whereHas(
+        $brut = LigneCommandeAchat::whereHas(
             'commandeAchat',
             fn ($q) => $q->where('fournisseur_id', $this->id)->where('statut', 'validee')
         )->with('taxe')->get()->sum(fn (LigneCommandeAchat $l) => $l->montantTtc());
+
+        return $brut - $this->retours()->sum('montant_total');
     }
 
     public function nombreAchats(): int

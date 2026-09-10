@@ -32,7 +32,9 @@ class ReglementFournisseurController extends Controller
         ]);
 
         $commandeAchat = $donnees['commande_achat_id'] ?? null
-            ? CommandeAchat::withTrashed()->find($donnees['commande_achat_id'])
+            ? CommandeAchat::withTrashed()
+                ->with(['lignes', 'receptions.lignes.taxe', 'paiements', 'reglementsFournisseur', 'retours'])
+                ->find($donnees['commande_achat_id'])
             : null;
 
         // Un règlement imputé à un achat précis ne peut pas dépasser le

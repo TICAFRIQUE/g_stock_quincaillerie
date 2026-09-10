@@ -61,6 +61,11 @@ class Client extends Model
         return $this->hasMany(Devis::class);
     }
 
+    public function retours(): HasMany
+    {
+        return $this->hasMany(RetourVente::class);
+    }
+
     /**
      * Solde dérivé, jamais stocké (règle 12) : somme des écritures du
      * compte. Positif = le client doit de l'argent.
@@ -71,12 +76,15 @@ class Client extends Model
     }
 
     /**
-     * Chiffre d'affaires total réalisé avec ce client (ventes non annulées).
-     * KPI fiche client.
+     * Total NET des ventes réalisées avec ce client : total des ventes (non
+     * annulées) moins les retours déjà enregistrés, tous documents confondus
+     * — un volume de business réel, pas juste la somme brute des factures
+     * émises (qui ne dit rien de ce qui a ensuite été retourné). KPI fiche
+     * client ("Total ventes net").
      */
     public function totalVentes(): int
     {
-        return $this->ventes()->sum('total_net');
+        return $this->ventes()->sum('total_net') - $this->retours()->sum('montant_total');
     }
 
     /**

@@ -41,16 +41,17 @@ class CommandeAchatController extends Controller
         $fin = $request->filled('date_fin') ? Carbon::parse($request->string('date_fin')) : now()->endOfMonth();
 
         $query = CommandeAchat::query()
-            // lignes.taxe/paiements/reglementsFournisseur : nécessaires à
+            // lignes.taxe/paiements/reglementsFournisseur/retours : nécessaires à
             // CommandeAchat::totalTtc()/montantRegle()/resteDu() (colonnes
-            // Montant dû/Déjà réglé/Reste à régler), chargées ici pour
+            // Montant facturé/Déjà réglé/Reste à régler — resteDu() déduit aussi les
+            // retours déjà enregistrés sur cette commande), chargées ici pour
             // éviter un N+1 sur chaque ligne de la page. receptions.lignes :
             // nécessaires à totalTtcReel() (montant réel). lignes.receptions
             // (chemin inverse, distinct du précédent) : nécessaires à
             // quantiteRecuePieces()/tauxCompletion() (colonne Réception) —
             // voir les docblocks de CommandeAchat pour le détail de chaque
             // chemin d'eager loading.
-            ->with(['fournisseur', 'lignes.taxe', 'lignes.receptions.taxe', 'paiements', 'reglementsFournisseur', 'receptions.lignes.taxe'])
+            ->with(['fournisseur', 'lignes.taxe', 'lignes.receptions.taxe', 'paiements', 'reglementsFournisseur', 'receptions.lignes.taxe', 'retours'])
             ->whereBetween('date_commande', [$debut->toDateString(), $fin->toDateString()])
             ->when($request->filled('recherche'), function ($q) use ($request) {
                 $recherche = $request->string('recherche');
@@ -357,7 +358,7 @@ class CommandeAchatController extends Controller
     {
         $commandeAchat->load([
             'fournisseur', 'lignes.produit', 'lignes.uniteVente.unite', 'lignes.taxe', 'lignes.magasinDestination',
-            'paiements.moyenPaiement', 'reglementsFournisseur',
+            'paiements.moyenPaiement', 'reglementsFournisseur', 'retours',
             'receptions.lignes.taxe', 'receptions.lignes.produit', 'receptions.lignes.magasin', 'receptions.paiements.moyenPaiement',
         ]);
         $dejaRecuParLigne = $this->calculerDejaRecuParLigne($commandeAchat);
@@ -484,7 +485,7 @@ class CommandeAchatController extends Controller
     {
         $commandeAchat->load([
             'fournisseur', 'lignes.produit', 'lignes.uniteVente.unite', 'lignes.taxe', 'lignes.magasinDestination',
-            'paiements.moyenPaiement', 'reglementsFournisseur',
+            'paiements.moyenPaiement', 'reglementsFournisseur', 'retours',
             'receptions.lignes.taxe', 'receptions.lignes.produit', 'receptions.lignes.magasin', 'receptions.paiements.moyenPaiement', 'receptions.auteur',
         ]);
 

@@ -22,6 +22,20 @@ class AuthenticatedSessionController extends Controller
 
     private const DECOMPTE_SECONDES = 60;
 
+    /**
+     * Second verrou, par identifiant SEUL (toutes IP confondues) : le verrou
+     * par (identifiant + IP) ci-dessus ne bloque rien pour un attaquant
+     * distribué qui change d'IP à chaque tentative — chaque nouvelle IP
+     * repart avec un compteur à zéro pour le même identifiant. Seuil plus
+     * large et fenêtre plus longue pour ne pas gêner un usage normal
+     * (plusieurs postes/IP légitimes sur un même compte au fil de la
+     * journée), mais suffisant pour rendre l'épuisement des 10 000 codes
+     * possibles impraticable même en rotation d'IP.
+     */
+    private const MAX_TENTATIVES_COMPTE = 15;
+
+    private const DECOMPTE_COMPTE_SECONDES = 900;
+
     public function create(): View
     {
         return view('auth.login');
@@ -35,9 +49,11 @@ class AuthenticatedSessionController extends Controller
         ]);
 
         $cle = $this->cleLimitation($request, $donnees['username']);
+        $cleCompte = $this->cleLimitationCompte($donnees['username']);
 
-        if (RateLimiter::tooManyAttempts($cle, self::MAX_TENTATIVES)) {
-            $secondes = RateLimiter::availableIn($cle);
+        if (RateLimiter::tooManyAttempts($cle, self::MAX_TENTATIVES)
+            || RateLimiter::tooManyAttempts($cleCompte, self::MAX_TENTATIVES_COMPTE)) {
+            $secondes = max(RateLimiter::availableIn($cle), RateLimiter::availableIn($cleCompte));
 
             throw ValidationException::withMessages([
                 'username' => "Trop de tentatives. Réessayez dans {$secondes} secondes.",
@@ -48,6 +64,7 @@ class AuthenticatedSessionController extends Controller
         // (colonne password, hashé) : seul le champ de connexion change.
         if (! Auth::attempt(['username' => $donnees['username'], 'password' => $donnees['code']])) {
             RateLimiter::hit($cle, self::DECOMPTE_SECONDES);
+            RateLimiter::hit($cleCompte, self::DECOMPTE_COMPTE_SECONDES);
 
             throw ValidationException::withMessages([
                 'username' => 'Identifiants incorrects.',
@@ -55,6 +72,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         RateLimiter::clear($cle);
+        RateLimiter::clear($cleCompte);
 
         if (! Auth::user()->actif) {
             Auth::logout();
@@ -72,6 +90,11 @@ class AuthenticatedSessionController extends Controller
     private function cleLimitation(Request $request, string $username): string
     {
         return Str::transliterate(Str::lower($username)).'|'.$request->ip();
+    }
+
+    private function cleLimitationCompte(string $username): string
+    {
+        return 'compte|'.Str::transliterate(Str::lower($username));
     }
 
     public function destroy(Request $request): RedirectResponse

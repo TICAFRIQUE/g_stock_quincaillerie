@@ -218,12 +218,16 @@ class CommandeAchat extends Model
 
     /**
      * Reste dû au fournisseur : montant réellement dû (totalTtcReel(), pas
-     * l'indicatif) moins le montant réglé. Suppose `lignes`,
-     * `receptions.lignes.taxe`, `paiements` et `reglementsFournisseur`
-     * chargées.
+     * l'indicatif) moins le montant réglé, moins les retours déjà
+     * enregistrés sur CETTE commande précise (un retour référence toujours
+     * une commande précise, il doit réduire ce qui reste dû dessus — jamais
+     * < 0, l'éventuel excédent devient un avoir sur le compte fournisseur
+     * global, pas une dette négative par document). Suppose `lignes`,
+     * `receptions.lignes.taxe`, `paiements`, `reglementsFournisseur` et
+     * `retours` chargées.
      */
     public function resteDu(): int
     {
-        return $this->totalTtcReel() - $this->montantRegle();
+        return max(0, $this->totalTtcReel() - $this->montantRegle() - $this->retours->sum('montant_total'));
     }
 }

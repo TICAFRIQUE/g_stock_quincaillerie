@@ -20,6 +20,34 @@ class BonLivraisonController extends Controller
 {
     use AutoriseMagasin;
 
+    /**
+     * Liste toutes les factures pas entièrement livrées, tous magasins/
+     * clients confondus (comptant comme crédit, aucune restriction par type
+     * de client) — pour qu'un utilisateur disposant de vente.livrer traite
+     * les livraisons en attente sans devoir déjà connaître la facture
+     * concernée. Aucune dépendance à une session de caisse.
+     */
+    public function index(Request $request): View
+    {
+        // Restriction silencieuse au magasin de l'utilisateur (même logique
+        // que SessionCaisseController/StockMouvementController) — pas un
+        // filtre affiché : un utilisateur non rattaché à un magasin
+        // (superadmin) voit toutes les factures, tous magasins confondus.
+        $ventes = Vente::query()
+            ->livraisonIncomplete()
+            ->when($request->user()->magasin_id, fn ($q, $magasinId) => $q->where('ventes.magasin_id', $magasinId))
+            ->when($request->filled('recherche'), function ($q) use ($request) {
+                $recherche = $request->string('recherche');
+                $q->where('numero', 'like', "%{$recherche}%");
+            })
+            ->with(['client', 'lignes', 'bonsLivraison.lignes'])
+            ->latest('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('bons-livraison.index', ['ventes' => $ventes]);
+    }
+
     public function store(Request $request, Vente $vente, BonLivraisonService $service): RedirectResponse
     {
         $this->assurerMagasin($vente->magasin_id);

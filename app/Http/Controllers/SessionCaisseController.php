@@ -117,7 +117,7 @@ class SessionCaisseController extends Controller
 
         // Décomposition du CA ci-dessus : sur TOUTE la session, pas
         // seulement la page affichée par $ventes plus bas (paginée).
-        $totalDu = (int) $session->ventes()->with('paiements', 'reglementsClient')->get()
+        $totalDu = (int) $session->ventes()->with('paiements', 'reglementsClient', 'retours')->get()
             ->sum(fn (Vente $v) => $v->soldeDuReel());
         $avoirApplique = (int) $session->ventes()->sum('avoir_applique');
         $totalEspeces = (int) $paiementsParMoyen
@@ -129,7 +129,7 @@ class SessionCaisseController extends Controller
         // soldeDu() (colonnes Réglé/Reste dû du tableau) — chargées ici pour
         // éviter un N+1 sur chaque ligne de la page.
         $query = $session->ventes()->getQuery()
-            ->with(['paiements', 'reglementsClient', 'lignes', 'bonsLivraison.lignes'])
+            ->with(['paiements', 'reglementsClient', 'retours', 'lignes', 'bonsLivraison.lignes'])
             ->when($request->filled('recherche'), function ($q) use ($request) {
                 $recherche = $request->string('recherche');
                 $q->where('numero', 'like', "%{$recherche}%");

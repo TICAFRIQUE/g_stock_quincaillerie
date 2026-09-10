@@ -60,7 +60,7 @@ class ClientController extends Controller
     {
         return $this->pdfDepuisListe(
             'Clients',
-            ['Code', 'Nom', 'Type', 'Téléphone', 'Solde dû', 'Limite de crédit', 'Statut'],
+            ['Code', 'Nom', 'Type', 'Téléphone', 'Solde dû', 'Avoir', 'Limite de crédit', 'Statut'],
             $this->lignesExport($request),
             'clients.pdf',
         );
@@ -70,7 +70,7 @@ class ClientController extends Controller
     {
         return $this->excelDepuisListe(
             'Clients',
-            ['Code', 'Nom', 'Type', 'Téléphone', 'Solde dû', 'Limite de crédit', 'Statut'],
+            ['Code', 'Nom', 'Type', 'Téléphone', 'Solde dû', 'Avoir', 'Limite de crédit', 'Statut'],
             $this->lignesExport($request),
             'clients.xlsx',
         );
@@ -95,15 +95,20 @@ class ClientController extends Controller
             ->groupBy('client_id')
             ->pluck('solde', 'client_id');
 
-        return $clients->map(fn (Client $c) => [
-            $c->code,
-            $c->nom,
-            $c->typeClient->nom ?? '—',
-            $c->telephone ?? '—',
-            montant($soldes[$c->id] ?? 0),
-            $c->limite_credit !== null ? montant($c->limite_credit) : 'Illimitée',
-            $c->actif ? 'Actif' : 'Inactif',
-        ]);
+        return $clients->map(function (Client $c) use ($soldes) {
+            $solde = (int) ($soldes[$c->id] ?? 0);
+
+            return [
+                $c->code,
+                $c->nom,
+                $c->typeClient->nom ?? '—',
+                $c->telephone ?? '—',
+                montant(max($solde, 0)),
+                montant(max(-$solde, 0)),
+                $c->limite_credit !== null ? montant($c->limite_credit) : 'Illimitée',
+                $c->actif ? 'Actif' : 'Inactif',
+            ];
+        });
     }
 
     public function create(): View
@@ -165,11 +170,11 @@ class ClientController extends Controller
 
         // Le "reste dû" par vente (bouton "Régler cette dette") a besoin de
         // soldeDuReel() sur la vente référencée : précharger ses
-        // paiements/règlements pour éviter un N+1 (voir Vente::soldeDuReel()).
+        // paiements/règlements/retours pour éviter un N+1 (voir Vente::soldeDuReel()).
         $ecritures = $client->ecritures()
             ->with(['auteur', 'reference' => function ($morphTo) {
                 $morphTo->morphWith([
-                    Vente::class => ['paiements', 'reglementsClient'],
+                    Vente::class => ['paiements', 'reglementsClient', 'retours'],
                     RetourVente::class => ['lignes.produit'],
                     RemboursementAvoirClient::class => ['paiements'],
                 ]);
@@ -182,7 +187,7 @@ class ClientController extends Controller
         // logique que le ticket de vente.
         $ventes = $client->ventes()
             ->withTrashed()
-            ->with(['magasin', 'paiements', 'reglementsClient', 'lignes', 'bonsLivraison.lignes'])
+            ->with(['magasin', 'paiements', 'reglementsClient', 'lignes', 'retours', 'bonsLivraison.lignes'])
             ->latest('created_at')
             ->paginate(10, ['*'], 'ventes_page');
 

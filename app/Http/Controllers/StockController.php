@@ -88,12 +88,16 @@ class StockController extends Controller
         $spreadsheet = new Spreadsheet();
         $feuille = $spreadsheet->getActiveSheet();
         $feuille->setTitle('État du stock');
-        $feuille->fromArray(['Produit', 'SKU', 'Stock', 'Seuil d\'alerte', 'Prix de vente'], null, 'A1');
+        $feuille->fromArray(['Produit', 'SKU', 'Stock', 'Seuil d\'alerte', 'Prix de vente', 'Coût moyen pondéré'], null, 'A1');
 
         $ligne = 2;
         foreach ($produits as $produit) {
-            $detail = collect($produit->stockParMagasin($magasinsAffiches))
+            $stockParMagasin = $produit->stockParMagasin($magasinsAffiches);
+            $detail = collect($stockParMagasin)
                 ->map(fn (array $l) => $l['magasin']->nom.' : '.quantite($l['quantite']))
+                ->implode(' | ');
+            $detailCmp = collect($stockParMagasin)
+                ->map(fn (array $l) => $l['magasin']->nom.' : '.montant($l['cout_moyen_pondere']))
                 ->implode(' | ');
 
             $feuille->setCellValue("A{$ligne}", $produit->libelle_affichage);
@@ -101,10 +105,11 @@ class StockController extends Controller
             $feuille->setCellValue("C{$ligne}", $detail);
             $feuille->setCellValue("D{$ligne}", $produit->seuil_alerte);
             $feuille->setCellValue("E{$ligne}", $produit->prix_piece);
+            $feuille->setCellValue("F{$ligne}", $detailCmp);
             $ligne++;
         }
 
-        foreach (['A', 'B', 'C', 'D', 'E'] as $colonne) {
+        foreach (['A', 'B', 'C', 'D', 'E', 'F'] as $colonne) {
             $feuille->getColumnDimension($colonne)->setAutoSize(true);
         }
 

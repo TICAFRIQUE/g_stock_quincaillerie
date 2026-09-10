@@ -301,13 +301,18 @@ Route::middleware(['auth', 'abonnement.actif'])->group(function () {
         Route::get('sessions/{session}/vente', [VenteController::class, 'create'])->name('ventes.create');
         Route::post('sessions/{session}/vente', [VenteController::class, 'store'])->name('ventes.store');
         Route::get('produits/{produit}/stock-magasins', [ProduitController::class, 'stockParMagasin'])->name('produits.stock-magasins');
-        // withTrashed() : une vente annulée reste consultable (ticket avec
-        // mention "Annulée"), jamais un 404.
-        Route::get('ventes/{vente}/ticket', [VenteController::class, 'ticket'])->name('ventes.ticket')->withTrashed();
         Route::get('ventes/{vente}/facture', [VenteController::class, 'facture'])->name('ventes.facture')->withTrashed();
         Route::get('ventes/{vente}/pdf', [VenteController::class, 'pdf'])->name('ventes.pdf')->withTrashed();
         Route::get('ventes/{vente}/excel', [VenteController::class, 'excel'])->name('ventes.excel')->withTrashed();
     });
+
+    // Hors du groupe can:vente.creer : un utilisateur n'ayant que vente.livrer
+    // (livreur/magasinier sans droit de vente) doit pouvoir ouvrir la fiche
+    // d'une facture pour y enregistrer une livraison, sans avoir besoin de
+    // vente.creer — le contrôle se fait dans VenteController::ticket() lui-même
+    // (vente.creer OU vente.livrer). withTrashed() : une vente annulée reste
+    // consultable (ticket avec mention "Annulée"), jamais un 404.
+    Route::get('ventes/{vente}/ticket', [VenteController::class, 'ticket'])->name('ventes.ticket')->withTrashed();
 
     Route::middleware('can:vente.signaler')->group(function () {
         Route::post('ventes/{vente}/signaler', [VenteController::class, 'signaler'])->name('ventes.signaler');
@@ -324,6 +329,7 @@ Route::middleware(['auth', 'abonnement.actif'])->group(function () {
     });
 
     Route::middleware('can:vente.livrer')->group(function () {
+        Route::get('bons-livraison', [BonLivraisonController::class, 'index'])->name('bons-livraison.index');
         Route::post('ventes/{vente}/bons-livraison', [BonLivraisonController::class, 'store'])->name('ventes.bons-livraison.store');
         // withTrashed() : un bon de livraison annulé reste consultable
         // (badge "Annulé"), jamais un 404 — même logique que ventes.facture.

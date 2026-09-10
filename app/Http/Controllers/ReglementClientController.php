@@ -32,7 +32,7 @@ class ReglementClientController extends Controller
         // reste dû par facture ne bougeait jamais (voir CLAUDE.md règle 14,
         // Vente::montantRegle()/soldeDuReel()).
         $clients = Client::actifsAvecDette();
-        $clients->load(['ventes.paiements', 'ventes.reglementsClient']);
+        $clients->load(['ventes.paiements', 'ventes.reglementsClient', 'ventes.retours']);
         $clients->each(function (Client $client) {
             $client->facturesOuvertes = $client->ventes
                 ->filter(fn (Vente $v) => $v->soldeDuReel() > 0)
@@ -69,7 +69,7 @@ class ReglementClientController extends Controller
         // client, qui peut inclure d'autres ventes) — même principe que
         // ReglementFournisseurController::store().
         if ($vente) {
-            $vente->loadMissing('paiements', 'reglementsClient');
+            $vente->loadMissing('paiements', 'reglementsClient', 'retours');
             $montantTotal = array_sum(array_column($donnees['paiements'], 'montant'));
             if ($montantTotal > $vente->soldeDuReel()) {
                 return back()->withInput()->with('erreur', 'Le montant dépasse le reste dû sur cette vente ('.number_format($vente->soldeDuReel(), 0, ',', ' ').' F).');

@@ -10,6 +10,102 @@ pas supprimer les entrées cochées (historique).
 
 ---
 
+## 2026-09-10 — retours déduits du "reste dû" + coût moyen pondéré par magasin
+
+- [ ] **Correctif : un retour (client ou fournisseur) déjà enregistré déduit
+  maintenant le "reste dû" affiché** sur la facture/le bon de commande
+  concerné (`Vente::soldeDuReel()`, `CommandeAchat::resteDu()`) — jusqu'ici
+  un retour créditait bien l'avoir du compte (règle 18), mais le "reste dû"
+  affiché sur CE document précis ne bougeait jamais, ce qui pouvait laisser
+  croire à une dette encore ouverte alors qu'elle était déjà couverte par le
+  retour. Impacte aussi les KPI "Total ventes"/"Total achats" (fiches
+  client/fournisseur, désormais nets des retours) et les exports PDF/Excel
+  clients/fournisseurs/commandes (nouvelle colonne "Avoir"/"Retours").
+  Déploiement standard, aucune migration (recalcul à la volée, aucune donnée
+  historique modifiée).
+  - [ ] **Tester après déploiement** : ouvrir une facture/un bon de commande
+    ayant déjà un retour enregistré → vérifier que le "reste dû" en tient
+    compte ; vérifier la nouvelle colonne "Avoir" sur les listes et exports
+    clients/fournisseurs.
+- [ ] **Nouveau : coût moyen pondéré (CMP) par magasin** affiché sur l'état de
+  stock (`/stock`), export Excel et PDF — jusqu'ici seule la quantité par
+  magasin y figurait, pas le CMP (déjà utilisé en interne pour la marge).
+  Déploiement standard, aucune migration (donnée déjà stockée sur `Stock`,
+  simple affichage supplémentaire).
+
+## 2026-09-09 — onglet "Bon de livraison" (liste globale)
+
+- [ ] **Nouveau : liste globale des factures à livrer** (`/bons-livraison`, menu
+  Vente → Bon de livraison). Déploiement standard, aucune migration. Deux
+  changements de code à connaître :
+  - `ventes/{vente}/ticket` n'exige plus la permission `vente.creer` au niveau
+    de la route — le contrôle se fait maintenant dans
+    `VenteController::ticket()` (`vente.creer` OU `vente.livrer`), pour qu'un
+    utilisateur n'ayant que `vente.livrer` (livreur/magasinier) puisse ouvrir
+    une facture et y enregistrer une livraison.
+  - La liste couvre **toutes** les ventes non entièrement livrées (comptant
+    comme crédit, sans restriction par type de client) — aucun impact sur les
+    ventes déjà livrées à 100 %.
+  **Tester après déploiement** : avec un utilisateur n'ayant que
+  `vente.livrer` (pas `vente.creer`), vérifier l'accès à `/bons-livraison`,
+  l'ouverture d'une facture depuis cette liste, et l'enregistrement d'une
+  livraison — sans session de caisse ouverte. Vérifier aussi qu'un utilisateur
+  avec seulement `vente.creer` garde l'accès normal au ticket (non-régression).
+- [ ] **Rappel** : `vente.livrer` n'est actuellement coché pour aucun rôle sur
+  ce déploiement — l'accorder sur `/roles` au(x) rôle(s) concerné(s) (ex.
+  Caissier, ou un rôle dédié), sans quoi seul le Superadmin verra le nouvel
+  onglet.
+
+---
+
+## 2026-09-07 — correctifs suite à l'audit de sécurité
+
+- [ ] **Correctif : rôle « Gérant » seedé n'obtient plus `utilisateur.gerer`/
+  `role.gerer` par défaut** (`database/seeders/RolePermissionSeeder.php`) —
+  ces deux permissions sont réservées Superadmin (`config/permissions.php`,
+  `superadmin_only`) car elles permettent de créer des comptes/rôles
+  arbitraires ; le Gérant seedé les recevait pourtant intégralement via
+  `syncPermissions(config('permissions.catalogue'))`. Corrigé pour les
+  **nouvelles installations** uniquement (le seeder ne re-synchronise jamais
+  un rôle déjà existant, pour ne pas écraser une personnalisation faite
+  depuis `/roles`).
+  - [ ] **Action manuelle requise sur toute installation existante** : en tant
+    que Superadmin, ouvrir `/roles`, éditer le rôle **Gérant** et décocher
+    `utilisateur.gerer` et `role.gerer` s'ils sont cochés. Aucune commande,
+    aucune migration — juste ce clic en interface.
+- [ ] **Correctif : blocage anti-brute-force du code de connexion, désormais
+  aussi par compte (indépendant de l'IP)** (`AuthenticatedSessionController`)
+  — le verrou existant (identifiant + IP, 5 tentatives/60 s) ne bloquait rien
+  pour un attaquant changeant d'IP à chaque tentative. Nouveau verrou
+  complémentaire par identifiant seul (15 tentatives/15 min, toutes IP
+  confondues). Aucune configuration serveur requise (utilise le cache
+  applicatif existant).
+- [ ] **Correctif : ajustement/casse de stock désormais restreint au magasin
+  du gérant** (`StockMouvementController::store()`) — un gérant ne peut plus
+  ajuster/casser du stock d'un magasin qui n'est pas le sien (même garde que
+  sur les ventes/sessions de caisse). Un transfert reste inchangé (vise par
+  nature deux magasins).
+- [ ] **Dépendances mises à jour (vulnérabilités connues corrigées)** :
+  `guzzlehttp/guzzle` 7.14.1 → 7.15.5, `league/commonmark` 2.8.3 → 2.10.0
+  (`composer audit` confirmait 16 advisories, dont un XSS et plusieurs déni
+  de service sur commonmark ; 0 après mise à jour). Côté front,
+  `npm audit fix` a nettoyé `nanoid`/`postcss` (0 vulnérabilité restante).
+  Déploiement standard, plus :
+  ```
+  composer install --no-dev --optimize-autoloader
+  npm ci && npm run build
+  ```
+  Aucune migration.
+- [ ] **`SESSION_SECURE_COOKIE=true` à ajouter au `.env` serveur** (site déjà
+  en HTTPS) — nouvelle variable documentée dans `.env.example` et dans la
+  check-list `DEPLOIEMENT.md`, absente jusqu'ici : sans elle le cookie de
+  session peut être transmis en clair.
+- [ ] **Tester après déploiement** : connexion avec un compte Gérant existant
+  (toujours fonctionnelle) ; vérifier dans `/roles` que Gérant n'a plus
+  `utilisateur.gerer`/`role.gerer` après l'action manuelle ci-dessus ; tenter
+  un ajustement de stock depuis un compte Gérant sur un magasin qui n'est pas
+  le sien (URL forgée) → doit être refusé (403).
+
 ## 2026-09-04
 
 - [ ] **Correctif : règlement de dette client, désormais uniquement par

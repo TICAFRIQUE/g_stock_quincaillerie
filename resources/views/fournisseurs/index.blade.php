@@ -31,22 +31,26 @@
                         <x-th-tri champ="nom" label="Nom" />
                         <th>Téléphone</th>
                         <th>E-mail</th>
-                        <th>Solde</th>
+                        <th>Solde dû</th>
+                        <th>Avoir</th>
                         <x-th-tri champ="actif" label="Statut" />
                         <th class="text-end d-print-none">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($fournisseurs as $fournisseur)
-                        @php $solde = (int) ($soldes[$fournisseur->id] ?? 0); @endphp
+                        @php
+                            $solde = (int) ($soldes[$fournisseur->id] ?? 0);
+                            $soldeDu = max($solde, 0);
+                            $avoir = max(-$solde, 0);
+                        @endphp
                         <tr>
                             <td><code>{{ $fournisseur->code }}</code></td>
                             <td><a href="{{ route('fournisseurs.show', $fournisseur) }}">{{ $fournisseur->nom }}</a></td>
                             <td>{{ $fournisseur->telephone ?? '—' }}</td>
                             <td>{{ $fournisseur->email ?? '—' }}</td>
-                            <td class="{{ $solde > 0 ? 'text-danger fw-medium' : ($solde < 0 ? 'text-success fw-medium' : '') }}">
-                                {{ montant($solde) }}{{ $solde < 0 ? ' (avoir)' : '' }}
-                            </td>
+                            <td class="{{ $soldeDu > 0 ? 'text-danger fw-medium' : '' }}">{{ montant($soldeDu) }}</td>
+                            <td class="{{ $avoir > 0 ? 'text-success fw-medium' : '' }}">{{ montant($avoir) }}</td>
                             <td>
                                 @if ($fournisseur->actif)
                                     <span class="badge text-bg-success">Actif</span>
@@ -64,7 +68,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center text-secondary py-4">Aucun fournisseur pour l'instant.</td>
+                            <td colspan="8" class="text-center text-secondary py-4">Aucun fournisseur pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>

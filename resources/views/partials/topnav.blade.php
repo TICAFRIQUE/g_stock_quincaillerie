@@ -101,10 +101,10 @@
         </li>
     @endcanany
 
-    @canany(['caisse.ouvrir', 'client.voir', 'devis.voir'])
+    @canany(['caisse.ouvrir', 'client.voir', 'devis.voir', 'vente.livrer'])
         <li class="nav-item dropdown">
             <a href="#"
-                class="nav-link dropdown-toggle {{ request()->routeIs('sessions.*', 'ventes.*', 'ventes-en-attente.*', 'reglements.*', 'devis.*', 'clients.*') ? 'active' : '' }}"
+                class="nav-link dropdown-toggle {{ request()->routeIs('sessions.*', 'ventes.*', 'ventes-en-attente.*', 'reglements.*', 'devis.*', 'clients.*', 'bons-livraison.*') ? 'active' : '' }}"
                 data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="bi bi-cart3 me-1"></i>Vente
             </a>
@@ -130,6 +130,14 @@
                         <a href="{{ route('clients.index') }}"
                             class="dropdown-item {{ request()->routeIs('clients.*') ? 'active' : '' }}">
                             <i class="bi bi-people-fill me-2"></i>Clients
+                        </a>
+                    </li>
+                @endcan
+                @can('vente.livrer')
+                    <li>
+                        <a href="{{ route('bons-livraison.index') }}"
+                            class="dropdown-item {{ request()->routeIs('bons-livraison.*') ? 'active' : '' }}">
+                            <i class="bi bi-truck me-2"></i>Bon de livraison
                         </a>
                     </li>
                 @endcan

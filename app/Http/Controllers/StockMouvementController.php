@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\MouvementStockType;
 use App\Exceptions\StockInsuffisantException;
+use App\Http\Controllers\Concerns\AutoriseMagasin;
 use App\Models\Magasin;
 use App\Models\MouvementStock;
 use App\Models\Produit;
@@ -17,6 +18,8 @@ use Illuminate\View\View;
 
 class StockMouvementController extends Controller
 {
+    use AutoriseMagasin;
+
     public function index(Request $request): View
     {
         $debut = $request->filled('date_debut') ? Carbon::parse($request->string('date_debut')) : now()->startOfMonth();
@@ -73,6 +76,11 @@ class StockMouvementController extends Controller
             'quantite' => ['required', 'numeric', 'min:0.001'],
             'motif' => ['nullable', 'string', 'max:255'],
         ]);
+
+        // Un ajustement/casse est mono-magasin (contrairement à un transfert,
+        // qui vise par nature deux magasins différents) : un gérant local ne
+        // doit pouvoir en poser que sur son propre magasin.
+        $this->assurerMagasin((int) $donnees['magasin_id']);
 
         $estCasse = $donnees['type'] === 'casse';
         $type = $estCasse ? MouvementStockType::Casse : MouvementStockType::Ajustement;

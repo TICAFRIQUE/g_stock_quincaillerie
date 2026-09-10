@@ -36,22 +36,34 @@
         </div>
     </div>
 
+    @php
+        $soldeDu = max($solde, 0);
+        $avoir = max(-$solde, 0);
+    @endphp
+
+    {{-- Ordre logique : activité (total achats, nombre de bons) → ce qui a
+         déjà été réglé → ce qui reste (dû, puis avoir — les deux gardés côte
+         à côte, issus de la dissociation du même solde). --}}
     <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
-            <x-kpi-card label="Solde du compte" icon="bi-cash-stack" :color="$solde > 0 ? 'danger' : 'success'"
-                :value="montant($solde) . ($solde < 0 ? ' (avoir)' : '')" />
-        </div>
-        <div class="col-6 col-md-3">
-            <x-kpi-card label="Total achats" icon="bi-graph-up-arrow" color="info"
+        <div class="col-6 col-md-4 col-lg-2">
+            <x-kpi-card label="Total achats net" icon="bi-graph-up-arrow" color="info"
                 :value="montant($totalAchats)" />
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4 col-lg-2">
             <x-kpi-card label="Bons de commande" icon="bi-truck" color="primary"
                 :value="$fournisseur->commande_achats_count" />
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4 col-lg-2">
             <x-kpi-card label="Total réglé" icon="bi-check2-circle" color="success"
                 :value="montant($totalRegle)" />
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <x-kpi-card label="Solde dû" icon="bi-cash-stack" :color="$soldeDu > 0 ? 'danger' : 'secondary'"
+                :value="montant($soldeDu)" />
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <x-kpi-card label="Avoir" icon="bi-piggy-bank" :color="$avoir > 0 ? 'success' : 'secondary'"
+                :value="montant($avoir)" />
         </div>
     </div>
 
@@ -79,7 +91,8 @@
                         <th>Destination(s)</th>
                         <th>Statut</th>
                         <th>Réception</th>
-                        <th class="text-end">Total TTC</th>
+                        <th>Retours</th>
+                        <th class="text-end">Montant facturé</th>
                         <th class="text-end">Réglé</th>
                         <th class="text-end">Reste dû</th>
                         <th class="text-end">Actions</th>
@@ -104,6 +117,15 @@
                                 @if ($commande->statut === 'validee')
                                     <span class="small {{ $commande->tauxCompletion() >= 100 ? 'text-success' : ($commande->tauxCompletion() > 0 ? 'text-warning-emphasis' : 'text-secondary') }}">
                                         {{ quantite($commande->quantiteRecuePieces()) }}/{{ quantite($commande->quantiteCommandeePieces()) }} · {{ $commande->tauxCompletion() }} %
+                                    </span>
+                                @else
+                                    <span class="text-secondary">—</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if ($commande->retours->isNotEmpty())
+                                    <span class="badge text-bg-warning-subtle text-warning-emphasis">
+                                        {{ $commande->retours->count() }} · {{ montant($commande->retours->sum('montant_total')) }}
                                     </span>
                                 @else
                                     <span class="text-secondary">—</span>
@@ -138,7 +160,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center text-secondary py-4">Aucune commande pour ce fournisseur.</td>
+                            <td colspan="10" class="text-center text-secondary py-4">Aucune commande pour ce fournisseur.</td>
                         </tr>
                     @endforelse
                 </tbody>

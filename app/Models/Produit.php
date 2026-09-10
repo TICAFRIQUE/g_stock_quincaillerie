@@ -177,19 +177,21 @@ class Produit extends Model implements HasMedia
      * produit (N+1).
      *
      * @param  iterable<Magasin>  $magasins
-     * @return array<int, array{magasin: Magasin, quantite: float, sous_seuil: bool}>
+     * @return array<int, array{magasin: Magasin, quantite: float, sous_seuil: bool, cout_moyen_pondere: int}>
      */
     public function stockParMagasin(iterable $magasins): array
     {
         $stocksParMagasin = $this->stocks->keyBy('magasin_id');
 
         return collect($magasins)->map(function (Magasin $magasin) use ($stocksParMagasin) {
-            $quantite = (float) ($stocksParMagasin->get($magasin->id)?->quantite ?? 0);
+            $stock = $stocksParMagasin->get($magasin->id);
+            $quantite = (float) ($stock?->quantite ?? 0);
 
             return [
                 'magasin' => $magasin,
                 'quantite' => $quantite,
                 'sous_seuil' => $quantite <= $this->seuil_alerte,
+                'cout_moyen_pondere' => (int) ($stock?->cout_moyen_pondere ?? 0),
             ];
         })->all();
     }

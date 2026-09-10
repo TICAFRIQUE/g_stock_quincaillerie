@@ -101,6 +101,7 @@
                         <th>Stock</th>
                         <th>Seuil d'alerte</th>
                         <th>Prix de vente</th>
+                        <th>Coût moyen pondéré</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -110,10 +111,11 @@
                             <td><x-stock-par-magasin :produit="$produit" :magasins="$magasinsAffiches" /></td>
                             <td>{{ $produit->seuil_alerte }}</td>
                             <td>{{ montant($produit->prix_piece) }}</td>
+                            <td><x-cmp-par-magasin :produit="$produit" :magasins="$magasinsAffiches" /></td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="text-center text-secondary py-4">Aucun produit trouvé.</td>
+                            <td colspan="5" class="text-center text-secondary py-4">Aucun produit trouvé.</td>
                         </tr>
                     @endforelse
                 </tbody>

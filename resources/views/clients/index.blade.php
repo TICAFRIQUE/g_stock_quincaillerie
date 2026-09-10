@@ -32,6 +32,7 @@
                         <th>Type</th>
                         <th>Téléphone</th>
                         <th>Solde dû</th>
+                        <th>Avoir</th>
                         <th>Limite de crédit</th>
                         <x-th-tri champ="actif" label="Statut" />
                         <th class="text-end d-print-none">Actions</th>
@@ -39,13 +40,18 @@
                 </thead>
                 <tbody>
                     @forelse ($clients as $client)
-                        @php $solde = (int) ($soldes[$client->id] ?? 0); @endphp
+                        @php
+                            $solde = (int) ($soldes[$client->id] ?? 0);
+                            $soldeDu = max($solde, 0);
+                            $avoir = max(-$solde, 0);
+                        @endphp
                         <tr>
                             <td><code>{{ $client->code }}</code></td>
                             <td><a href="{{ route('clients.show', $client) }}">{{ $client->nom }}</a></td>
                             <td>{{ $client->typeClient->nom ?? '—' }}</td>
                             <td>{{ $client->telephone ?? '—' }}</td>
-                            <td class="{{ $solde > 0 ? 'text-danger fw-medium' : '' }}">{{ montant($solde) }}</td>
+                            <td class="{{ $soldeDu > 0 ? 'text-danger fw-medium' : '' }}">{{ montant($soldeDu) }}</td>
+                            <td class="{{ $avoir > 0 ? 'text-success fw-medium' : '' }}">{{ montant($avoir) }}</td>
                             <td>{{ $client->limite_credit !== null ? montant($client->limite_credit) : 'Illimitée' }}</td>
                             <td>
                                 @if ($client->actif)
@@ -64,7 +70,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-secondary py-4">Aucun client pour l'instant.</td>
+                            <td colspan="9" class="text-center text-secondary py-4">Aucun client pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>

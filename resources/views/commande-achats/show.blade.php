@@ -48,11 +48,12 @@
         $lignesAReceptionner = $commande->lignes->filter(
             fn ($ligne) => (float) $ligne->quantite_pieces - ($dejaRecuParLigne[$ligne->id] ?? 0) > 0
         );
+        $quantiteRetournee = (float) $commande->retours->flatMap->lignes->sum('quantite_pieces');
     @endphp
 
     @if ($commande->statut === 'validee' && ! $commande->trashed())
         <div class="row g-3 mb-3">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card h-100 shadow-sm border-0 border-start border-4 border-info">
                     <div class="card-body">
                         <div class="text-secondary small">Réception</div>
@@ -60,11 +61,14 @@
                         <div class="small text-secondary">
                             Reste à recevoir : <span class="{{ $commande->quantiteResteARecevoirPieces() > 0 ? 'text-warning-emphasis fw-medium' : '' }}">{{ quantite($commande->quantiteResteARecevoirPieces()) }}</span>
                             · {{ $commande->tauxCompletion() }} %
+                            @if ($quantiteRetournee > 0)
+                                · dont {{ quantite($quantiteRetournee) }} retournée(s)
+                            @endif
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card h-100 shadow-sm border-0 border-start border-4 border-primary">
                     <div class="card-body">
                         <div class="text-secondary small">Montant</div>
@@ -78,13 +82,24 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card h-100 shadow-sm border-0 border-start border-4 border-secondary">
                     <div class="card-body">
                         <div class="text-secondary small">Réceptions</div>
                         <div class="fs-4 fw-bold">{{ $commande->receptions->count() }}</div>
                         <div class="small text-secondary">
                             Reste dû : {{ number_format($commande->resteDu(), 0, ',', ' ') }} F
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100 shadow-sm border-0 border-start border-4 border-warning">
+                    <div class="card-body">
+                        <div class="text-secondary small">Retours</div>
+                        <div class="fs-4 fw-bold">{{ quantite($quantiteRetournee) }} pièce(s)</div>
+                        <div class="small text-secondary">
+                            {{ $commande->retours->count() }} retour(s) · {{ number_format($commande->retours->sum('montant_total'), 0, ',', ' ') }} F
                         </div>
                     </div>
                 </div>
@@ -285,14 +300,14 @@
     @endif
 
     @if ($commande->retours->isNotEmpty())
-        <div class="card mt-3">
+        <div class="card mt-3 bg-warning-subtle border-0">
             <div class="card-body">
-                <h3 class="h6">Retours</h3>
+                <h3 class="h6 text-warning-emphasis"><i class="bi bi-arrow-return-left me-1"></i>Retours</h3>
                 @foreach ($commande->retours as $retour)
-                    <div class="small border-bottom py-1 text-info-emphasis">
+                    <div class="small border-bottom border-warning-subtle py-1 text-warning-emphasis">
                         <div class="d-flex justify-content-between">
                             <span>
-                                <i class="bi bi-arrow-return-left me-1"></i><code>{{ $retour->numero }}</code>
+                                <code>{{ $retour->numero }}</code>
                                 du {{ $retour->created_at->format('d/m/Y H:i') }}
                                 par {{ $retour->auteur?->name ?? 'utilisateur supprimé' }}
                             </span>
@@ -417,9 +432,13 @@
                         // reçue à plusieurs destinations en une seule réception
                         // (voir ajouterDestination) — un même produit livré et
                         // réparti sur plusieurs sites d'un coup.
+                        // Pré-rempli au reste à recevoir (cas le plus fréquent :
+                        // tout réceptionner d'un coup) — l'utilisateur réduit la
+                        // valeur lui-même pour une réception partielle, même
+                        // logique que le bon de livraison (ventes/ticket.blade.php).
                         groupes: {{ $lignesAReceptionner->mapWithKeys(fn ($l) => [$l->id => [[
                             'magasin_id' => $l->magasin_destination_id ?? '',
-                            'quantite_pieces' => 0,
+                            'quantite_pieces' => (float) $l->quantite_pieces - ($dejaRecuParLigne[$l->id] ?? 0),
                             'prix_achat_reel' => $l->prixAchatParPiece(),
                         ]]])->toJson() }},
                         sommeGroupe(ligneId) {

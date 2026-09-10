@@ -54,7 +54,8 @@
                         <x-th-tri champ="statut" label="Statut" />
                         <th>Type</th>
                         <th>Réception</th>
-                        <th class="text-end">Montant dû</th>
+                        <th>Retours</th>
+                        <th class="text-end">Montant facturé</th>
                         <th class="text-end">Déjà réglé</th>
                         <th class="text-end">Reste à régler</th>
                         <th class="text-end">Actions</th>
@@ -89,6 +90,15 @@
                                     <span class="text-secondary">—</span>
                                 @endif
                             </td>
+                            <td>
+                                @if ($commande->retours->isNotEmpty())
+                                    <span class="badge text-bg-warning-subtle text-warning-emphasis">
+                                        {{ $commande->retours->count() }} · {{ montant($commande->retours->sum('montant_total')) }}
+                                    </span>
+                                @else
+                                    <span class="text-secondary">—</span>
+                                @endif
+                            </td>
                             @if ($commande->statut === 'validee')
                                 <td class="text-end">{{ montant($commande->totalTtcReel()) }}</td>
                                 <td class="text-end text-success">{{ montant($commande->montantRegle()) }}</td>
@@ -107,7 +117,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="text-center text-secondary py-4">Aucun bon de commande pour l'instant.</td>
+                            <td colspan="11" class="text-center text-secondary py-4">Aucun bon de commande pour l'instant.</td>
                         </tr>
                     @endforelse
                 </tbody>

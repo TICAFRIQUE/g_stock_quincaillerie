@@ -39,13 +39,17 @@
         </div>
     </div>
 
+    @php
+        $soldeDu = max($solde, 0);
+        $avoir = max(-$solde, 0);
+    @endphp
+
+    {{-- Ordre logique : activité (CA, nombre de ventes) → ce qui a déjà été
+         réglé → ce qui reste (dû, puis avoir — les deux gardés côte à côte,
+         issus de la dissociation du même solde) → politique de crédit. --}}
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-4 col-lg-2">
-            <x-kpi-card label="Solde du compte" icon="bi-cash-stack" :color="$solde > 0 ? 'danger' : 'success'"
-                :value="montant($solde) . ($solde < 0 ? ' (avoir)' : '')" />
-        </div>
-        <div class="col-6 col-md-4 col-lg-2">
-            <x-kpi-card label="Chiffre d'affaires" icon="bi-graph-up-arrow" color="info"
+            <x-kpi-card label="Total ventes net" icon="bi-graph-up-arrow" color="info"
                 :value="montant($totalVentes)" />
         </div>
         <div class="col-6 col-md-4 col-lg-2">
@@ -57,8 +61,12 @@
                 :value="montant($totalRegle)" />
         </div>
         <div class="col-6 col-md-4 col-lg-2">
-            <x-kpi-card label="Panier moyen" icon="bi-basket" color="warning"
-                :value="montant($client->ventes_count > 0 ? intdiv($totalVentes, $client->ventes_count) : 0)" />
+            <x-kpi-card label="Solde dû" icon="bi-cash-stack" :color="$soldeDu > 0 ? 'danger' : 'secondary'"
+                :value="montant($soldeDu)" />
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <x-kpi-card label="Avoir" icon="bi-piggy-bank" :color="$avoir > 0 ? 'success' : 'secondary'"
+                :value="montant($avoir)" />
         </div>
         <div class="col-6 col-md-4 col-lg-2">
             <x-kpi-card label="Limite de crédit" icon="bi-shield-check" color="secondary"
@@ -79,6 +87,7 @@
                         <th>Date</th>
                         <th>Magasin</th>
                         <th>Statut</th>
+                        <th>Retours</th>
                         <th class="text-end">Total</th>
                         <th class="text-end">Réglé</th>
                         <th class="text-end">Reste dû</th>
@@ -97,6 +106,15 @@
                                     <span class="badge text-bg-danger">Annulée</span>
                                 @else
                                     <span class="badge text-bg-success">Validée</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if ($vente->retours->isNotEmpty())
+                                    <span class="badge text-bg-warning-subtle text-warning-emphasis">
+                                        {{ $vente->retours->count() }} · {{ montant($vente->retours->sum('montant_total')) }}
+                                    </span>
+                                @else
+                                    <span class="text-secondary">—</span>
                                 @endif
                             </td>
                             <td class="text-end">{{ montant($vente->total_net) }}</td>
@@ -141,7 +159,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center text-secondary py-4">Aucune vente pour ce client.</td>
+                            <td colspan="10" class="text-center text-secondary py-4">Aucune vente pour ce client.</td>
                         </tr>
                     @endforelse
                 </tbody>

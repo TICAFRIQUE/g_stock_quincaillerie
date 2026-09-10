@@ -58,7 +58,7 @@ class RapportController extends Controller
         // Reste dû réel : nécessite paiements/reglementsClient par vente
         // (voir Vente::soldeDuReel()), donc une collection plutôt qu'un
         // simple sum() SQL — même périmètre exact que $requeteTotaux.
-        $totalDu = (int) (clone $requeteTotaux)->with('paiements', 'reglementsClient')->get()
+        $totalDu = (int) (clone $requeteTotaux)->with('paiements', 'reglementsClient', 'retours')->get()
             ->sum(fn (Vente $v) => $v->soldeDuReel());
 
         return view('rapports.ventes', [
@@ -205,7 +205,7 @@ class RapportController extends Controller
             ->when($request->filled('caisse_id'), fn ($q) => $q->whereHas('sessionCaisse', fn ($sc) => $sc->where('caisse_id', $request->integer('caisse_id'))))
             ->whereBetween('created_at', [$debut, $fin]);
 
-        $totalDu = (int) (clone $requeteTotaux)->with('paiements', 'reglementsClient')->get()
+        $totalDu = (int) (clone $requeteTotaux)->with('paiements', 'reglementsClient', 'retours')->get()
             ->sum(fn (Vente $v) => $v->soldeDuReel());
 
         return [

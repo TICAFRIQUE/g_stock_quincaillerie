@@ -124,7 +124,7 @@ class ReglementFournisseurService
 
         $commandesDues = $fournisseur->commandeAchats()
             ->where('statut', 'validee')
-            ->with('lignes', 'paiements', 'reglementsFournisseur')
+            ->with('lignes', 'paiements', 'reglementsFournisseur', 'retours', 'receptions.lignes.taxe')
             ->orderBy('date_commande')
             ->orderBy('id')
             ->get()

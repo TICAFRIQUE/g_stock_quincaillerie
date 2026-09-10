@@ -39,6 +39,7 @@
                 <th>Stock</th>
                 <th class="text-end">Seuil d'alerte</th>
                 <th class="text-end">Prix de vente</th>
+                <th class="text-end">Coût moyen pondéré</th>
             </tr>
         </thead>
         <tbody>
@@ -56,10 +57,15 @@
                     </td>
                     <td class="text-end">{{ $produit->seuil_alerte }}</td>
                     <td class="text-end">{{ montant($produit->prix_piece) }}</td>
+                    <td class="text-end">
+                        @foreach ($produit->stockParMagasin($magasinsAffiches) as $ligne)
+                            <div>{{ $ligne['magasin']->nom }} : {{ montant($ligne['cout_moyen_pondere']) }}</div>
+                        @endforeach
+                    </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="5" class="text-end">Aucun produit.</td>
+                    <td colspan="6" class="text-end">Aucun produit.</td>
                 </tr>
             @endforelse
         </tbody>

@@ -330,6 +330,11 @@ class VenteController extends Controller
 
     public function ticket(Vente $vente): View
     {
+        // Route ouverte hors du groupe can:vente.creer (voir routes/web.php) :
+        // un utilisateur n'ayant que vente.livrer (livreur/magasinier sans
+        // droit de vente) doit pouvoir ouvrir cette fiche pour y enregistrer
+        // une livraison.
+        abort_unless(request()->user()->can('vente.creer') || request()->user()->can('vente.livrer'), 403);
         $this->assurerMagasin($vente->magasin_id);
 
         $vente->load([
@@ -423,7 +428,7 @@ class VenteController extends Controller
     {
         $this->assurerMagasin($vente->magasin_id);
 
-        $vente->load(['client', 'magasin', 'lignes.produit', 'lignes.uniteVente', 'lignes.taxe', 'paiements.moyenPaiement', 'reglementsClient', 'bonsLivraison.lignes']);
+        $vente->load(['client', 'magasin', 'lignes.produit', 'lignes.uniteVente', 'lignes.taxe', 'paiements.moyenPaiement', 'reglementsClient', 'retours', 'bonsLivraison.lignes']);
 
         $dejaLivreParLigne = $vente->bonsLivraison
             ->flatMap(fn ($bonLivraison) => $bonLivraison->lignes)
@@ -524,7 +529,7 @@ class VenteController extends Controller
      */
     private function chargerDonneesFacture(Vente $vente): array
     {
-        $vente->load(['client', 'magasin', 'caissier', 'sessionCaisse.caisse', 'lignes.produit', 'lignes.uniteVente', 'lignes.taxe', 'paiements.moyenPaiement', 'reglementsClient', 'bonsLivraison.lignes']);
+        $vente->load(['client', 'magasin', 'caissier', 'sessionCaisse.caisse', 'lignes.produit', 'lignes.uniteVente', 'lignes.taxe', 'paiements.moyenPaiement', 'reglementsClient', 'retours', 'bonsLivraison.lignes']);
 
         // bonsLivraison exclut déjà les BL annulés (scope global SoftDeletes) :
         // pas de filtre deleted_at à refaire ici, contrairement à ticket() qui

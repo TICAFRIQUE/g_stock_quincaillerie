@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -140,16 +141,20 @@ class Vente extends Model
     /**
      * Reste réellement dû : soldeDu() net de la part déjà couverte par un
      * avoir client au moment de la vente (avoir_applique, figé à la
-     * création — voir VenteService::vendre()). Sans ça, une facture
-     * intégralement compensée par un avoir préexistant continuait d'afficher
-     * un "reste dû" alors que le compte du client était déjà à 0 (l'avoir
-     * se déduit automatiquement de la dette posée, règle 12/20) — c'est
-     * cette valeur qu'il faut utiliser partout où "reste dû" signifie une
-     * vraie dette encore ouverte (ticket, bouton "Régler", export).
+     * création — voir VenteService::vendre()) ET des retours déjà
+     * enregistrés sur CETTE vente précise (jamais négatif — l'éventuel
+     * excédent devient un avoir sur le compte client global, pas une dette
+     * négative par document). Sans ça, une facture intégralement compensée
+     * par un avoir préexistant ou par un retour continuait d'afficher un
+     * "reste dû" alors que le compte du client était déjà à 0 (l'avoir se
+     * déduit automatiquement de la dette posée, règle 12/20) — c'est cette
+     * valeur qu'il faut utiliser partout où "reste dû" signifie une vraie
+     * dette encore ouverte (ticket, bouton "Régler", export). Suppose
+     * `paiements`, `reglementsClient` et `retours` chargées.
      */
     public function soldeDuReel(): int
     {
-        return max(0, $this->soldeDu() - $this->avoir_applique);
+        return max(0, $this->soldeDu() - $this->avoir_applique - $this->retours->sum('montant_total'));
     }
 
     /**
@@ -181,5 +186,25 @@ class Vente extends Model
     public function entierementLivree(): bool
     {
         return $this->quantiteLivreePieces() >= $this->lignes->sum('quantite_pieces');
+    }
+
+    /**
+     * Vendu > livré (bons de livraison actifs, non annulés) — couvre aussi
+     * bien une vente jamais touchée par un bon de livraison (livré = 0)
+     * qu'une livraison partielle en cours. Aucune restriction par client/
+     * type de client : toute vente non entièrement livrée qualifie (voir
+     * BonLivraisonController::index()). Comparaison SQL directe (pas de
+     * tauxCompletion() PHP ligne par ligne, qui filtrerait après
+     * pagination), même principe que CommandeAchat::scopeReceptionIncomplete().
+     */
+    public function scopeLivraisonIncomplete(Builder $query): Builder
+    {
+        return $query->whereNull('ventes.deleted_at')->whereRaw(
+            '(select coalesce(sum(lv.quantite_pieces), 0) from ligne_ventes lv where lv.vente_id = ventes.id)'
+            .' > '
+            .'(select coalesce(sum(lbl.quantite_pieces), 0) from ligne_bon_livraisons lbl'
+            .' inner join bon_livraisons bl on bl.id = lbl.bon_livraison_id'
+            .' where bl.vente_id = ventes.id and bl.deleted_at is null)'
+        );
     }
 }

@@ -173,6 +173,9 @@ sous seuil — voir `routes/console.php`).
       **AutoSSL** dans cPanel si ce n'est pas déjà fait).
 - [ ] `APP_DEBUG=false` confirmé dans le `.env` serveur (sinon les erreurs
       exposent la stack trace au lieu des pages `errors/*.blade.php`).
+- [ ] `SESSION_SECURE_COOKIE=true` confirmé dans le `.env` serveur (site en
+      HTTPS ci-dessus) — sinon le cookie de session peut être transmis en
+      clair.
 - [ ] Connexion avec un compte de test réussie.
 - [ ] Une vente de test complète fonctionne (session → panier → paiement →
       ticket).

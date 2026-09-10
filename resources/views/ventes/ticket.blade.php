@@ -6,14 +6,26 @@
     <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
         <div>
             <div class="d-flex align-items-center gap-2">
-                <x-bouton-retour :route="route('sessions.show', $vente->sessionCaisse)" />
+                {{-- Un utilisateur n'ayant que vente.livrer (pas caisse.ouvrir)
+                     peut atteindre cette page depuis /bons-livraison sans
+                     jamais pouvoir ouvrir sessions.show — le retour pointe
+                     alors vers la liste des livraisons plutôt qu'un 403. --}}
+                <x-bouton-retour :route="request()->user()->can('caisse.ouvrir') ? route('sessions.show', $vente->sessionCaisse) : route('bons-livraison.index')" />
                 <h2 class="h4 mb-0">Détail de la facture</h2>
             </div>
             <div class="text-secondary small ms-5 ps-1"><code>{{ $vente->numero }}</code></div>
         </div>
-        <a href="{{ route('ventes.create', $vente->sessionCaisse) }}" class="btn btn-primary">
-            <i class="bi bi-cart-plus me-1"></i>Nouvelle facture
-        </a>
+        @can('vente.creer')
+            {{-- $sessionOuverte : la session ouverte de L'UTILISATEUR COURANT
+                 (déjà chargée pour le bouton "Régler", règle 14), jamais celle
+                 de CETTE facture précise — souvent déjà clôturée (vieille
+                 facture), ce qui faisait 403 ("Cette session n'est plus
+                 ouverte"). Avec une session ouverte : va droit à la création.
+                 Sinon : sessions.index pour en choisir/ouvrir une. --}}
+            <a href="{{ $sessionOuverte ? route('ventes.create', $sessionOuverte) : route('sessions.index') }}" class="btn btn-primary">
+                <i class="bi bi-cart-plus me-1"></i>Nouvelle facture
+            </a>
+        @endcan
     </div>
 
     @if ($vente->trashed())
@@ -40,13 +52,15 @@
         $totalVenduPieces = $vente->lignes->sum('quantite_pieces');
         $totalLivrePieces = $dejaLivreParLigne->sum();
         $resteALivrerPieces = $totalVenduPieces - $totalLivrePieces;
+        $quantiteRetournee = (float) $vente->retours->flatMap->lignes->sum('quantite_pieces');
     @endphp
 
-    {{-- 3 KPI : qui/où/quand, montant (gros chiffre + détail réglé/reste), --}}
-    {{-- livraison (gros chiffre + détail livré/reste) — purement informatif, --}}
-    {{-- les actions sont regroupées séparément juste en dessous. --}}
+    {{-- KPI : qui/où/quand, montant (gros chiffre + détail réglé/avoir/retours/
+    reste — chaque déduction du "Reste" listée explicitement, pas seulement
+    fondue dans le chiffre final), livraison, retours — purement informatif,
+    les actions sont regroupées séparément juste en dessous. --}}
     <div class="row g-3 mb-3 d-print-none">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card h-100 bg-primary-subtle border-0">
                 <div class="card-body">
                     <div class="fw-medium">
@@ -61,7 +75,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card h-100 bg-reglement-subtle border-0">
                 <div class="card-body">
                     <div class="text-secondary small">Montant à régler</div>
@@ -71,13 +85,19 @@
                     @else
                         <div class="small text-secondary">
                             Déjà réglé : {{ montant($vente->montantRegle()) }}
+                            @if ($vente->avoir_applique > 0)
+                                · Avoir appliqué : {{ montant($vente->avoir_applique) }}
+                            @endif
+                            @if ($vente->retours->isNotEmpty())
+                                · Retours : {{ montant($vente->retours->sum('montant_total')) }}
+                            @endif
                             · Reste : <span class="{{ $vente->soldeDuReel() > 0 ? 'text-danger fw-medium' : '' }}">{{ montant($vente->soldeDuReel()) }}</span>
                         </div>
                     @endif
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card h-100 bg-info-subtle border-0">
                 <div class="card-body">
                     <div class="text-secondary small">Livraison</div>
@@ -85,6 +105,17 @@
                     <div class="small text-secondary">
                         Déjà livré : {{ $totalLivrePieces }}
                         · Reste à livrer : <span class="{{ $resteALivrerPieces > 0 ? 'text-warning-emphasis fw-medium' : '' }}">{{ $resteALivrerPieces }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100 bg-warning-subtle border-0">
+                <div class="card-body">
+                    <div class="text-secondary small">Retours</div>
+                    <div class="fs-4 fw-bold">{{ quantite($quantiteRetournee) }} pièce(s)</div>
+                    <div class="small text-secondary">
+                        {{ $vente->retours->count() }} retour(s) · {{ montant($vente->retours->sum('montant_total')) }}
                     </div>
                 </div>
             </div>
@@ -272,14 +303,14 @@
     </div>
 
     @if ($vente->retours->isNotEmpty())
-        <div class="card mb-3 d-print-none bg-light border-0">
+        <div class="card mb-3 d-print-none bg-warning-subtle border-0">
             <div class="card-body">
-                <h3 class="h6">Retours</h3>
+                <h3 class="h6 text-warning-emphasis"><i class="bi bi-arrow-return-left me-1"></i>Retours</h3>
                 @foreach ($vente->retours as $retour)
-                    <div class="small border-bottom py-1 text-info-emphasis">
+                    <div class="small border-bottom border-warning-subtle py-1 text-warning-emphasis">
                         <div class="d-flex justify-content-between">
                             <span>
-                                <i class="bi bi-arrow-return-left me-1"></i><code>{{ $retour->numero }}</code>
+                                <code>{{ $retour->numero }}</code>
                                 du {{ $retour->created_at->format('d/m/Y H:i') }}
                                 par {{ $retour->auteur?->name ?? 'utilisateur supprimé' }}
                             </span>
@@ -348,6 +379,10 @@
                                         <i class="bi bi-printer"></i>
                                         <span class="visually-hidden">Imprimer</span>
                                     </button>
+                                    <a href="{{ route('bons-livraison.pdf', $bonLivraison) }}" class="btn btn-sm btn-icon btn-outline-secondary" title="Télécharger le PDF">
+                                        <i class="bi bi-file-earmark-pdf"></i>
+                                        <span class="visually-hidden">PDF</span>
+                                    </a>
                                     @if (! $bonLivraison->trashed() && $peutLivrer)
                                         <button type="button" class="btn btn-sm btn-icon btn-outline-danger" data-bs-toggle="modal" data-bs-target="#annulerLivraisonModal{{ $bonLivraison->id }}" title="Annuler ce bon de livraison">
                                             <i class="bi bi-x-lg"></i>
@@ -799,7 +834,10 @@
             <div class="modal-dialog modal-lg">
                 <div class="modal-content"
                      x-data="{
-                        lignes: {{ $lignesLivrables->mapWithKeys(fn ($l) => [$l->id => 0])->toJson() }},
+                        // Pré-rempli au reste à livrer (cas le plus fréquent :
+                        // tout remettre d'un coup) — l'utilisateur réduit la
+                        // valeur lui-même pour une livraison partielle.
+                        lignes: {{ $lignesLivrables->mapWithKeys(fn ($l) => [$l->id => (float) $l->quantite_pieces - ($dejaLivreParLigne[$l->id] ?? 0)])->toJson() }},
                         max: {{ $lignesLivrables->mapWithKeys(fn ($l) => [$l->id => $l->quantite_pieces - ($dejaLivreParLigne[$l->id] ?? 0)])->toJson() }},
                         get total() { return Object.values(this.lignes).reduce((s, q) => s + (Number(q) || 0), 0); },
                      }">

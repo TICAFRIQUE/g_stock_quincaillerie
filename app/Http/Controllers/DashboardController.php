@@ -61,7 +61,7 @@ class DashboardController extends Controller
             return ['session' => null];
         }
 
-        $ventesSession = $session->ventes()->with('paiements', 'reglementsClient')->get();
+        $ventesSession = $session->ventes()->with('paiements', 'reglementsClient', 'retours')->get();
         $nombreVentes = $ventesSession->count();
         $totalVentes = (int) $ventesSession->sum('total_net');
 

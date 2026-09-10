@@ -54,7 +54,7 @@ class FournisseurController extends Controller
     {
         return $this->pdfDepuisListe(
             'Fournisseurs',
-            ['Code', 'Nom', 'Téléphone', 'E-mail', 'Solde dû', 'Statut'],
+            ['Code', 'Nom', 'Téléphone', 'E-mail', 'Solde dû', 'Avoir', 'Statut'],
             $this->lignesExport($request),
             'fournisseurs.pdf',
         );
@@ -64,7 +64,7 @@ class FournisseurController extends Controller
     {
         return $this->excelDepuisListe(
             'Fournisseurs',
-            ['Code', 'Nom', 'Téléphone', 'E-mail', 'Solde dû', 'Statut'],
+            ['Code', 'Nom', 'Téléphone', 'E-mail', 'Solde dû', 'Avoir', 'Statut'],
             $this->lignesExport($request),
             'fournisseurs.xlsx',
         );
@@ -89,21 +89,26 @@ class FournisseurController extends Controller
             ->groupBy('fournisseur_id')
             ->pluck('solde', 'fournisseur_id');
 
-        return $fournisseurs->map(fn (Fournisseur $f) => [
-            $f->code,
-            $f->nom,
-            $f->telephone ?? '—',
-            $f->email ?? '—',
-            montant($soldes[$f->id] ?? 0),
-            $f->actif ? 'Actif' : 'Inactif',
-        ]);
+        return $fournisseurs->map(function (Fournisseur $f) use ($soldes) {
+            $solde = (int) ($soldes[$f->id] ?? 0);
+
+            return [
+                $f->code,
+                $f->nom,
+                $f->telephone ?? '—',
+                $f->email ?? '—',
+                montant(max($solde, 0)),
+                montant(max(-$solde, 0)),
+                $f->actif ? 'Actif' : 'Inactif',
+            ];
+        });
     }
 
     public function commandesPdf(Request $request, Fournisseur $fournisseur): Response
     {
         return $this->pdfDepuisListe(
             "Bons de commande — {$fournisseur->nom}",
-            ['Numéro', 'Date', 'Destination(s)', 'Statut', 'Réception', 'Total TTC', 'Réglé', 'Reste dû'],
+            ['Numéro', 'Date', 'Destination(s)', 'Statut', 'Réception', 'Retours', 'Montant facturé', 'Réglé', 'Reste dû'],
             $this->lignesExportCommandes($request, $fournisseur),
             "bons-de-commande-{$fournisseur->code}.pdf",
         );
@@ -113,7 +118,7 @@ class FournisseurController extends Controller
     {
         return $this->excelDepuisListe(
             "Bons de commande {$fournisseur->nom}",
-            ['Numéro', 'Date', 'Destination(s)', 'Statut', 'Réception', 'Total TTC', 'Réglé', 'Reste dû'],
+            ['Numéro', 'Date', 'Destination(s)', 'Statut', 'Réception', 'Retours', 'Montant facturé', 'Réglé', 'Reste dû'],
             $this->lignesExportCommandes($request, $fournisseur),
             "bons-de-commande-{$fournisseur->code}.xlsx",
         );
@@ -129,7 +134,7 @@ class FournisseurController extends Controller
         $commandes = $fournisseur->commandeAchats()
             ->withTrashed()
             ->when($request->boolean('reception_incomplete'), fn ($q) => $q->receptionIncomplete())
-            ->with(['lignes.taxe', 'lignes.magasinDestination', 'lignes.receptions.taxe', 'paiements', 'reglementsFournisseur', 'receptions.lignes.taxe'])
+            ->with(['lignes.taxe', 'lignes.magasinDestination', 'lignes.receptions.taxe', 'paiements', 'reglementsFournisseur', 'receptions.lignes.taxe', 'retours'])
             ->latest('created_at')
             ->get();
 
@@ -139,6 +144,7 @@ class FournisseurController extends Controller
             $c->lignes->pluck('magasinDestination.nom')->filter()->unique()->implode(', ') ?: '—',
             $c->trashed() ? 'Annulée' : ($c->statut === 'validee' ? 'Validée' : 'Brouillon'),
             $c->statut === 'validee' ? quantite($c->quantiteRecuePieces()).'/'.quantite($c->quantiteCommandeePieces()).' ('.$c->tauxCompletion().' %)' : '—',
+            $c->retours->isNotEmpty() ? $c->retours->count().' · '.montant($c->retours->sum('montant_total')) : '—',
             montant($c->totalTtcReel()),
             $c->statut === 'validee' ? montant($c->montantRegle()) : '—',
             $c->statut === 'validee' ? montant($c->resteDu()) : '—',
@@ -169,7 +175,7 @@ class FournisseurController extends Controller
         $commandes = $fournisseur->commandeAchats()
             ->withTrashed()
             ->when($request->boolean('reception_incomplete'), fn ($q) => $q->receptionIncomplete())
-            ->with(['lignes.taxe', 'lignes.magasinDestination', 'lignes.receptions.taxe', 'paiements', 'reglementsFournisseur', 'receptions.lignes.taxe'])
+            ->with(['lignes.taxe', 'lignes.magasinDestination', 'lignes.receptions.taxe', 'paiements', 'reglementsFournisseur', 'receptions.lignes.taxe', 'retours'])
             ->latest('created_at')
             ->paginate(10, ['*'], 'commandes_page')
             ->withQueryString();
