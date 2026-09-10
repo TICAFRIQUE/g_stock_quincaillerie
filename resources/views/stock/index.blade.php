@@ -100,8 +100,8 @@
                         <x-th-tri champ="nom" label="Produit" />
                         <th>Stock</th>
                         <th>Seuil d'alerte</th>
-                        <th>Prix de vente</th>
                         <th>Coût moyen pondéré</th>
+                        <th>Prix de vente</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -110,8 +110,8 @@
                             <td>{{ $produit->libelle_affichage }} <code class="small">{{ $produit->sku }}</code></td>
                             <td><x-stock-par-magasin :produit="$produit" :magasins="$magasinsAffiches" /></td>
                             <td>{{ $produit->seuil_alerte }}</td>
-                            <td>{{ montant($produit->prix_piece) }}</td>
                             <td><x-cmp-par-magasin :produit="$produit" :magasins="$magasinsAffiches" /></td>
+                            <td>{{ montant($produit->prix_piece) }}</td>
                         </tr>
                     @empty
                         <tr>

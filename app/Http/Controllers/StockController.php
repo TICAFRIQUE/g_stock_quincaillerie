@@ -88,7 +88,7 @@ class StockController extends Controller
         $spreadsheet = new Spreadsheet();
         $feuille = $spreadsheet->getActiveSheet();
         $feuille->setTitle('État du stock');
-        $feuille->fromArray(['Produit', 'SKU', 'Stock', 'Seuil d\'alerte', 'Prix de vente', 'Coût moyen pondéré'], null, 'A1');
+        $feuille->fromArray(['Produit', 'SKU', 'Stock', 'Seuil d\'alerte', 'Coût moyen pondéré', 'Prix de vente'], null, 'A1');
 
         $ligne = 2;
         foreach ($produits as $produit) {
@@ -104,8 +104,8 @@ class StockController extends Controller
             $feuille->setCellValue("B{$ligne}", $produit->sku);
             $feuille->setCellValue("C{$ligne}", $detail);
             $feuille->setCellValue("D{$ligne}", $produit->seuil_alerte);
-            $feuille->setCellValue("E{$ligne}", $produit->prix_piece);
-            $feuille->setCellValue("F{$ligne}", $detailCmp);
+            $feuille->setCellValue("E{$ligne}", $detailCmp);
+            $feuille->setCellValue("F{$ligne}", $produit->prix_piece);
             $ligne++;
         }
 
